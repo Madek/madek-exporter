@@ -1,0 +1,18 @@
+jobs:
+  build:
+    name: Build the App
+    run_when:
+      on any branch:
+        type: branch
+        include_match: ^.*$
+    context:
+      tasks:
+        build:
+          traits:
+            nodejs: true
+            Leiningen: true
+            JDK: true
+            g2016: true
+          scripts:
+            prepare:
+              body: ./bin/prepare

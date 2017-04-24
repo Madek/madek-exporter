@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -eoux
+
+lein descjop-init
