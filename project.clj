@@ -18,7 +18,7 @@
             "descjop-version" ["new" "descjop" "version"]
             "descjop-init" ["do"
                             ["shell" "npm" "install"]
-                            ["shell" "grunt" "download-electron"]]
+                            ["shell" "node_modules/grunt/bin/grunt" "download-electron"]]
             "descjop-init-win" ["do"
                             ["shell" "cmd.exe" "/c" "npm" "install"]
                             ["shell" "cmd.exe" "/c" "grunt" "download-electron"]]
