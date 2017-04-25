@@ -8,8 +8,10 @@
 .lein-plugins/*
 .lein-repl-history
 .nrepl-port
-app/dev/js/
-app/prod/js/
+app/dev/js/out_front/
+app/dev/js/out_main/
+app/prod/js/out_front/
+app/prod/js/out_main/
 classes/*
 electron/*
 lib/*
@@ -17,3 +19,4 @@ node_modules/*
 out/*
 pom.xml
 target/*
+tmp/

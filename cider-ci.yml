@@ -21,3 +21,11 @@ jobs:
               start_when:
                 prepare has passed:
                   script_key: prepare
+            build-mac-os:
+              body: |
+                set -eoux
+                ./bin/build-mac-os
+                zip -r /tmp/Madek-App_Mac-OS_${CIDER_CI_TREE_ID}.zip madek-app-darwin-x64
+              start_when:
+                build-shared has passed:
+                  script_key: build-shared
