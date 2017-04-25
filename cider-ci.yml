@@ -16,3 +16,8 @@ jobs:
           scripts:
             prepare:
               body: ./bin/prepare
+            build-shared:
+              body: ./bin/build-shared
+              start_when:
+                prepare has passed:
+                  script_key: prepare
