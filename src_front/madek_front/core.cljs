@@ -1,11 +1,12 @@
 (ns madek-front.core
   (:require  [reagent.core :as reagent :refer [atom]]))
 
-(defonce state (atom {:message "Hello Reagent world"}))
+(defonce state (atom {:message "Hello Madek User!"}))
 
 (defn root-component []
-  [:h1 (:message @state)
-   [:p "with figwheel!"]])
+  [:div
+   [:p "Application loaded!"]
+   [:p (:message @state)]])
 
 (defn mount-root [setting]
   (reagent/render [root-component]

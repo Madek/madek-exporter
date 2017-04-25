@@ -15,6 +15,7 @@ app/prod/js/out_main/
 classes/*
 electron/*
 lib/*
+madek-app-darwin-x64/
 node_modules/*
 out/*
 pom.xml
