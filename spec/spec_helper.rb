@@ -13,11 +13,16 @@ require 'helpers/misc'
 APP_ROOT_DIR = \
   Pathname(File.dirname(File.absolute_path(__FILE__))).parent
 
-APP_BINARY =
-  APP_ROOT_DIR.join(
-    'madek-app-darwin-x64/madek-app.app/Contents/MacOS/madek-app').to_s
-
-# binding.pry
+APP_BINARY = \
+  case RUBY_PLATFORM
+  when 'x86_64-darwin16'
+    APP_ROOT_DIR.join(
+      'madek-app-darwin-x64/madek-app.app/Contents/MacOS/madek-app').to_s
+  when 'x86_64-linux', 'x86_64-linux-gnu'
+    APP_ROOT_DIR.join( 'madek-app-linux-x64/madek-app').to_s
+  else
+    raise "#{RUBY_PLATFORM} system not configured / not supported"
+  end
 
 RSpec.configure do |config|
   config.include Helpers::Misc
@@ -28,10 +33,10 @@ RSpec.configure do |config|
       :browser => :chrome,
       :desired_capabilities => Selenium::WebDriver::Remote::Capabilities.chrome(
         'chromeOptions' => {
-          #'args' => [ "--window-size=200,200" ]
-          'binary' => APP_BINARY
+          'binary' => APP_BINARY,
+          "args" => [ "--verbose",
+                      "--log-path=#{ENV['CIDER_CI_WORKING_DIR']}/logs/chromedriver.log"]
         }))
-    # binding.pry
   end
 
   config.before(:all) do |example|

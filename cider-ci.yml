@@ -8,11 +8,24 @@ jobs:
     context:
       tasks:
         build:
+          trial_attachments:
+            screenshots:
+              include_match: 'tmp\/.+\.png$'
+              content_type: image/png
+            logs:
+              include_match: 'logs\/.+\.log$'
+              content_type: text/plain
+
+          environment_variables:
+            RUBY_ENGINE: ruby
+            RUBY_VERSION: 2.2.4
+            RUBY: '{{RUBY_ENGINE}}-{{RUBY_VERSION}}'
           traits:
-            nodejs: true
-            Leiningen: true
             JDK: true
-            g2016: true
+            Leiningen: true
+            nodejs: true
+            ruby-install: yes
+            xorg: yes
           scripts:
             prepare:
               body: ./bin/prepare
@@ -39,3 +52,38 @@ jobs:
               start_when:
                 build-shared has passed:
                   script_key: build-shared
+            bundle:
+              exclusive_executor_resource: ruby-install_{{$RUBY}}
+              timeout: 20 Minutes
+              body: |
+                #!/usr/bin/env bash
+                set -eux
+                export PATH=~/.rubies/$RUBY/bin:$PATH
+
+                rm -f .bundle/config
+
+                if [ ! -d ~/.rubies/$RUBY ]; then
+                  ruby-install --no-install-deps $RUBY_ENGINE $RUBY_VERSION
+                fi
+
+                if [ ! -f ~/.rubies/$RUBY/bin/bundle ]; then
+                  gem install bundler
+                fi
+
+                bundle install
+            test:
+              start_when:
+                bundle has passed:
+                  script_key: bundle
+                build-linux has passed:
+                  script_key: build-linux
+              body: |
+                #!/usr/bin/env bash
+                set -eux
+                export PATH=~/.rubies/$RUBY/bin:$PATH
+                mkdir -p logs
+                xvfb-run -a -e logs/xvfb.log \
+                  bundle exec rspec
+
+
+
