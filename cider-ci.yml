@@ -15,6 +15,9 @@ jobs:
             logs:
               include_match: 'logs\/.+\.log$'
               content_type: text/plain
+            binaries:
+              include_match: '\w+\.zip'
+              content_type: application/zip
 
           environment_variables:
             RUBY_ENGINE: ruby
@@ -24,8 +27,9 @@ jobs:
             JDK: true
             Leiningen: true
             nodejs: true
-            ruby-install: yes
-            xorg: yes
+            ruby-install: true
+            wine: true
+            xorg: true
           scripts:
             prepare:
               body: ./bin/prepare
@@ -39,7 +43,16 @@ jobs:
                 set -eoux
                 ./bin/build-mac-os
                 zip -r Madek-App_Mac-OS.zip madek-app-darwin-x64
-                cp Madek-App_Mac-OS.zip /tmp/Madek-App_Mac-OS_${CIDER_CI_TREE_ID}.zip
+                # cp Madek-App_Mac-OS.zip /tmp/Madek-App_Mac-OS_${CIDER_CI_TREE_ID}.zip
+              start_when:
+                build-shared has passed:
+                  script_key: build-shared
+            build-windows:
+              body: |
+                set -eoux
+                ./bin/build-win
+                zip -r Madek-App_Windows.zip madek-app-win32-x64
+                # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
               start_when:
                 build-shared has passed:
                   script_key: build-shared
@@ -48,7 +61,7 @@ jobs:
                 set -eoux
                 ./bin/build-linux
                 zip -r Madek-App_Linux.zip madek-app-linux-x64
-                cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
+                # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
               start_when:
                 build-shared has passed:
                   script_key: build-shared

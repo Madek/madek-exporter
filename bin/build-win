@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -eoux
+rm -rf ./madek-app-win32-x64
+
+./node_modules/electron-packager/cli.js \
+  --overwrite --platform=win32 --arch=x64 --electron-version=1.6.0 \
+  --icon=Madek.icns \
+  ./app/prod madek-app
+
+#cp -rf vendor/jre_darwin/Contents/Home ./madek-app-darwin-x64/madek-app.app/Contents/Resources/jre
+
+#cp target/app-server.jar ./madek-app-darwin-x64/madek-app.app/Contents/Resources/
