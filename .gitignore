@@ -5,6 +5,7 @@
 *jar
 .DS_Store
 .lein-deps-sum
+.lein-env
 .lein-plugins/*
 .lein-repl-history
 .nrepl-port

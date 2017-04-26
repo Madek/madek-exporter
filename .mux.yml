@@ -1,0 +1,17 @@
+name: madek/app
+
+windows:
+
+  '2':
+    name: figwheel repl
+    command: >
+      rm -rf app/dev/js/out_front && rm -rf app/dev/js/out_main
+      && rm -rf app/prod/js/out_front && rm -rf app/prod/js/out_main && rm -rf target/*
+      && lein do clean, descjop-init, descjop-externs, descjop-once, descjop-figwheel
+  '3':
+    name: electron app
+    command: >
+      sleep 60
+      && ./electron/Electron.app/Contents/MacOS/Electron app/dev
+
+

@@ -3,17 +3,43 @@
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.8.0"]
+  :dependencies [
+                 [org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.473" :exclusions [org.apache.ant/ant]]
                  [org.clojure/core.async "0.2.395"]
                  [reagent "0.6.0"]
                  [ring/ring-core "1.5.1"]
-                 [figwheel "0.5.9"]]
-  :plugins [[lein-cljsbuild "1.1.5"]
+                 ]
+  :plugins [
+            [lein-cljsbuild "1.1.5"]
+            [lein-environ "1.0.2"]
             [lein-externs "0.1.6"]
+            [lein-libdir "0.1.1"]
             [lein-shell "0.5.0"]
-            [lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]]]
-  :source-paths ["src_tools"]
+            ]
+
+  :source-paths ["src_server"]
+
+  :profiles {:dev {
+                   :dependencies [
+                                  [figwheel "0.5.9"]
+                                  ]
+                   :env {:dev true}
+                   :plugins [ [lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]] ]
+                   :repl-options {:init-ns madek.app.server.main}
+                   :source-paths ["src_server", "src_front_profile/dev"]
+                   }
+
+             :uberjar {
+                       :prep-tasks ["compile"]
+                       :source-paths ["src_server"]
+                       :env {:production true}
+                       :uberjar-name "app-server.jar"
+                       :aot [madek.app.server.main]
+                       :jar true
+                       :main madek.app.server.main
+                       }
+             }
   :aliases {"descjop-help" ["new" "descjop" "help"]
             "descjop-version" ["new" "descjop" "version"]
             "descjop-init" ["do"
@@ -46,14 +72,15 @@
                                  ["cljsbuild" "once" "prod-main"]
                                  ["cljsbuild" "once" "prod-front"]]
             ;; electron packager for production
-            "descjop-uberapp-osx" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek" "--platform=darwin" "--arch=x64" "--electron-version=1.6.0"]
-            "descjop-uberapp-app-store" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek" "--platform=mas" "--arch=x64" "--electron-version=1.6.0"]
-            "descjop-uberapp-linux" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek" "--platform=linux" "--arch=x64" "--electron-version=1.6.0"]
-            "descjop-uberapp-win64" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek" "--platform=win32" "--arch=x64" "--electron-version=1.6.0"]
-            "descjop-uberapp-win32" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek" "--platform=win32" "--arch=ia32" "--electron-version=1.6.0"]
+            "descjop-uberapp-osx" ["shell" "electron-packager" "./app/prod" "madek-app" "--platform=darwin" "--arch=x64" "--electron-version=1.6.0"]
+            "descjop-uberapp-app-store" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-app" "--platform=mas" "--arch=x64" "--electron-version=1.6.0"]
+            "descjop-uberapp-linux" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-app" "--platform=linux" "--arch=x64" "--electron-version=1.6.0"]
+            "descjop-uberapp-win64" ["shell" "electron-packager" "./app/prod" "madek-app" "--platform=win32" "--arch=x64" "--electron-version=1.6.0"]
+            "descjop-uberapp-win32" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-app" "--platform=win32" "--arch=ia32" "--electron-version=1.6.0"]
             }
-  :hooks [leiningen.cljsbuild]
-  :cljsbuild {:builds {:dev-main {:source-paths ["src"]
+  ;:hooks [leiningen.cljsbuild]
+
+  :cljsbuild {:builds {:dev-main {:source-paths ["src_back"]
                                   :incremental true
                                   :jar true
                                   :assert true
@@ -78,7 +105,7 @@
                                              ;;:source-map "app/dev/js/test.js.map"
                                              :pretty-print true
                                              :output-wrapper true}}
-                       :dev-front {:source-paths ["src_front" "src_front_profile/madek_front/dev"]
+                       :dev-front {:source-paths ["src_front" "src_front_profile/dev"]
                                    :incremental true
                                    :jar true
                                    :assert true
@@ -101,7 +128,7 @@
                                               ;;:source-map "app/dev/js/test.js.map"
                                               :pretty-print true
                                               :output-wrapper true}}
-                       :prod-main {:source-paths ["src"]
+                       :prod-main {:source-paths ["src_back"]
                                    :incremental true
                                    :jar true
                                    :assert true
@@ -126,7 +153,7 @@
                                               ;;:source-map "app/prod/js/test.js.map"
                                               :pretty-print true
                                               :output-wrapper true}}
-                       :prod-front {:source-paths ["src_front" "src_front_profile/madek_front/prod"]
+                       :prod-front {:source-paths ["src_front" "src_front_profile/prod"]
                                     :incremental true
                                     :jar true
                                     :assert true
@@ -148,7 +175,13 @@
 
                                                ;;:source-map "app/prod/js/test.js.map"
                                                :pretty-print true
-                                               :output-wrapper true}}}}
+                                               :output-wrapper true}}
+                       :uberjar {
+                                 :source-paths ["src_server"]
+                                 :jar false
+                                 :compiler {}
+                                 }
+                       }}
   :figwheel {:http-server-root "public"
-             :ring-handler figwheel-middleware/app
+             :ring-handler madek-front.figwheel-middleware/app
              :server-port 3449})
