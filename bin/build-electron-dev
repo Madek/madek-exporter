@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -eou
+rm -rf \
+  app/dev/js/out_main \
+  app/dev/js/cljsbuild-main.js \
+  app/dev/js/front.js \
+  app/dev/js/out_front.js
+lein do \
+  externs electron-main-dev app/dev/js/externs.js, \
+  cljsbuild once electron-main-dev, \
+  externs electron-front-dev app/dev/js/externs_front.js, \
+  cljsbuild once electron-front-dev

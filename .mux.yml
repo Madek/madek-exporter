@@ -1,14 +1,18 @@
 name: madek/app
 
 windows:
-
-  '2':
+  2:
+    name: repl
+    command: |
+      sleep 5 && lein do repl
+    post_command_send_keys: |
+      (-main)
+  3:
     name: figwheel repl
     command: >
-      rm -rf app/dev/js/out_front && rm -rf app/dev/js/out_main
-      && rm -rf app/prod/js/out_front && rm -rf app/prod/js/out_main && rm -rf target/*
-      && lein do clean, descjop-init, descjop-externs, descjop-once, descjop-figwheel
-  '3':
+      ./bin/build-electron-dev
+      && lein do descjop-figwheel
+  5:
     name: electron app
     command: >
       sleep 60

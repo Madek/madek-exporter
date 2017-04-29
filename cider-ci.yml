@@ -8,6 +8,9 @@ jobs:
     context:
       tasks:
         build:
+          git_options:
+            submodules:
+              include_match: ^.*$
           trial_attachments:
             screenshots:
               include_match: 'tmp\/.+\.png$'
@@ -18,7 +21,6 @@ jobs:
             binaries:
               include_match: '\w+\.zip'
               content_type: application/zip
-
           environment_variables:
             RUBY_ENGINE: ruby
             RUBY_VERSION: 2.2.4
@@ -31,13 +33,33 @@ jobs:
             wine: true
             xorg: true
           scripts:
-            prepare:
-              body: ./bin/prepare
-            build-shared:
-              body: ./bin/build-shared
+            download-electron:
+              body: |
+                ./node_modules/grunt/bin/grunt download-electron
+            build-electron-front:
+              body: |
+                set -eoux
+                lein do  \
+                  externs electron-front-prod app/prod/js/externs.js, \
+                  cljsbuild once electron-front-prod
+            build-electron-main:
+              body: |
+                set -eoux
+                lein do  \
+                  externs electron-main-prod app/prod/js/externs.js, \
+                  cljsbuild once electron-main-prod
+            build-jvm-main:
+              body: lein uberjar
+            build-components-done:
+              # just a meta script to model dependencies easier
+              body: exit 0
               start_when:
-                prepare has passed:
-                  script_key: prepare
+                build jvm server has passed:
+                  script_key: build-jvm-main
+                build electron-front has passed:
+                  script_key: build-electron-front
+                build electron-main has passed:
+                  script_key: build-electron-main
             build-mac-os:
               body: |
                 set -eoux
@@ -45,17 +67,22 @@ jobs:
                 zip -r Madek-App_Mac-OS.zip madek-app-darwin-x64
                 # cp Madek-App_Mac-OS.zip /tmp/Madek-App_Mac-OS_${CIDER_CI_TREE_ID}.zip
               start_when:
-                build-shared has passed:
-                  script_key: build-shared
+                build-components has passed:
+                  script_key: build-components-done
+                electron-downloaded:
+                  script_key: download-electron
             build-windows:
               body: |
                 set -eoux
                 ./bin/build-win
                 zip -r Madek-App_Windows.zip madek-app-win32-x64
                 # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
+                #
               start_when:
-                build-shared has passed:
-                  script_key: build-shared
+                build-components has passed:
+                  script_key: build-components-done
+                electron-downloaded:
+                  script_key: download-electron
             build-linux:
               body: |
                 set -eoux
@@ -63,8 +90,10 @@ jobs:
                 zip -r Madek-App_Linux.zip madek-app-linux-x64
                 # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
               start_when:
-                build-shared has passed:
-                  script_key: build-shared
+                build-components has passed:
+                  script_key: build-components-done
+                electron-downloaded:
+                  script_key: download-electron
             bundle:
               exclusive_executor_resource: ruby-install_{{$RUBY}}
               timeout: 20 Minutes
