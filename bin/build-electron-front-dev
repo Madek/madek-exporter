@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -eou
+rm -rf \
+  app/dev/js/front.js \
+  app/dev/js/out_front.js
+lein do \
+  externs electron-front-dev app/dev/js/externs_front.js, \
+  cljsbuild once electron-front-dev

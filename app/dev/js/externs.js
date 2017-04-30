@@ -3,6 +3,7 @@ var TopLevel = {
 "BrowserWindow" : function () {},
 "console" : function () {},
 "crashReporter" : function () {},
+"existsSync" : function () {},
 "loadURL" : function () {},
 "log" : function () {},
 "on" : function () {},

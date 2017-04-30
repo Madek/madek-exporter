@@ -2,20 +2,27 @@ name: madek/app
 
 windows:
   2:
-    name: repl
-    command: |
-      sleep 5 && lein do repl
+    name: jvm-main
+    command: >
+      rm -rf target &&
+      sleep 5 &&
+      lein do repl
     post_command_send_keys: |
       (-main)
   3:
-    name: figwheel repl
+    name: electron-app
     command: >
-      ./bin/build-electron-dev
-      && lein do descjop-figwheel
+      sleep 30 &&
+      ./electron/Electron.app/Contents/MacOS/Electron app/dev
   5:
-    name: electron app
+    name: electron-front
     command: >
-      sleep 60
-      && ./electron/Electron.app/Contents/MacOS/Electron app/dev
-
-
+      rm -rf \
+        app/dev/js/front.js \
+        app/dev/js/out_front.js &&
+      lein do descjop-figwheel
+  6:
+    name: electron-main
+    command: >
+      rm -rf app/dev/js/out_main app/dev/js/cljsbuild-main.js &&
+      lein cljsbuild auto electron-main-dev

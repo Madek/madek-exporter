@@ -1,6 +1,10 @@
 # The Madek App
 
 
+## Building the App for Production
+
+We do this via our CI system, see the file [cider-ci.yml](cider-ci.yml).
+
 ## Development
 
 The setup of the project is based on
@@ -8,28 +12,52 @@ The setup of the project is based on
 and cleaned up in many ways. Descjop consists essentially of conventions
 and a number of of `lein` aliases. See the file [project.clj](project.clj).
 
-
-### Building the App for Production
-
-We do this via our CI system, see the file [cider-ci.yml](cider-ci.yml).
-
-### Development with Figwheel etc
-
 See also the file [.mux.yml](.mux.yml).
 
-We use 3 terminals. In terminal `figwheel`
+### First time preparation
 
-      ./bin/build-electron-dev && lein do descjop-figwheel
+`node` and `npm` must be installed and in the execution PATH. Run
 
-In the terminal `repl` we run the java server part:
+    npm install
 
-      lein repl
-      # it will open a repl in the main namespace, wher we can start the server with
-      (-main)
+Download Electron for your platform. One way to do it is via grunt
 
-Once figwheel is ready and the server are ready we start electron with the dev environment,
-e.g. on MacOS:
-
-      ./electron/Electron.app/Contents/MacOS/Electron app/dev
+    ./node_modules/grunt/bin/grunt download-electron
 
 
+### Development targets
+
+There are three build targets:
+
+1. JVM main
+2. Electron main
+3. Electron front
+
+We build each one "continuously" in its own window when developing. A forth
+window holds the electron app.
+
+### JVM main
+
+    rm -rf target
+    lein repl
+    # it will open a repl in the main namespace, where we can start the server with
+    (-main)
+
+
+### Electron main
+
+    rm -rf app/dev/js/out_main app/dev/js/cljsbuild-main.js
+    lein cljsbuild auto electron-main-dev
+
+
+### Electron front
+
+    rm -rf app/dev/js/front.js app/dev/js/out_front.js
+    lein descjop-figwheel
+
+
+### The Electron app
+
+Wait until all the three previous ones are ready. Then e.g. on MacOS:
+
+    ./electron/Electron.app/Contents/MacOS/Electron app/dev
