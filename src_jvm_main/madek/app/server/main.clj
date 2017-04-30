@@ -59,7 +59,7 @@
       (println (usage summary {:options options}))
       (let [{target-dir :download-dir madke-url :madek-url} options]
         (state/initialize
-          {:java-server-startup-options options
+          {:jvm-main-options options
            :download-parameters
            {:target-dir target-dir }
            :connection

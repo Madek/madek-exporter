@@ -58,7 +58,7 @@
                        :prep-tasks ["compile"]
                        :source-paths ["src_jvm_main"]
                        :env {:production true}
-                       :uberjar-name "../app/prod/app-server.jar"
+                       :uberjar-name "../app/prod/jvm-main.jar"
                        :aot [madek.app.server.main]
                        :jar true
                        :main madek.app.server.main
@@ -117,18 +117,10 @@
                          :warnings true
                          :elide-asserts true
                          :target :nodejs
-
-                         ;; no optimize compile (dev)
-                         ;; :optimizations :none
                          :output-dir "app/dev/js/out_main"
+                         :source-map "app/dev/js/source.map"
 
-                         ;; simple compile (dev)
                          :optimizations :simple
-
-                         ;; advanced compile (prod)
-                         ;;:optimizations :advanced
-
-                         ;;:source-map "app/dev/js/test.js.map"
                          :pretty-print true
                          :output-wrapper true}}
              :electron-main-prod

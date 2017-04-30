@@ -10,6 +10,11 @@
 (defn root-component []
   [:div
    [:p "Application loaded!"]
+   [:p "JVM main state: "
+    (if (:jvm-main-options  @state/db)
+      "Connected! "
+      "waiting ..."
+      )]
    [:p (:message @state)]
    [:div.app-db
     [:h3 "Application DB"]

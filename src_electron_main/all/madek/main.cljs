@@ -1,7 +1,8 @@
-(ns madek.core
+(ns madek.main
   (:require
     [cljs.nodejs :as nodejs]
     [madek.windows]
+    [madek.jvm-main-process]
     ))
 
 (def Electron (nodejs/require "electron"))
@@ -15,8 +16,11 @@
 (defn -main []
   (.start crash-reporter
           (clj->js
-            {:companyName "ZHdK"
-             :submitURL   "https://wiki.zhdk.ch/madek-hilfe/doku.php"}))
+            {:productName "Madek"
+             :companyName "ZHdK"
+             :submitURL   "https://wiki.zhdk.ch/madek-hilfe/doku.php"
+             :uploadToServer false }))
+  (madek.jvm-main-process/init app)
   (.on nodejs/process "error"
        (fn [err] (.log js/console err)))
   (.on app "window-all-closed"
