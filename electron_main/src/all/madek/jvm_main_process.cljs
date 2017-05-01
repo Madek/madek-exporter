@@ -22,6 +22,10 @@
             (.spawn child-process
                     "/usr/bin/java" (clj->js ["-jar" jar-path])))
     (.on @jvm-main-process-child "error" #(.log js/console (str "JVM-MAIN_PROC-ERR " %)))
+    (.on @jvm-main-process-child "exit"
+         (fn [code signal]
+           (when (and code (not= 0 code))
+             (throw (js/Error. (str "The jvm-main process exited abnormally with code " code))))))
     (.on (.-stdout @jvm-main-process-child) "data" #(.log js/console (str "JVM-MAIN_OUT " %)))
     (.on (.-stderr @jvm-main-process-child) "data" #(.log js/console (str "JVM-MAIN_ERR " %)))
     ;(js/setTimeout #(.log js/console @jvm-main-process-child) 1000)

@@ -29,9 +29,9 @@ Download Electron for your platform. One way to do it is via grunt
 
 There are three build targets:
 
-1. JVM main
-2. Electron main
-3. Electron front
+1. JVM main, the code is located in `jvm_main/`.
+2. Electron main, the code is located in `electron_main/`.
+3. Electron front, also known as the "renderer", the code is located in `electron_front/`.
 
 We build each one "continuously" in its own window when developing. A forth
 window holds the electron app.

@@ -5,6 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [
 
+
                  [cljs-http "0.1.39"]
                  [cljsjs/moment "2.10.6-3"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
@@ -15,12 +16,14 @@
                  [fipp "0.6.8"]
                  [hiccup "1.0.5"]
                  [json-roa_clj-client "0.2.0"]
+                 [log4j/log4j "1.2.17" :exclusions [javax.mail/mail javax.jms/jms com.sun.jdmk/jmxtools com.sun.jmx/jmxri]]
                  [logbug "4.2.2"]
                  [org.apache.commons/commons-lang3 "3.4"]
                  [org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.473" :exclusions [org.apache.ant/ant]]
                  [org.clojure/core.async "0.2.395"]
                  [org.immutant/web "2.1.2" :exclusions [ch.qos.logback/logback-classic]]
+                 [org.slf4j/slf4j-log4j12 "1.7.21"]
                  [reagent "0.6.0"]
                  [ring "1.4.0"]
                  [ring-undertow-adapter "0.2.2"]
@@ -30,7 +33,6 @@
                  [secretary "1.2.3"]
                  [timothypratley/patchin "0.3.5"]
                  [venantius/accountant "0.1.6" :exclusions [org.clojure/tools.reader]]
-
                  ; DON'T REMOVE THIS the clojurescript stuff depends on this version
                  ; check and upgrade it when updating clojurescript
                  [com.google.guava/guava "20.0"]
@@ -45,18 +47,20 @@
             [lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]]
             ]
 
-  :source-paths ["src_jvm_main"]
+  :source-paths ["jvm_main/src"]
 
   :profiles {:dev {;:dependencies [[figwheel "0.5.9"]]
                    :env {:dev true}
                    ;:plugins [ [lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]] ]
                    :repl-options {:init-ns madek.app.server.main}
-                   :source-paths ["src_jvm_main", "src_front_profile/dev"]
+                   :source-paths ["jvm_main/src", "electron_front/src/dev"]
+                   :resource-paths["jvm_main/resources/dev"]
                    }
 
              :uberjar {
                        :prep-tasks ["compile"]
-                       :source-paths ["src_jvm_main"]
+                       :source-paths ["jvm_main/src"]
+                       :resource-paths["jvm_main/resources/prod"]
                        :env {:production true}
                        :uberjar-name "../app/prod/jvm-main.jar"
                        :aot [madek.app.server.main]
@@ -106,7 +110,7 @@
 
 :cljsbuild {:builds
             {:electron-main-dev
-             {:source-paths ["src_electron_main/all" "src_electron_main/dev"]
+             {:source-paths ["electron_main/src/all" "electron_main/src/dev"]
               :incremental true
               :jar true
               :assert true
@@ -124,7 +128,7 @@
                          :pretty-print true
                          :output-wrapper true}}
              :electron-main-prod
-             {:source-paths ["src_electron_main/all" "src_electron_main/prod"]
+             {:source-paths ["electron_main/src/all" "electron_main/src/prod"]
               :incremental true
               :jar true
               :assert true
@@ -150,7 +154,7 @@
                          :pretty-print true
                          :output-wrapper true}}
              :electron-front-dev
-             {:source-paths ["src_electron_front/all" "src_electron_front/dev"]
+             {:source-paths ["electron_front/src/all" "electron_front/src/dev"]
               :incremental true
               :jar true
               :assert true
@@ -174,7 +178,7 @@
                          :pretty-print true
                          :output-wrapper true}}
              :electron-front-prod
-             {:source-paths ["src_electron_front/all" "src_electron_front/prod"]
+             {:source-paths ["electron_front/src/all" "electron_front/src/prod"]
               :incremental true
               :jar true
               :assert true
@@ -198,7 +202,7 @@
                          :pretty-print true
                          :output-wrapper true}}
              :uberjar {
-                       :source-paths ["src_jvm_main"]
+                       :source-paths ["jvm_main/src"]
                        :jar false
                        :compiler {}
                        }
