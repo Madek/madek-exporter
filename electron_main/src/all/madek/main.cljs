@@ -1,8 +1,10 @@
 (ns madek.main
   (:require
     [cljs.nodejs :as nodejs]
-    [madek.windows]
+
     [madek.jvm-main-process]
+    [madek.menu]
+    [madek.windows]
     ))
 
 (def Electron (nodejs/require "electron"))
@@ -12,6 +14,7 @@
 (def Os (nodejs/require "os"))
 
 (def app (.-app Electron))
+
 
 (defn -main []
   (.start crash-reporter
@@ -26,7 +29,10 @@
   (.on app "window-all-closed"
        (fn [] (if (not= (.-platform nodejs/process) "darwin")
                 (.quit app))))
-  (.on app "ready" (fn [] (madek.windows/open-new-window))))
+  (.on app "ready" (fn []
+                     (madek.menu/initialize)
+                     (madek.windows/open-new)
+                     )))
 
 (nodejs/enable-util-print!)
 

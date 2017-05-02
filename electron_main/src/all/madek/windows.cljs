@@ -15,7 +15,7 @@
            (fn [_ _ _ new-state]
              (.log js/console "windows changed" (-> new-state keys clj->js))))
 
-(defn open-new-window []
+(defn open-new []
   (let [id (-> (uuid/make-random-uuid) uuid/uuid-string)
         window (BrowserWindow. (clj->js {:width 800 :height 600}))]
     (.loadURL window (str "file://" (madek.path-resolver/resolve-path "index.html")))
