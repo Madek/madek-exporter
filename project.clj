@@ -6,37 +6,37 @@
   :dependencies [
 
 
-                 [cljs-http "0.1.39"]
-                 [cljsjs/moment "2.10.6-3"]
+                 [cljs-http "0.1.43"]
+                 [cljsjs/moment "2.17.1-0"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
                  [com.taoensso/sente "1.8.1"]
-                 [compojure "1.5.2"]
-                 [environ "1.0.2"]
-                 [figwheel "0.5.9"]
-                 [fipp "0.6.8"]
+                 [compojure "1.6.0"]
+                 [environ "1.1.0"]
+                 [figwheel "0.5.10"]
+                 [fipp "0.6.9"]
                  [hiccup "1.0.5"]
                  [json-roa_clj-client "0.2.0"]
                  [log4j/log4j "1.2.17" :exclusions [javax.mail/mail javax.jms/jms com.sun.jdmk/jmxtools com.sun.jmx/jmxri]]
                  [logbug "4.2.2"]
-                 [org.apache.commons/commons-lang3 "3.4"]
+                 [org.apache.commons/commons-lang3 "3.5"]
                  [org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.473" :exclusions [org.apache.ant/ant]]
-                 [org.clojure/core.async "0.2.395"]
-                 [org.immutant/web "2.1.2" :exclusions [ch.qos.logback/logback-classic]]
-                 [org.slf4j/slf4j-log4j12 "1.7.21"]
-                 [reagent "0.6.0"]
-                 [ring "1.4.0"]
+                 [org.clojure/core.async "0.3.442"]
+                 [org.immutant/web "2.1.6" :exclusions [ch.qos.logback/logback-classic]]
+                 [org.slf4j/slf4j-log4j12 "1.7.25"]
+                 [reagent "0.6.1"]
+                 [ring "1.6.0"]
                  [ring-undertow-adapter "0.2.2"]
-                 [ring/ring-core "1.5.1"]
-                 [ring/ring-defaults "0.1.5"]
+                 [ring/ring-core "1.6.0"]
+                 [ring/ring-defaults "0.3.0"]
                  [ring/ring-json "0.4.0"]
                  [secretary "1.2.3"]
                  [timothypratley/patchin "0.3.5"]
-                 [venantius/accountant "0.1.6" :exclusions [org.clojure/tools.reader]]
+                 [venantius/accountant "0.2.0" :exclusions [org.clojure/tools.reader]]
+
                  ; DON'T REMOVE THIS the clojurescript stuff depends on this version
                  ; check and upgrade it when updating clojurescript
-                 [com.google.guava/guava "20.0"]
-
+                 [com.google.guava/guava "21.0"]
                  ]
   :plugins [
             [lein-cljsbuild "1.1.5"]
@@ -44,14 +44,12 @@
             [lein-externs "0.1.6"]
             [lein-libdir "0.1.1"]
             [lein-shell "0.5.0"]
-            [lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]]
+            [lein-figwheel "0.5.10" :exclusions [org.clojure/core.cache]]
             ]
 
   :source-paths ["jvm_main/src"]
 
-  :profiles {:dev {;:dependencies [[figwheel "0.5.9"]]
-                   :env {:dev true}
-                   ;:plugins [ [lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]] ]
+  :profiles {:dev {:env {:dev true}
                    :repl-options {:init-ns madek.app.server.main}
                    :source-paths ["jvm_main/src", "electron_front/src/dev"]
                    :resource-paths["jvm_main/resources/dev"]
