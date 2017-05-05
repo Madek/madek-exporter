@@ -15,15 +15,34 @@
    :accelerator "CommandOrControl+N"
    })
 
+(def toggle-deftools-subitem
+  {:label "Toggle Developer Tools"
+   :click (fn [_ win _]
+            (when win
+              (-> win .-webContents .toggleDevTools)))
+   :accelerator (case (.-platform nodejs/process)
+                  "darwin" "Alt+Command+I"
+                  "Ctrl+Shift+I")})
+
+(def reload-page-subitem
+  {:label "Reload"
+   :click (fn [_ win _]
+            (when win
+              (-> win .-webContents .reload)))
+   :accelerator "CommandOrControl+R" })
+
 (def menu-template
   (->> [(when (= (.-platform nodejs/process) "darwin")
-          {:label (-> Electron .-app .getName )
+          {:label "Madek"
            :submenu [{:role "quit"}
                      ]})
         {:label "File"
          :submenu [new-window-subitem]}
         {:label "Window"
          :submenu [{:role "close"}
+                   {:type "separator"}
+                   reload-page-subitem
+                   toggle-deftools-subitem
                    {:type "separator"}
                    new-window-subitem
                    ]}]
@@ -34,7 +53,8 @@
 (def menu (.buildFromTemplate Menu (clj->js menu-template)))
 
 (defn initialize []
-  (.setApplicationMenu Menu menu))
+  (.setApplicationMenu Menu menu)
+  )
 
 ;
 
