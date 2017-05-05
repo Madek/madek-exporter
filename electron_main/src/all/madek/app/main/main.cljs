@@ -1,10 +1,10 @@
-(ns madek.main
+(ns madek.app.main.main
   (:require
     [cljs.nodejs :as nodejs]
 
-    [madek.jvm-main-process]
-    [madek.menu]
-    [madek.windows]
+    [madek.app.main.jvm-main-process]
+    [madek.app.main.menu]
+    [madek.app.main.windows]
     ))
 
 (def Electron (nodejs/require "electron"))
@@ -23,15 +23,15 @@
              :companyName "ZHdK"
              :submitURL   "https://wiki.zhdk.ch/madek-hilfe/doku.php"
              :uploadToServer false }))
-  (madek.jvm-main-process/init app)
+  (madek.app.main.jvm-main-process/init app)
   (.on nodejs/process "error"
        (fn [err] (.log js/console err)))
   (.on app "window-all-closed"
        (fn [] (if (not= (.-platform nodejs/process) "darwin")
                 (.quit app))))
   (.on app "ready" (fn []
-                     (madek.menu/initialize)
-                     (madek.windows/open-new)
+                     (madek.app.main.menu/initialize)
+                     (madek.app.main.windows/open-new)
                      )))
 
 (nodejs/enable-util-print!)

@@ -1,7 +1,7 @@
-(ns madek.jvm-main-process
+(ns madek.app.main.jvm-main-process
   (:require
-    [madek.env]
-    [madek.path-resolver]
+    [madek.app.main.env]
+    [madek.app.main.path-resolver]
 
     [cljs.nodejs :as nodejs]
     ))
@@ -16,7 +16,7 @@
     (.kill @jvm-main-process-child "SIGKILL")))
 
 (defn start []
-  (let [jar-path (madek.path-resolver/resolve-path "jvm-main.jar")]
+  (let [jar-path (madek.app.main.path-resolver/resolve-path "jvm-main.jar")]
     (.log js/console "starting jvm-main-process")
     (reset! jvm-main-process-child
             (.spawn child-process
@@ -32,7 +32,8 @@
     ))
 
 (defn init [app]
-  (case madek.env/env
-    :dev nil; (start)
-    :prod (start))
+  (case madek.app.main.env/env
+    :dev nil ; (start)
+    :prod nil ; (start)
+    )
   (.on app "quit" stop))

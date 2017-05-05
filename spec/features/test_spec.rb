@@ -2,15 +2,30 @@ require 'spec_helper'
 
 HERE = File.expand_path('.', __FILE__)
 
-feature "Foo" do
-  example "Bar" do
-    expect(page).to have_content "Madek APP"
+feature "The Madek App Window" do
+
+  example "Is running and connects to the main process" do
+
     wait_until do
-      page.has_content? "Application loaded!"
+      not (page.has_content? "Loading ...")
     end
-    wait_until 30 do
-      page.has_content? 'JVM main state: Connected!'
+
+    wait_until do
+      page.has_content? "Madek Navigation"
     end
+
+    # check that we receive messages from electron-main
+    click_on 'Debug'
+    # wait_until do
+    #   page.has_content? /Electron-main DB .* nodejs-version/
+    # end
+
+    # check that we receive messages from electron-main
+    click_on 'About'
+    # wait_until do
+    #   page.has_content? /Electron-main DB .* nodejs-version/
+    # end
+
   end
 end
 

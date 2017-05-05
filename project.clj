@@ -5,7 +5,6 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [
 
-
                  [cljs-http "0.1.39"]
                  [cljsjs/moment "2.10.6-3"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
@@ -32,7 +31,7 @@
                  [ring/ring-json "0.4.0"]
                  [secretary "1.2.3"]
                  [timothypratley/patchin "0.3.5"]
-                 [venantius/accountant "0.1.6" :exclusions [org.clojure/tools.reader]]
+                 [venantius/accountant "0.2.0" :exclusions [org.clojure/tools.reader]]
                  ; DON'T REMOVE THIS the clojurescript stuff depends on this version
                  ; check and upgrade it when updating clojurescript
                  [com.google.guava/guava "20.0"]
@@ -156,6 +155,7 @@
              :electron-front-dev
              {:source-paths ["electron_front/src/all" "electron_front/src/dev"]
               :incremental true
+              ;:figwheel {:on-jsload madek.main/init!}
               :jar true
               :assert true
               :compiler {:output-to "app/dev/js/front.js"
@@ -206,7 +206,7 @@
                        :jar false
                        :compiler {}
                        }
-}}
+             }}
 :figwheel {:http-server-root "public"
-           :ring-handler madek-front.figwheel-middleware/app
+           :ring-handler madek.app.front.figwheel-middleware/app
            :server-port 3449})

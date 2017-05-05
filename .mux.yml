@@ -20,9 +20,9 @@ windows:
       rm -rf \
         app/dev/js/front.js \
         app/dev/js/out_front.js &&
-      lein do descjop-figwheel
+      lein trampoline figwheel electron-front-dev
   6:
     name: electron-main
     command: >
       rm -rf app/dev/js/out_main app/dev/js/cljsbuild-main.js &&
-      lein cljsbuild auto electron-main-dev
+      lein trampoline cljsbuild auto electron-main-dev

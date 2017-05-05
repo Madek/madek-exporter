@@ -1,4 +1,4 @@
-(ns madek.path-resolver
+(ns madek.app.main.path-resolver
   (:require
     [cljs.nodejs :as nodejs]
     ))
