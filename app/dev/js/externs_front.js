@@ -8,5 +8,8 @@ var TopLevel = {
 "log" : function () {},
 "navigator" : function () {},
 "on" : function () {},
+"send" : function () {},
+"target" : function () {},
+"value" : function () {},
 "versions" : function () {}
 }

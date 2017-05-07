@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -eou
+lein with-profile prod sass once

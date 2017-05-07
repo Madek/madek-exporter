@@ -26,3 +26,6 @@ windows:
     command: >
       rm -rf app/dev/js/out_main app/dev/js/cljsbuild-main.js &&
       lein trampoline cljsbuild auto electron-main-dev
+  7:
+    name: css
+    command: lein sass watch

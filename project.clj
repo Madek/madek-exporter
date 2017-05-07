@@ -43,19 +43,25 @@
             [lein-externs "0.1.6"]
             [lein-libdir "0.1.1"]
             [lein-shell "0.5.0"]
-            [lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]]
             ]
 
   :source-paths ["jvm_main/src"]
 
   :profiles {:dev {;:dependencies [[figwheel "0.5.9"]]
                    :env {:dev true}
-                   ;:plugins [ [lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]] ]
+                   :plugins [[lein-figwheel "0.5.9" :exclusions [org.clojure/core.cache]]
+                             [lein-sassy "1.0.7"]]
                    :repl-options {:init-ns madek.app.server.main}
                    :source-paths ["jvm_main/src", "electron_front/src/dev"]
                    :resource-paths["jvm_main/resources/dev"]
+                   :sass {:src "electron_front/sass"
+                          :dst "app/dev/css" }
                    }
 
+             :prod {:sass {:src "electron_front/sass"
+                           :dst "app/prod/css"
+                           :style :compressed }
+                    }
              :uberjar {
                        :prep-tasks ["compile"]
                        :source-paths ["jvm_main/src"]

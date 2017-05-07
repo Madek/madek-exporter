@@ -10,6 +10,15 @@
 
 (def Electron (nodejs/require "electron"))
 
+; this will enable the "inspect" context menu; only in dev mode
+(when (= madek.app.main.env/env :dev)
+  ((nodejs/require "electron-context-menu")
+   (clj->js
+     {:prepend
+      (fn [params, bw]
+        (clj->js [{:label "Rainbow"
+                   :visible (= (.-mediaType params) "image")}]))})))
+
 (def crash-reporter (.-crashReporter Electron))
 
 (def Os (nodejs/require "os"))

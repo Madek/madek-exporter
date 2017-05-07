@@ -7,17 +7,19 @@
     ))
 
 (defn naviagation []
-  [:div.navigation
-   [:h3 "Madek Navigation"]
-   [:ul.nav
-    [:li [:a {:href (routes/about-page)} "About"]]
-    [:li [:a {:href (routes/connection-page)} "Connection"]]
-    [:li [:a {:href (routes/debug-page)} "Debug"]]
-    ]])
+  [:nav.navbar.navbar-inverse
+   [:div.container-fluid
+    [:div.navbar-header
+     [:span.navbar-brand {:href "#"} "Madek"]]
+    [:ul.navbar-nav.nav
+     [:li [:a {:href (routes/about-page)} "About"]]
+     [:li [:a {:href (routes/connection-page)} "Connection"]]
+     [:li [:a {:href (routes/debug-page)} "Debug"]]
+     ]]])
 
 
 (defn root-component []
-  [:div
+  [:div.container-fluid
    [naviagation]
    (when-let [page @state/current-page]
      [:div.page [page]])])

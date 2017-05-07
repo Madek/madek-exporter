@@ -11,7 +11,7 @@ feature "The Madek App Window" do
     end
 
     wait_until do
-      page.has_content? "Madek Navigation"
+      page.has_content? "Madek"
     end
 
     click_on 'About'

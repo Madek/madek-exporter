@@ -9,4 +9,5 @@ lein do \
   externs electron-main-prod app/prod/js/externs.js, \
   cljsbuild once electron-main-prod, \
   externs electron-front-prod app/prod/js/externs_front.js, \
-  cljsbuild once electron-front-prod
+  cljsbuild once electron-front-prod, \
+  with-profile prod sass once

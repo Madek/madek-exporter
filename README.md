@@ -27,11 +27,12 @@ Download Electron for your platform. One way to do it is via grunt
 
 ### Development targets
 
-There are three build targets:
+There are the following build targets:
 
 1. JVM main, the code is located in `jvm_main/`.
 2. Electron main, the code is located in `electron_main/`.
 3. Electron front, also known as the "renderer", the code is located in `electron_front/`.
+4. Stylesheets compiled from sass.
 
 We build each one "continuously" in its own window when developing. A forth
 window holds the electron app.
@@ -55,9 +56,32 @@ window holds the electron app.
     rm -rf app/dev/js/front.js app/dev/js/out_front.js
     lein descjop-figwheel
 
+### Stylesheets
+
+The Electron front includes stylesheets which we are building continuously with
+
+    lein sass watch
 
 ### The Electron app
 
 Wait until all the three previous ones are ready. Then e.g. on MacOS:
 
     ./electron/Electron.app/Contents/MacOS/Electron app/dev
+
+
+### Running and Debugging the Production App
+
+The electron parts can be build with `bin/build-electron-prod` and
+the jvm with `lein uberjar`. It is then possible to start it e.g.
+
+    ./electron/Electron.app/Contents/MacOS/Electron app/prod
+
+This is quite close to executing a ready built. If that doesn't show the
+problem. It is possible to get even closer by building, e.g. `bin/build-mac-os`
+the complete app and running it, e.g.
+`./madek-app-darwin-x64/madek-app.app/Contents/MacOS/madek-app` on MacOS.
+
+Caveat: a still running jvm process for development will likely cause port
+conflicts.
+
+
