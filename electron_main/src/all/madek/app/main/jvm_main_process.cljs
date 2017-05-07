@@ -34,6 +34,5 @@
 (defn init [app]
   (case madek.app.main.env/env
     :dev nil ; (start)
-    :prod nil ; (start)
-    )
+    :prod (start))
   (.on app "quit" stop))

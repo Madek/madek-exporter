@@ -19,8 +19,7 @@
 (add-watch
   windows :windows-change-logger
   (fn [_ _ _ new-state]
-    (.log js/console "windows changed"
-          (-> new-state keys clj->js))))
+    (.log js/console "windows changed" (-> new-state keys clj->js))))
 
 (defn open-new []
   (let [id (-> (uuid/make-random-uuid) uuid/uuid-string)
@@ -37,7 +36,7 @@
    (when-let [win-a (get @windows client-id)]
      (send-db-full client-id db win-a)))
   ([client-id db win-a]
-   (.log js/console "send-db-full" (clj->js [client-id db]))
+   ;(.log js/console "send-db-full" (clj->js [client-id db]))
    (let [wc (-> @win-a :window .-webContents)]
      (.send wc "db-full" (clj->js db))
      (swap! win-a assoc :db db))))
@@ -47,9 +46,9 @@
   (let [current-client-db (:db @win-a)
         db-patch (patchin/diff current-client-db new-client-db)
         wc (-> @win-a :window .-webContents)]
-    (.log js/console "send-db-patch" (clj->js {:current-client-db current-client-db
-                                               :new-client-db new-client-db
-                                               :db-patch db-patch}))
+    ;(.log js/console "send-db-patch" (clj->js {:current-client-db current-client-db
+    ;                                           :new-client-db new-client-db
+    ;                                           :db-patch db-patch}))
     (.send wc "db-patch" (clj->js db-patch))
     (swap! win-a assoc :db new-client-db)))
 

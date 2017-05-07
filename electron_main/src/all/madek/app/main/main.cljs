@@ -2,6 +2,7 @@
   (:require
     [cljs.nodejs :as nodejs]
 
+    [madek.app.main.connection]
     [madek.app.main.jvm-main-process]
     [madek.app.main.menu]
     [madek.app.main.windows]

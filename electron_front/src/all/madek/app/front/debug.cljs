@@ -11,9 +11,9 @@
     (if (empty? @state/electron-main-db)
       "waiting ..."
       "connected! ")]
-   [:p "JVM main state: "
+   [:p "JVM main "
     (if (:jvm-main-options  @state/jvm-main-db)
-      "Connected! "
+      "connected! "
       "waiting ...")]
    [:div.jvm-main-db
     [:h3 "Electron-main DB"]

@@ -33,9 +33,6 @@ jobs:
             wine: true
             xorg: true
           scripts:
-            download-electron:
-              body: |
-                ./node_modules/grunt/bin/grunt download-electron
             build-electron-front:
               body: |
                 set -eoux
@@ -69,8 +66,6 @@ jobs:
               start_when:
                 build-components has passed:
                   script_key: build-components-done
-                electron-downloaded:
-                  script_key: download-electron
             build-windows:
               body: |
                 set -eoux
@@ -81,8 +76,6 @@ jobs:
               start_when:
                 build-components has passed:
                   script_key: build-components-done
-                electron-downloaded:
-                  script_key: download-electron
             build-linux:
               body: |
                 set -eoux
@@ -92,8 +85,6 @@ jobs:
               start_when:
                 build-components has passed:
                   script_key: build-components-done
-                electron-downloaded:
-                  script_key: download-electron
             bundle:
               exclusive_executor_resource: ruby-install_{{$RUBY}}
               timeout: 20 Minutes

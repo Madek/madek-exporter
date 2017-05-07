@@ -14,17 +14,21 @@ feature "The Madek App Window" do
       page.has_content? "Madek Navigation"
     end
 
-    # check that we receive messages from electron-main
-    click_on 'Debug'
-    # wait_until do
-    #   page.has_content? /Electron-main DB .* nodejs-version/
-    # end
-
-    # check that we receive messages from electron-main
     click_on 'About'
     # wait_until do
     #   page.has_content? /Electron-main DB .* nodejs-version/
     # end
+
+    # check that we receive messages from electron-main and jvm-main
+    click_on 'Debug'
+
+    wait_until do
+      page.has_content? "Electron main connected!"
+    end
+
+    wait_until do
+      page.has_content? "JVM main connected!"
+    end
 
   end
 end

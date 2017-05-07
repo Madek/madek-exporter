@@ -1,6 +1,7 @@
 (ns madek.app.front.routes
   (:require
     [madek.app.front.about]
+    [madek.app.front.connection]
     [madek.app.front.debug]
     [madek.app.front.state]
 
@@ -12,11 +13,14 @@
 
 ;(defroute "/" [] (reset! madek.app.front.state/current-page nil))
 
-(defroute debug-page "/debug" []
-  (reset! madek.app.front.state/current-page madek.app.front.debug/page))
-
 (defroute about-page "/about" []
   (reset! madek.app.front.state/current-page madek.app.front.about/page))
+
+(defroute connection-page "/connection" []
+  (reset! madek.app.front.state/current-page madek.app.front.connection/page))
+
+(defroute debug-page "/debug" []
+  (reset! madek.app.front.state/current-page madek.app.front.debug/page))
 
 (defn init []
   (accountant/configure-navigation!

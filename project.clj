@@ -5,7 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [
 
-                 [cljs-http "0.1.39"]
+                 [cljs-http "0.1.43"]
                  [cljsjs/moment "2.10.6-3"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
                  [com.taoensso/sente "1.8.1"]
@@ -209,4 +209,4 @@
              }}
 :figwheel {:http-server-root "public"
            :ring-handler madek.app.front.figwheel-middleware/app
-           :server-port 3449})
+           :server-port 8384})

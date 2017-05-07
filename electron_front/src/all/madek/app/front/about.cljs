@@ -10,7 +10,9 @@
   [:div.content
    [:div.build
     [:h2 "Built"]
-    ;[:p "Version" [:span.version (-> @state/electron-main-db :package-json :version)]]
+    [:p "Version: "
+     [:span.env (-> @state/electron-main-db
+                    :environment :package-json :version)]]
     [:p "Environment: "
      [:span.env madek.app.front.env/env]]]
    [:div.electron
