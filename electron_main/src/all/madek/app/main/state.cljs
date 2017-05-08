@@ -15,7 +15,7 @@
                :environment
                {:nodejs-version (.-version nodejs/process)
                 :package-json package-json}
-               :connection {:status nil}}))
+               :jvm-process {:port env/jvm-port}}))
 
 (js/setInterval #(swap! db assoc :timestamp (.now js/Date)) 1000)
 

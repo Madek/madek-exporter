@@ -12,3 +12,7 @@
   (let [process-dir (.realpathSync fs ".")
         relative-app-dir "./app/dev"]
     (.resolve path process-dir relative-app-dir)))
+
+(def jvm-port 8383)
+
+
