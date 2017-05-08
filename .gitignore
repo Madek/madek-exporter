@@ -19,7 +19,9 @@ app/dev/js/out_main/
 app/dev/js/source.map
 app/prod/css/
 app/prod/js/cljsbuild-main.js
+app/prod/js/cljsbuild-main.js.map
 app/prod/js/front.js
+app/prod/js/front.js.map
 app/prod/js/out_front/
 app/prod/js/out_main/
 classes/*
