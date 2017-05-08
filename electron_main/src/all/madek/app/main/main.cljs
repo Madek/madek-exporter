@@ -25,6 +25,7 @@
 
 (def app (.-app Electron))
 
+(.log js/console "__dirname" (js* "__dirname"))
 
 (defn -main []
   (.start crash-reporter

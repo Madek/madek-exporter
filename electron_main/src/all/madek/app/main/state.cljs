@@ -1,17 +1,15 @@
 (ns madek.app.main.state
   (:require
+    [madek.app.main.env :as env]
+
     [cljs.nodejs :as nodejs]
-    [madek.app.main.path-resolver]
     [timothypratley.patchin :as patchin]
     ))
 
 (def fs (nodejs/require "fs"))
 
 (def package-json
-  (if-let [package-file (madek.app.main.path-resolver/resolve-path
-                          "package.json")]
-    (.parse js/JSON (.readFileSync fs package-file))
-    nil))
+  (.parse js/JSON (.readFileSync fs (str env/app-dir "/" "package.json"))))
 
 (def db (atom {:timestamp (.now js/Date)
                :environment

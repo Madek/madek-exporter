@@ -127,9 +127,8 @@
                          :elide-asserts true
                          :target :nodejs
                          :output-dir "app/dev/js/out_main"
-                         :source-map "app/dev/js/source.map"
-
-                         :optimizations :simple
+                         :source-map true
+                         :optimizations :none
                          :pretty-print true
                          :output-wrapper true}}
              :electron-main-prod
@@ -144,18 +143,9 @@
                          :warnings true
                          :elide-asserts true
                          :target :nodejs
-
-                         ;; no optimize compile (dev)
-                         ;;:optimizations :none
                          :output-dir "app/prod/js/out_main"
-
-                         ;; simple compile (dev)
-                         :optimizations :simple
-
-                         ;; advanced compile (prod)
-                         ;;:optimizations :advanced
-
-                         ;;:source-map "app/prod/js/test.js.map"
+                         :optimizations :advanced
+                         :source-map "app/prod/js/cljsbuild-main.js.map"
                          :pretty-print true
                          :output-wrapper true}}
              :electron-front-dev

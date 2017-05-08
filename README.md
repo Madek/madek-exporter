@@ -71,17 +71,10 @@ Wait until all the three previous ones are ready. Then e.g. on MacOS:
 
 ### Running and Debugging the Production App
 
-The electron parts can be build with `bin/build-electron-prod` and
-the jvm with `lein uberjar`. It is then possible to start it e.g.
+The electron parts can be build with
+1. `bin/build-electron-prod` and the jvm with
+2. `lein uberjar`.
 
-    ./electron/Electron.app/Contents/MacOS/Electron app/prod
-
-This is quite close to executing a ready built. If that doesn't show the
-problem. It is possible to get even closer by building, e.g. `bin/build-mac-os`
-the complete app and running it, e.g.
-`./madek-app-darwin-x64/madek-app.app/Contents/MacOS/madek-app` on MacOS.
-
-Caveat: a still running jvm process for development will likely cause port
-conflicts.
-
-
+The next steps depend on the OS. On MacOS:
+3. `bin/build-mac-os`
+4. `./madek-app-darwin-x64/madek-app.app/Contents/MacOS/madek-app`

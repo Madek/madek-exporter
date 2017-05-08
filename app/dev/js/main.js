@@ -1,12 +1,12 @@
 // optimization : simple or optimization: advanced
-require('./cljsbuild-main');
+// require('./cljsbuild-main');
 
 // optimization : none
 // uncomment below
 //
-// require('./out/goog/bootstrap/nodejs');
-// var goog = {};
-// require('./out/goog/base');
-// require('./cljsbuild-main');
-// require('./out/madek/core');
-// madek.core._main();
+require('./out_main/goog/bootstrap/nodejs');
+var goog = {};
+require('./out_main/goog/base');
+require('./cljsbuild-main');
+require('./out_main/madek/app/main/main');
+madek.app.main.main._main();

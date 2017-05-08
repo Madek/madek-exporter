@@ -1,10 +1,13 @@
 (ns madek.app.main.windows
   (:require
+    [madek.app.main.state]
+    [madek.app.main.env :as env]
+
     [cljs-uuid-utils.core :as uuid]
     [cljs.nodejs :as nodejs]
     [clojure.set :refer [difference]]
-    [madek.app.main.path-resolver]
-    [madek.app.main.state]
+
+
     [timothypratley.patchin :as patchin]
     ))
 
@@ -23,8 +26,10 @@
 
 (defn open-new []
   (let [id (-> (uuid/make-random-uuid) uuid/uuid-string)
-        window (BrowserWindow. (clj->js {:width 800 :height 600}))]
-    (.loadURL window (str "file://" (madek.app.main.path-resolver/resolve-path "index.html")))
+        window (BrowserWindow. (clj->js {:width 800 :height 600}))
+        index-html-path (str env/app-dir "/index.html")]
+    (.log js/console "index-html-path" index-html-path)
+    (.loadURL window (str "file://" index-html-path))
     (swap! windows assoc id (atom {:window window}))
     (.on (.-webContents window) "dom-ready" (fn [] (send-db-full id)))
     (.on window "closed" (fn [] (swap! windows dissoc id)))))

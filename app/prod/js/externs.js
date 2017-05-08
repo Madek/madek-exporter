@@ -6,7 +6,6 @@ var TopLevel = {
 "crashReporter" : function () {},
 "Date" : function () {},
 "Error" : function () {},
-"existsSync" : function () {},
 "ipcMain" : function () {},
 "JSON" : function () {},
 "kill" : function () {},
