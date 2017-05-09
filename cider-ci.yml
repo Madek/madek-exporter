@@ -30,6 +30,7 @@ jobs:
             Leiningen: true
             nodejs: true
             ruby-install: true
+            # nx-18122-vm: true
             wine: true
             xorg: true
           scripts:
@@ -38,14 +39,14 @@ jobs:
             build-electron-front:
               body: |
                 set -eoux
-                lein do  \
-                  externs electron-front-prod app/prod/js/externs.js, \
+                lein do \
+                  externs electron-front-prod app/prod/js/front_externs.js, \
                   cljsbuild once electron-front-prod
             build-electron-main:
               body: |
                 set -eoux
-                lein do  \
-                  externs electron-main-prod app/prod/js/externs.js, \
+                lein do \
+                  externs electron-main-prod app/prod/js/main_externs.js, \
                   cljsbuild once electron-main-prod
             build-jvm-main:
               body: lein uberjar

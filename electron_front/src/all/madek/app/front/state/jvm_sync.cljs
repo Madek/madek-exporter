@@ -5,13 +5,19 @@
     ))
 
 
-(defn init [jvm-main-db client-db]
+(defn init [jvm-main-db client-db opts]
 
-  (let [{:keys [chsk ch-recv send-fn state]}
-        (sente/make-channel-socket! "localhost:8383/chsk" ; Note the same path as before
-                                    {:type :auto ; e/o #{:auto :ajax :ws}
-                                     :client-id (:client-id @client-db)
-                                     })]
+  (let [{port :jvm-port password :jvm-password} opts
+        {:keys [chsk ch-recv send-fn state jvm-port]}
+        (sente/make-channel-socket! "/chsk"
+          {:type :auto ; e/o #{:auto :ajax :ws}
+           ; TODO we add parameters for basic auth here; it is not supported by chome yet
+           ; and hence disabled on the server side;
+           ; I am not sure if this is the right place here; but is seems as it doesn't
+           ; mess up the host; chrome seems just to remove it
+           :host (str (:client-id @client-db) ":" password "@localhost:" port)
+           :protocol :http
+           :client-id (:client-id @client-db)})]
     (def chsk       chsk)
     (def ch-chsk    ch-recv) ; ChannelSocket's receive channel
     (def chsk-send! send-fn) ; ChannelSocket's send API fn
@@ -29,7 +35,7 @@
     (when (= id :chsk/recv)
       (let [[event-id data] ?data]
         (when (and event-id data)
-          (js/console.log (clj->js {:event-id event-id :data data}))
+          ;(js/console.log (clj->js {:event-id event-id :data data}))
           (case event-id
             :madek/db (reset! jvm-main-db data)
             :madek/patch (patch-db data)

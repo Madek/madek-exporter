@@ -1,6 +1,7 @@
 (ns madek.app.main.env
   (:require
     [cljs.nodejs :as nodejs]
+    [cljs-uuid-utils.core :as uuid]
     ))
 
 (def path (nodejs/require "path"))
@@ -14,3 +15,5 @@
     (.resolve path dirname relative-app-dir)))
 
 (def jvm-port (+ 1024 (rand-int (- 65535 1024))))
+
+(def jvm-password (uuid/make-random-uuid))

@@ -12,6 +12,7 @@
     [clojure.walk]
     ))
 
+(def Electron (nodejs/require "electron"))
 
 ;### dbs ######################################################################
 
@@ -33,5 +34,13 @@
 ;### init #####################################################################
 
 (defn init []
-  (electron-main-sync/init electron-main-db)
-  (jvm-sync/init jvm-main-db client-db))
+  (electron-main-sync/init electron-main-db))
+
+(.on (.-ipcRenderer Electron) "madek:jvm-sync:init"
+     (fn [event data]
+       (let [opts (-> data js->clj clojure.walk/keywordize-keys)]
+         (js/console.log "madek:jvm-sync:init" opts)
+         (jvm-sync/init jvm-main-db client-db opts)
+         )))
+
+

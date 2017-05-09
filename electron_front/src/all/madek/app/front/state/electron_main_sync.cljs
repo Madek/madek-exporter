@@ -8,13 +8,13 @@
 
 (defn init [electron-main-db]
 
-  (.on (.-ipcRenderer Electron) "db-full"
+  (.on (.-ipcRenderer Electron) "madek:db:full"
        (fn [event data]
          ;(js/console.log "db-full" (-> data clj->js clojure.walk/keywordize-keys))
          (reset! electron-main-db (-> data js->clj clojure.walk/keywordize-keys))
          ))
 
-  (.on (.-ipcRenderer Electron) "db-patch"
+  (.on (.-ipcRenderer Electron) "madek:db:patch"
        (fn [event data]
          ;(js/console.log "db-patch"  (clj->js (type data)))
          (swap! electron-main-db

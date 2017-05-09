@@ -2,7 +2,7 @@
 set -eou
 rm -rf \
   app/dev/js/out_main \
-  app/dev/js/cljsbuild-main.js
+  app/dev/js/main.js
 lein do \
-  externs electron-main-dev app/dev/js/externs.js, \
+  externs electron-main-dev app/dev/js/main_externs.js, \
   cljsbuild once electron-main-dev

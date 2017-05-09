@@ -4,5 +4,5 @@ rm -rf \
   app/dev/js/front.js \
   app/dev/js/out_front.js
 lein do \
-  externs electron-front-dev app/dev/js/externs_front.js, \
+  externs electron-front-dev app/dev/js/front_externs.js, \
   cljsbuild once electron-front-dev

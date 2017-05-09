@@ -31,7 +31,12 @@
     (.log js/console "index-html-path" index-html-path)
     (.loadURL window (str "file://" index-html-path))
     (swap! windows assoc id (atom {:window window}))
-    (.on (.-webContents window) "dom-ready" (fn [] (send-db-full id)))
+    (.on (.-webContents window) "dom-ready"
+         (fn []
+           (.send (.-webContents window) "madek:jvm-sync:init"
+                  (clj->js {:jvm-port env/jvm-port
+                            :jvm-password env/jvm-password}))
+           (send-db-full id)))
     (.on window "closed" (fn [] (swap! windows dissoc id)))))
 
 (defn send-db-full
@@ -43,7 +48,7 @@
   ([client-id db win-a]
    ;(.log js/console "send-db-full" (clj->js [client-id db]))
    (let [wc (-> @win-a :window .-webContents)]
-     (.send wc "db-full" (clj->js db))
+     (.send wc "madek:db:full" (clj->js db))
      (swap! win-a assoc :db db))))
 
 
@@ -54,7 +59,7 @@
     ;(.log js/console "send-db-patch" (clj->js {:current-client-db current-client-db
     ;                                           :new-client-db new-client-db
     ;                                           :db-patch db-patch}))
-    (.send wc "db-patch" (clj->js db-patch))
+    (.send wc "madek:db:patch" (clj->js db-patch))
     (swap! win-a assoc :db new-client-db)))
 
 (defn send-db
