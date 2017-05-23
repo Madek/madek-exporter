@@ -18,8 +18,10 @@
   (let [jar-path (str env/app-dir "/" "jvm-main.jar")]
     (.log js/console "starting jvm-main-process")
     (reset! jvm-main-process-child
-            (.spawn child-process
-                    "/usr/bin/java" (clj->js ["-jar" jar-path "-p" env/jvm-port])))
+            (.spawn child-process "/usr/bin/java"
+                    (clj->js ["-jar" jar-path
+                              "-p" env/jvm-port
+                              "-s" env/jvm-password])))
     (.on @jvm-main-process-child "error" #(.log js/console (str "JVM-MAIN_PROC-ERR " %)))
     (.on @jvm-main-process-child "exit"
          (fn [code signal]

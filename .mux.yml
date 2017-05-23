@@ -24,7 +24,7 @@ windows:
   6:
     name: electron-main
     command: >
-      rm -rf app/dev/js/out_main app/dev/js/cljsbuild-main.js &&
+      rm -rf app/dev/js/out_main app/dev/js/main.js &&
       lein trampoline cljsbuild auto electron-main-dev
   7:
     name: css

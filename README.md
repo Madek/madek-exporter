@@ -47,7 +47,7 @@ window holds the electron app.
 
 ### Electron main
 
-    rm -rf app/dev/js/out_main app/dev/js/cljsbuild-main.js
+    rm -rf app/dev/js/out_main app/dev/js/main.js
     lein cljsbuild auto electron-main-dev
 
 

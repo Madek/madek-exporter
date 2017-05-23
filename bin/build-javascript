@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -eoux
-lein descjop-externs
-lein descjop-once
-# lein uberjar

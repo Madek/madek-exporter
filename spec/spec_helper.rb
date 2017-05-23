@@ -1,14 +1,14 @@
-require 'capybara/rspec'
 require 'active_support/all'
-require 'selenium-webdriver'
-#require 'chromedriver'
 require 'capybara/poltergeist'
-require 'pry'
+require 'capybara/rspec'
+require 'chromedriver/helper'
 require 'logger'
+require 'pry'
+require 'selenium-webdriver'
 
 require 'helpers/misc'
 
-# Chromedriver.set_version "2.29"
+Chromedriver.set_version "2.29"
 
 APP_ROOT_DIR = \
   Pathname(File.dirname(File.absolute_path(__FILE__))).parent

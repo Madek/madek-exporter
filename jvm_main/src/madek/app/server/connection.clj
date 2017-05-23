@@ -10,6 +10,7 @@
     [clj-logging-config.log4j :as logging-config]
     [clojure.tools.logging :as logging]
     [logbug.catcher :as catcher]
+    [logbug.debug :as debug]
     [logbug.thrown :as thrown]
     ))
 
@@ -21,33 +22,52 @@
     (logging/debug (-> response roa/data))
     response))
 
+(defn connect-with-authentication []
+  )
+
+(defn connect-anonymously []
+  )
+
 (defn connect-to-madek-server [request]
   (catcher/snatch
     {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
     (logging/debug 'connect {:request request})
-    (let [connect-body (:body request)
-          url (-> connect-body :madek-url)
-          http-options (utils/options-to-http-options connect-body)
-          auth-info-response (-> (roa/get-root (str url "/api/")
-                                               :default-conn-opts http-options)
-                                 (roa/relation :auth-info)
-                                 (roa/get {}))]
-      (if-not auth-info-response
-        {:status 422 :body {:message (str "no auth-info response, "
-                                          "check your connection parameters.")}}
-        (let [response-status (:status auth-info-response)]
-          (logging/debug 'auth-info-response auth-info-response)
-          (logging/debug 'response-status response-status)
-          (if-not (and (>= response-status 200) (< response-status 300))
-            {:status response-status :body {:message "authentication failed"}}
-            (let [auth-info (roa/data auth-info-response)]
-              (swap! state/db
-                     (fn [db conn-params]
-                       (assoc-in db [:connection] conn-params))
-                     (merge
-                       (select-keys connect-body [:session-token :madek-url])
-                       (select-keys auth-info [:login :session-expiration-seconds])
-                       {:session-expiration-ref-time (str (time/now))}))
-              {:status 202})))))))
+    (try (let [connect-body (:body request)
+               url (-> connect-body :url)
+               http-options (utils/options-to-http-options connect-body)
+               api-root (roa/get-root (str url "/api/")
+                                      :default-conn-opts http-options)
+               auth-info (when (:basic-auth http-options)
+                           (-> api-root (roa/relation :auth-info) (roa/get {})))]
+           (logging/debug 'http-options http-options)
+           (logging/debug 'api-root api-root)
+           (logging/debug 'auth-info auth-info)
+           (if-not auth-info
+             {:status 422 :body {:message (str "no auth-info response, "
+                                               "check your connection parameters.")}}
+             (let [response-status (:status auth-info)]
+               (logging/debug 'auth-info auth-info)
+               (logging/debug 'response-status response-status)
+               (if-not (and (>= response-status 200) (< response-status 300))
+                 {:status response-status :body {:message "Authentication failed"}}
+                 (let [auth-info (roa/data auth-info)]
+                   (swap! state/db
+                          (fn [db conn-params]
+                            (assoc-in db [:connection] conn-params))
+                          (merge
+                            (select-keys connect-body [:url])
+                            (select-keys auth-info [:login :session-expiration-seconds :email_address])))
+                   {:status 202})))))
+         (catch Exception e
+           (cond
+             (= (-> e ex-data :status) 401) {:status 401
+                                             :body "Authentication failed. Check your credentials!"}
+             :else (throw e))))))
 
 
+
+;### Debug ####################################################################
+;(logging-config/set-logger! :level :debug)
+;(logging-config/set-logger! :level :info)
+;(debug/debug-ns 'ring.middleware.resource)
+(debug/debug-ns *ns*)

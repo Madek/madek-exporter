@@ -3,7 +3,7 @@
   (:require
     [madek.app.server.server :as server]
     [madek.app.server.state :as state]
-    [madek.app.server.utils :as utils :refer [exit]]
+    [madek.app.server.utils :as utils :refer [exit presence]]
 
 
     [environ.core :refer [env]]
@@ -17,9 +17,8 @@
     ))
 
 (def cli-options
-  [
-   ["-u" "--madek-url  URL" "Madek URL"
-    :default (or (env :madek-url) "https://test.madek.zhdk.ch")]
+  [["-u" "--madek-url  URL" "Madek URL"
+    :default (or (env :madek-url) "https://staging.madek.zhdk.ch")]
    ["-d" "--download-dir DIRECTORY" "Download directory"
     :default (string/join java.io.File/separator
                           [(System/getProperty "user.home")
@@ -28,9 +27,11 @@
     :default 8383
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 1024 % 0x10000) "Must be a number between 1024 and 65536"]]
+   ["-s" "--password PASSWORD"
+    "Protects the http interfaces via Basic auth with this password"
+    :default "secret"]
    ["-i" "--interface INTERFACE" "Interface bind address"
     :default "localhost"]
-
    ["-h" "--help"]])
 
 (defn usage [options-summary & more]
@@ -64,10 +65,11 @@
            {:target-dir target-dir }
            :connection
            {:madek-url madke-url}}))
-      (let[{port :port host :interface} options]
+      (let[{port :port host :interface password :password} options]
         (server/initialize
           {:port port
-           :host host})))))
+           :host host}
+          {:password password})))))
 
 
 ;(-> (Desktop/getDesktop)(.browse (URI. "file:///Users/Thomas")))

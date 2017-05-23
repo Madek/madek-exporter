@@ -37,7 +37,10 @@
            :submenu [{:role "quit"}
                      ]})
         {:label "File"
-         :submenu [new-window-subitem]}
+         :submenu [{:role "copy"}
+                   {:role "paste"}
+                   {:type "separator"}
+                   new-window-subitem]}
         {:label "Window"
          :submenu [{:role "close"}
                    {:type "separator"}

@@ -8,7 +8,7 @@
                  [cljs-http "0.1.43"]
                  [cljsjs/moment "2.17.1-0"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
-                 [com.taoensso/sente "1.8.1"]
+                 [com.taoensso/sente "1.11.0"]
                  [compojure "1.6.0"]
                  [environ "1.1.0"]
                  [fipp "0.6.9"]
@@ -18,8 +18,9 @@
                  [logbug "4.2.2"]
                  [org.apache.commons/commons-lang3 "3.5"]
                  [org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.9.473" :exclusions [org.apache.ant/ant]]
+                 [org.clojure/clojurescript "1.9.521" :exclusions [org.apache.ant/ant]]
                  [org.clojure/core.async "0.3.442"]
+                 [org.clojure/data.codec "0.1.0"]
                  [org.immutant/web "2.1.6" :exclusions [ch.qos.logback/logback-classic]]
                  [org.slf4j/slf4j-log4j12 "1.7.25"]
                  [reagent "0.6.1"]
@@ -30,6 +31,7 @@
                  [ring/ring-json "0.4.0"]
                  [secretary "1.2.3"]
                  [timothypratley/patchin "0.3.5"]
+
                  [venantius/accountant "0.2.0" :exclusions [org.clojure/tools.reader]]
                  ; DON'T REMOVE THIS the clojurescript stuff depends on this version
                  ; check and upgrade it when updating clojurescript
@@ -46,7 +48,7 @@
 
   :source-paths ["jvm_main/src"]
 
-  :profiles {:dev {:dependencies [[figwheel "0.5.9"]]
+  :profiles {:dev {:dependencies [[figwheel "0.5.10"]]
                    :env {:dev true}
                    :plugins [[lein-figwheel "0.5.10" :exclusions [org.clojure/core.cache]]
                              [lein-sassy "1.0.7"]]
@@ -80,17 +82,6 @@
             "descjop-init-win" ["do"
                                 ["shell" "cmd.exe" "/c" "npm" "install"]
                                 ["shell" "cmd.exe" "/c" "grunt" "download-electron"]]
-            "descjop-externs" ["do"
-                               ["externs" "electron-main-dev" "app/dev/js/externs.js"]
-                               ["externs" "electron-front-dev" "app/dev/js/externs_front.js"]
-                               ["externs" "electron-main-prod" "app/prod/js/externs.js"]
-                               ["externs" "electron-front-prod" "app/prod/js/externs_front.js"]]
-            "descjop-externs-dev" ["do"
-                                   ["externs" "electron-main-dev" "app/dev/js/externs.js"]
-                                   ["externs" "electron-front-dev" "app/dev/js/externs_front.js"]]
-            "descjop-externs-prod" ["do"
-                                    ["externs" "electron-main-prod" "app/prod/js/externs.js"]
-                                    ["externs" "electron-front-prod" "app/prod/js/externs_front.js"]]
             "descjop-figwheel" ["trampoline" "figwheel" "electron-front-dev"]
             "descjop-once" ["do"
                             ["cljsbuild" "once" "electron-main-dev"]
@@ -118,8 +109,8 @@
               :incremental true
               :jar true
               :assert true
-              :compiler {:output-to "app/dev/js/cljsbuild-main.js"
-                         :externs ["app/dev/js/externs.js"
+              :compiler {:output-to "app/dev/js/main.js"
+                         :externs ["app/dev/js/main_externs.js"
                                    "node_modules/closurecompiler-externs/path.js"
                                    "node_modules/closurecompiler-externs/process.js"]
                          :warnings true
@@ -128,6 +119,7 @@
                          :output-dir "app/dev/js/out_main"
                          :source-map true
                          :optimizations :none
+                         :main "madek.app.main.main"
                          :pretty-print true
                          :output-wrapper true}}
              :electron-main-prod
@@ -135,8 +127,8 @@
               :incremental true
               :jar true
               :assert true
-              :compiler {:output-to "app/prod/js/cljsbuild-main.js"
-                         :externs ["app/prod/js/externs.js"
+              :compiler {:output-to "app/prod/js/main.js"
+                         :externs ["app/prod/js/main_externs.js"
                                    "node_modules/closurecompiler-externs/path.js"
                                    "node_modules/closurecompiler-externs/process.js"]
                          :warnings true
@@ -144,7 +136,7 @@
                          :target :nodejs
                          :output-dir "app/prod/js/out_main"
                          :optimizations :advanced
-                         :source-map "app/prod/js/cljsbuild-main.js.map"
+                         :source-map "app/prod/js/main.js.map"
                          :pretty-print true
                          :output-wrapper true}}
              :electron-front-dev
@@ -154,11 +146,13 @@
               :jar true
               :assert true
               :compiler {:output-to "app/dev/js/front.js"
-                         :externs ["app/dev/js/externs_front.js"]
+                         :externs ["app/dev/js/front_externs.js"]
                          :warnings true
                          :elide-asserts true
                          :optimizations :none
+                         :main "madek.app.front.init"
                          :output-dir "app/dev/js/out_front"
+                         :asset-path "js/out_front"
                          :source-map true
                          :pretty-print true
                          :output-wrapper true}}
@@ -168,7 +162,7 @@
               :jar true
               :assert true
               :compiler {:output-to "app/prod/js/front.js"
-                         :externs ["app/prod/js/externs_front.js"]
+                         :externs ["app/prod/js/front_externs.js"]
                          :warnings true
                          :elide-asserts true
                          :output-dir "app/prod/js/out_front"

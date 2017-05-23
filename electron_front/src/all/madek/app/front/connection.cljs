@@ -2,22 +2,53 @@
   (:refer-clojure :exclude [str keyword])
   (:require
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
+    [madek.app.front.request :as request]
 
     [fipp.edn :refer [pprint]]
     [reagent.ratom :as ratom :refer [reaction]]
     [madek.app.front.state :as state]
     [madek.app.front.env]
     [cljs.nodejs :as nodejs]
-    ))
+    )
+  (:import
+    [goog Uri]
+    )
+  )
 
 
 (def Electron (nodejs/require "electron"))
 
+(def form-data (reaction (-> @state/client-db :connection :form)))
+
+(def connected-entity*
+  (reaction
+    (if-let [email-address (-> @state/jvm-main-db :connection :email_address)]
+      (-> email-address (clojure.string/split #"@") first)
+      (-> @state/jvm-main-db :connection :login))))
+
+(def connected-target*
+  (reaction
+    (when-let [url (-> @state/jvm-main-db :connection :url)]
+      (let [gurl (Uri. url)]
+        (str (.getDomain gurl)
+             (when-let [p (.getPort gurl)]
+               (str ":" p)))))))
+
+(defn compact-component []
+  [:span
+   (when-let [ce @connected-entity*]
+     [:span ce])
+   (when-let [ct @connected-target*]
+     [:span
+      "@"
+      [:span ct ]])])
+
 (defn connect []
-  (js/console.log "CONNECT!")
-  ; TODO
-  ;(.send (.-ipcRenderer Electron) "madek:connect" (-> @state/client-db :connection :form clj->js))
-  )
+  (let [req {:method :post
+             :json-params @form-data
+             :path "/connect"}]
+    (request/send-off
+      req {:title "Connect!"})))
 
 (defn update-form-data [fun]
   (swap! state/client-db
@@ -28,7 +59,6 @@
 (defn update-form-data-value [k v]
   (update-form-data (fn [fd] (assoc fd k v))))
 
-(def form-data (reaction (-> @state/client-db :connection :form)))
 
 (def url-is-valid
   (reaction
@@ -37,6 +67,8 @@
         (re-matches #"https?://[^/]+" url)))))
 
 (def form-is-valid url-is-valid)
+
+(def show-password* (atom false))
 
 (defn form []
   [:div.form
@@ -48,7 +80,7 @@
       :placeholder "URL of you madek instance"
       :value (:url @form-data)
       :on-change #(update-form-data-value
-                    :url (-> % .-target .-value))}]]
+                    :url (-> % .-target .-value presence))}]]
    [:div.form-group
     [:label {:for "login"} "Login | e-mail address | api-client name"]
     [:input.login.form-control
@@ -56,19 +88,23 @@
       :placeholder "Login"
       :value (:login @form-data)
       :on-change #(update-form-data-value
-                    :login (-> % .-target .-value))}]]
+                    :login (-> % .-target .-value presence))}]]
+
    [:div.form-group
-    [:label {:for "password"} "Password | token"]
+    [:label {:for "password"} "Password | api-token"
+     [:span " ("
+      [:input {:type :checkbox
+               :on-change #(update-form-data (fn [fd] (assoc fd :show-password (-> fd :show-password not)))) ;#(swap! show-password* (fn [sp] (not sp)))
+               :checked (-> @form-data :show-password)}] " show)"]]
     [:input.password.form-control
-     {:type "password"
+     {:type (if (-> @form-data :show-password) "text" "password")
       :placeholder "Password"
       :value (:password @form-data)
       :on-change #(update-form-data-value
-                    :password(-> % .-target .-value))
-      }]]
+                    :password(-> % .-target .-value presence))}]]
    [:div.form-group.pull-right
     [:button.btn.btn-primary
-     (merge {:on-click #(connect)}
+     (merge {:on-click connect}
             (when (not @form-is-valid)
               {:disabled "yes"}))
      "Connect"]]])
