@@ -1,7 +1,5 @@
 (ns madek.app.server.utils
   (:require
-    [madek.app.server.state :as state]
-
     [json-roa.client.core :as roa]
     [clojure.string :as string]
     [clojure.java.shell :refer [sh]]

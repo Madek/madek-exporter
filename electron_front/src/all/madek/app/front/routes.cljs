@@ -3,6 +3,7 @@
     [madek.app.front.about]
     [madek.app.front.connection]
     [madek.app.front.debug]
+    [madek.app.front.download]
     [madek.app.front.state]
 
     [accountant.core :as accountant]
@@ -14,6 +15,9 @@
 
 (defroute connection-page "/connection" []
   (reset! madek.app.front.state/current-page madek.app.front.connection/page))
+
+(defroute download-page "/download" []
+  (reset! madek.app.front.state/current-page madek.app.front.download/page))
 
 (defroute debug-page "/debug" []
   (reset! madek.app.front.state/current-page madek.app.front.debug/page))

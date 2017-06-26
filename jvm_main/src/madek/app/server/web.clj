@@ -7,20 +7,19 @@
     [madek.app.server.utils :as utils]
     [madek.app.server.utils :refer [deep-merge]]
 
-    [json-roa.client.core :as roa]
-
-    [clojure.pprint :refer [pprint]]
-
+    [cheshire.core :as cheshire]
     [clj-http.client :as http-client]
+    [clojure.data.json :as json]
+    [clojure.pprint :refer [pprint]]
     [compojure.core :refer [ANY GET PATCH POST DELETE defroutes]]
     [compojure.route :refer [not-found resources]]
     [environ.core :refer [env]]
     [hiccup.core :refer [html]]
     [hiccup.page :refer [include-js include-css]]
+    [json-roa.client.core :as roa]
     [ring.middleware.defaults :refer [site-defaults wrap-defaults]]
     [ring.middleware.json]
     [ring.util.response :refer [response]]
-
 
     [clj-logging-config.log4j :as logging-config]
     [clojure.tools.logging :as logging]
@@ -43,37 +42,48 @@
                                    (-> @state/db :connection :session-token)}}})
       :body))
 
-(defn download-entity-check [request]
+(defn download-step1 [request]
   (catcher/snatch
     {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
-    (let [url (-> request :body :entity-url)
-          entity-data (get-entity-data-from-webapp url)]
-      (if-not (get #{"MediaEntry" "Collection"} (:type entity-data))
-        {:status 422 :body (str "Only sets (aka. Collections) can be downloaded, "
-                                "this entity es of type " (:type entity-data))}
-        (do (swap! state/db
-                   (fn [db dl-entity]
-                     (deep-merge db
-                                 {:download
-                                  {:state :download-entity-checked
-                                   :entity dl-entity}}))
-                   (assoc
-                     (select-keys entity-data [:title :uuid :type])
-                     :url url))
-            {:status 204})))))
-
-
-(defn download-entity-delete [_]
-  (swap! state/db (fn [db]
-                    (merge db
-                           {:download
-                            {:entity nil
-                             :state nil
-                             }})))
-  {:status 204})
-
+    (let [http-options (-> @state/db :connection :http-options)
+          id (-> request :body :entity-id)
+          entity (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
+                                   :default-conn-opts (-> @state/db :connection :http-options))
+                     (roa/relation :collection)
+                     (roa/get {:id id}))
+          title (-> entity
+                    (roa/relation :meta-data)
+                    (roa/get {:meta_keys (json/write-str ["madek_core:title"])})
+                    roa/coll-seq first (roa/get {}) roa/data :value)]
+      (do (swap! state/db
+                 (fn [db dl-entity target-dir]
+                   (deep-merge db
+                               {:download
+                                {:step1-completed true
+                                 :entity dl-entity
+                                 :target-directory target-dir}}))
+                 {:title title
+                  :uuid id
+                  :type "Collection"
+                  :url (-> request :body :url)}
+                 (-> request :body :target-directory))
+          {:status 204}))))
 
 ;(pprint @state/db)
+
+
+;### set options ##############################################################
+
+(defn patch-download [request]
+  (catcher/snatch
+    {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
+    (swap! state/db
+           (fn [db body]
+             (assoc-in db [:download]
+                       (deep-merge (:download db)
+                                   body)))
+           (:body request))
+    {:status 204}))
 
 ;##############################################################################
 
@@ -99,16 +109,14 @@
                                    (fn [db e]
                                      (deep-merge db
                                                  {:download
-                                                  {:state :failed
+                                                  {:download-finished true
                                                    :errors {:dowload-error (str e)}}}))
                                    e))
                :throwable Throwable}
               (case (-> @state/db :download :entity :type)
                 "Collection"  (export/download-set id target-dir recursive? entry-point http-options)
-                "MediaEntry" (export/download-media-entry id target-dir entry-point http-options)
-                )
-              (swap! state/db (fn [db] (assoc-in db [:download :state] :finished))))
-            )))
+                "MediaEntry" (export/download-media-entry id target-dir entry-point http-options))
+              (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true)))))))
 
 (defn download [request]
   (if (and @download-future (not (realized? @download-future)))
@@ -119,21 +127,18 @@
                            (fn [db e]
                              (deep-merge db
                                          {:download
-                                          {:state :failed
+                                          {:download-finished true
                                            :errors {:dowload-error (str e)}}}))
                            e))
        :throwable Throwable}
-      (swap! state/db (fn [db] (assoc-in db [:download :state] :downloading)))
+      (swap! state/db (fn [db] (assoc-in db [:download :download-started] true)))
       (let [id (-> @state/db :download :entity :uuid)
-            target-dir (-> @state/db :download-parameters :target-dir)
-            recursive? (-> @state/db :download-parameters :recursive not not)
-            entry-point (str (-> @state/db :connection :madek-url) "/api")
-            http-options (utils/options-to-http-options
-                           (-> @state/db :connection
-                               (select-keys [:session-token :login :password])))]
+            target-dir (-> @state/db :download :target-directory)
+            recursive? (-> @state/db :download :recursive not not)
+            entry-point (str (-> @state/db :connection :url) "/api")
+            http-options (-> @state/db :connection :http-options)]
         (start-download-future id target-dir recursive? entry-point http-options))
       {:status 202})))
-
 
 (defn patch-download-item [request]
   (logging/debug 'patch-download-item {:request request})
@@ -187,16 +192,18 @@
   (DELETE "/download" _ #'delete-download)
 
   (POST "/connect" _ #'connection/connect-to-madek-server)
+
   (POST "/open" _ #'open)
+
+  (PATCH "/download" _ #'patch-download)
+
   (PATCH "/download/items/:id" _ #'patch-download-item)
 
   (PATCH "/download-parameters" _ #'patch-download-parameters)
 
-
   (POST "/download" _ #'download)
 
-  (POST "/download/entity" _ #'download-entity-check)
-  (DELETE "/download/entity" _ #'download-entity-delete)
+  (POST "/download/step1" _ #'download-step1)
 
   (ANY "/shutdown" _ #'shutdown)
 
@@ -219,4 +226,4 @@
 ;(logging-config/set-logger! :level :debug)
 ;(logging-config/set-logger! :level :info)
 ;(debug/debug-ns 'ring.middleware.resource)
-;(debug/debug-ns *ns*)
+(debug/debug-ns *ns*)

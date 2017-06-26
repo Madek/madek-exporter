@@ -22,8 +22,11 @@
     [:ul.navbar-nav.nav
      [:li [:a {:href (routes/about-page)} "About"]]
      [:li [:a {:href (routes/connection-page)} "Connection"]]
+     [:li [:a {:href (routes/download-page)} "Export"]]
      [:li [:a {:href (routes/debug-page)} "Debug"]]
-     ]
+     [:li [:a {:href "#" }
+           [:input {:type :checkbox :on-click #(swap! state/client-db assoc :debug (-> @state/client-db :debug not))
+                    :checked (-> @state/client-db :debug)}]]]]
     [:ul.nav.navbar-nav.navbar-right
      [:li
       [:a [connection/compact-component]]]]]])

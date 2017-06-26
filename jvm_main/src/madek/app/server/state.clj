@@ -1,5 +1,6 @@
 (ns madek.app.server.state
   (:require
+    [madek.app.server.utils :as utils :refer [exit presence deep-merge]]
 
     [clojure.set :refer [difference]]
     [compojure.core :as cpj]
@@ -20,12 +21,17 @@
 
 ;### THE DATABASE #############################################################
 
-(defonce db (atom nil))
+(def default-download-directory
+  (clojure.string/join java.io.File/separator
+               [(System/getProperty "user.home")
+                "Downloads" "Madek-Export"]))
 
-;(reset! db {:x 42 :y 5})
+(defonce db (atom {:download {:target-directory default-download-directory}}))
+;(reset! db {:download {:target-directory default-download-directory}})
 
-(defonce clients
-  (atom {}))
+(swap! db assoc-in [:download :state] :step1)
+
+(defonce clients (atom {}))
 
 ;### sente setup ##############################################################
 
@@ -109,7 +115,7 @@
 ;### initialize ###############################################################
 
 (defn initialize [initial-db]
-  (reset! db initial-db)
+  (swap! db deep-merge initial-db)
   (initialize-sente)
   (add-watch connected-uids :connected-uids #'watch-connected-uids)
   (add-watch db :db #'watch-db)

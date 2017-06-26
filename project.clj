@@ -5,6 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [
 
+                 [camel-snake-kebab "0.4.0"]
                  [cljs-http "0.1.43"]
                  [cljsjs/moment "2.17.1-0"]
                  [com.lucasbradstreet/cljs-uuid-utils "1.0.2"]
@@ -13,6 +14,7 @@
                  [environ "1.1.0"]
                  [fipp "0.6.9"]
                  [hiccup "1.0.5"]
+                 [inflections "0.13.0"]
                  [json-roa_clj-client "0.2.0"]
                  [log4j/log4j "1.2.17" :exclusions [javax.mail/mail javax.jms/jms com.sun.jdmk/jmxtools com.sun.jmx/jmxri]]
                  [logbug "4.2.2"]

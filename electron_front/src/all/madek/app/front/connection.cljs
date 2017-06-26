@@ -109,8 +109,41 @@
               {:disabled "yes"}))
      "Connect"]]])
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def connection* (reaction (-> @state/jvm-main-db :connection)))
+
+(def connected?*
+  (reaction (and (-> @connection* :url presence boolean)
+                 (-> @connection* :email_address presence boolean))))
+
+(defn connection-connected-component []
+  [:div.connected
+   [:div.panel.panel-success
+    [:div.panel.panel-heading
+     [:h2 "Connected!"]]
+    [:div.panel.panel-body
+     [:p.text-success
+      "Your are connected to " [:code (-> @connection* :url)]
+      " as " [:code [:em (-> @connection* :email_address)]] "."]
+     [:pre (with-out-str (pprint @connection*))]]]])
+
+(defn connection-pending-component []
+  [:div.pending
+   [:div.alert.alert-warning
+    [:p "You are not connected yet!"
+     ]]])
+
+(defn connection-status-component []
+  [:div.connection.status
+   (if @connected?*
+     [connection-connected-component]
+     [connection-pending-component])
+   ])
+
 
 (defn page []
   [:div.connection
    [:h1 "Connection"]
-   (form)])
+   [connection-status-component]
+   (when-not @connected?* [form])])
