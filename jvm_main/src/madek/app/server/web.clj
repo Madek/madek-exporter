@@ -1,12 +1,15 @@
 (ns madek.app.server.web
+  (:refer-clojure :exclude [str keyword])
+
   (:require
 
     [madek.app.server.connection :as connection]
     [madek.app.server.export :as export]
     [madek.app.server.state :as state]
-    [madek.app.server.utils :as utils]
+    [madek.app.server.utils :as utils :refer [str keyword]]
     [madek.app.server.utils :refer [deep-merge]]
 
+    [inflections.core :refer [capitalize]]
     [cheshire.core :as cheshire]
     [clj-http.client :as http-client]
     [clojure.data.json :as json]
@@ -47,9 +50,12 @@
     {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
     (let [http-options (-> @state/db :connection :http-options)
           id (-> request :body :entity-id)
+          entity-type (case (-> request :body :entity-type)
+                        "entry" :media-entry
+                        "set" :collection)
           entity (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
                                    :default-conn-opts (-> @state/db :connection :http-options))
-                     (roa/relation :collection)
+                     (roa/relation entity-type)
                      (roa/get {:id id}))
           title (-> entity
                     (roa/relation :meta-data)
@@ -64,7 +70,7 @@
                                  :target-directory target-dir}}))
                  {:title title
                   :uuid id
-                  :type "Collection"
+                  :type entity-type
                   :url (-> request :body :url)}
                  (-> request :body :target-directory))
           {:status 204}))))
@@ -114,8 +120,8 @@
                                    e))
                :throwable Throwable}
               (case (-> @state/db :download :entity :type)
-                "Collection"  (export/download-set id target-dir recursive? entry-point http-options)
-                "MediaEntry" (export/download-media-entry id target-dir entry-point http-options))
+                :collection (export/download-set id target-dir recursive? entry-point http-options)
+                :media-entry (export/download-media-entry id target-dir entry-point http-options))
               (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true)))))))
 
 (defn download [request]

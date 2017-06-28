@@ -49,7 +49,6 @@
    [:h2 "Downloading / Exporting Now!"]
    [progress-component] ])
 
-
 (defn submit-dismiss []
   (let [req {:method :patch
              :json-params

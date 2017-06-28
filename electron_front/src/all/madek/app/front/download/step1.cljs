@@ -19,7 +19,7 @@
     ))
 
 
-(def path-regex #"^/(sets)/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$")
+(def path-regex #"^/(sets|entries)/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$")
 
 (def form-data* (reaction (-> @state/client-db :download :pre-check-form)))
 
@@ -45,7 +45,7 @@
     (boolean
       (when-let [connection-url (Uri. (-> @state/jvm-main-db :connection :url))]
         (and (-> @data* :entity-id presence boolean)
-             (= :set (-> @data* :entity-type))
+             (#{:set :entry} (-> @data* :entity-type))
              (= (:domain @data*) (.getDomain connection-url))
              (= (:port @data*) (.getPort connection-url))
              (= (:schme @data*) (.getScheme connection-url)))))))

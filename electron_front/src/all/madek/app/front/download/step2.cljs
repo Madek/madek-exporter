@@ -17,12 +17,13 @@
     [goog Uri]
     ))
 
-
 (def Electron (nodejs/require "electron"))
 
 (def shell (.-shell Electron))
 
 (def form-data* (reaction (-> @state/client-db :download :download-form)))
+
+(def download* (reaction (-> @state/jvm-main-db :download)))
 
 (def set-value
   (form-utils/create-update-form-data-setter
@@ -55,16 +56,17 @@
 
 (defn form-component []
   [:div.form
-   [:div.form-group
-    [:label "Recursive export: "]
-    [:br]
-    [:input {:type :checkbox
-             :on-click #(set-value :recursive (-> @form-data* :recursive not))
-             :checked (-> @form-data* :recursive)} ] " recurse"
-    [:p.help-block "Sets and media-entries  which are descendants of the selected set "
-     " will be exported  if this option is enabled.."
-     "Recurring entities will be replaced by symbolic links the file system and "
-     "therefore infinite recursion is avoided." ]]
+   (when (= :set (-> @download* :entity :type))
+     [:div.form-group
+      [:label "Recursive export: "]
+      [:br]
+      [:input {:type :checkbox
+               :on-click #(set-value :recursive (-> @form-data* :recursive not))
+               :checked (-> @form-data* :recursive)} ] " recurse"
+      [:p.help-block "Sets and media-entries  which are descendants of the selected set "
+       " will be exported  if this option is enabled.."
+       "Recurring entities will be replaced by symbolic links the file system and "
+       "therefore infinite recursion is avoided." ]])
    [:div.pull-left
     [:button.btn.btn-warning
      {:on-click back}
