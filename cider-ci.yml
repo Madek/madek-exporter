@@ -28,10 +28,11 @@ jobs:
           traits:
             JDK: true
             Leiningen: true
-            nodejs: true
-            ruby-install: true
             libgconf-2-4: true
-            # nx-18122-vm: true
+            nodejs: true
+            #nx-07288_linux-vm: true
+            ubuntu-desktop: true
+            ruby-install: true
             wine: true
             xorg: true
           scripts:

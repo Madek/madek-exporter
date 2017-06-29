@@ -15,10 +15,13 @@
     (.kill @jvm-main-process-child "SIGKILL")))
 
 (defn start []
-  (let [jar-path (str env/app-dir "/" "jvm-main.jar")]
+  (let [jar-path (str env/app-dir "/" "jvm-main.jar")
+        java-path (cond
+                    (= env/env :prod) (str env/app-dir "/../jre/bin/java")
+                    :else "/usr/bin/java" )]
     (.log js/console "starting jvm-main-process")
     (reset! jvm-main-process-child
-            (.spawn child-process "/usr/bin/java"
+            (.spawn child-process java-path
                     (clj->js ["-jar" jar-path
                               "-p" env/jvm-port
                               "-s" env/jvm-password])))
