@@ -26,7 +26,7 @@
   (reagent/atom
     {:debug false
      :client-id (uuid/uuid-string (uuid/make-random-uuid))
-     :connection {:form {:url "http://localhost:3100"
+     :connection {:form {:url nil
                          :login nil
                          :password nil
                          }}}))

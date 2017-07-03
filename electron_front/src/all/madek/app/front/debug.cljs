@@ -7,6 +7,11 @@
 
 (defn content []
   [:div.content
+   [:div.form
+    [:div.form-group
+     [:input {:type :checkbox :on-click #(swap! state/client-db assoc :debug (-> @state/client-db :debug not))
+              :checked (-> @state/client-db :debug)}]
+     " Show per page debug info"]]
    [:p "Electron main "
     (if (empty? @state/electron-main-db)
       "waiting ..."

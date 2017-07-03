@@ -40,7 +40,7 @@
      [:span ce])
    (when-let [ct @connected-target*]
      [:span
-      "@"
+      " " ; utf-8 m-space!
       [:span ct ]])])
 
 (defn connect []
@@ -77,7 +77,7 @@
     [:input.url.form-control
      {:class (if @url-is-valid "" "has-error")
       :type "url"
-      :placeholder "URL of you madek instance"
+      :placeholder "https://medienarchiv.zhdk.ch"
       :value (:url @form-data)
       :on-change #(update-form-data-value
                     :url (-> % .-target .-value presence))}]]

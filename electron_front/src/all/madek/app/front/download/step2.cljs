@@ -56,7 +56,7 @@
 
 (defn form-component []
   [:div.form
-   (when (= :set (-> @download* :entity :type))
+   (when (= :collection (-> @download* :entity :type))
      [:div.form-group
       [:label "Recursive export: "]
       [:br]
