@@ -120,6 +120,10 @@
                  [url-input-component]
                  [target-dir-input-component]
                  [:div.clearfix
+                  [:div.pull-left
+                   [:a.btn.btn-warning
+                    {:href "/connection"}
+                    "Back to connection"]]
                   [:button.btn.btn-primary.pull-right
                    (merge
                      {:on-click submit}

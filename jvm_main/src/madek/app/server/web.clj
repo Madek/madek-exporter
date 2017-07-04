@@ -36,15 +36,6 @@
 
 ;### download entity ##########################################################
 
-(defn get-entity-data-from-webapp [url]
-  (->  url
-      (http-client/get {:accept :json
-                        :as :json
-                        :cookies {"madek-session"
-                                  {:value
-                                   (-> @state/db :connection :session-token)}}})
-      :body))
-
 (defn download-step1 [request]
   (catcher/snatch
     {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
@@ -193,6 +184,24 @@
 ;##############################################################################
 
 
+(defn vocabularies [_]
+  (catcher/snatch
+    {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
+    (let [http-options (-> @state/db :connection :http-options)
+          vocabularies (->> (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
+                                              :default-conn-opts (-> @state/db :connection :http-options))
+                                (roa/relation :vocabularies)
+                                (roa/get {})
+                                roa/coll-seq)
+                            (map #(roa/get % {}))
+                            (map roa/data))]
+      {:status 200
+       :body vocabularies})))
+
+;(vocabularies nil)
+
+;##############################################################################
+
 (defroutes routes
 
   (DELETE "/download" _ #'delete-download)
@@ -212,6 +221,8 @@
   (POST "/download/step1" _ #'download-step1)
 
   (ANY "/shutdown" _ #'shutdown)
+
+  (GET "/vocabularies/" _ #'vocabularies)
 
   (resources "/")
 

@@ -50,6 +50,12 @@
     (request/send-off
       req {:title "Connect!"})))
 
+(defn disconnect []
+  (let [req {:method :delete
+             :path "/connect"}]
+    (request/send-off
+      req {:title "Disconnect!"})))
+
 (defn update-form-data [fun]
   (swap! state/client-db
          (fn [cs]
@@ -70,7 +76,7 @@
 
 (def show-password* (atom false))
 
-(defn form []
+(defn connect-form []
   [:div.form
    [:div.form-group {:class (if @url-is-valid "" "has-error")}
     [:label {:for "url"} "Madek base URL "]
@@ -109,6 +115,17 @@
               {:disabled "yes"}))
      "Connect"]]])
 
+(defn continue-form []
+  [:div.form
+   [:div.pull-left
+    [:button.btn.btn-warning
+     {:on-click disconnect}
+     "Disconnect" ]]
+   [:div.pull-right
+    [:a.btn.btn-primary
+     {:href "/download"}
+     "Continue to export" ]]])
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def connection* (reaction (-> @state/jvm-main-db :connection)))
@@ -146,4 +163,7 @@
   [:div.connection
    [:h1 "Connection"]
    [connection-status-component]
-   (when-not @connected?* [form])])
+   (if-not @connected?*
+     [connect-form]
+     [continue-form]
+     )])

@@ -54,19 +54,42 @@
      [:em (-> @state/jvm-main-db :download :entity :title)]]]
    [:p "Export to " [:code (-> @state/jvm-main-db :download :target-directory)] "."]])
 
+;;; recursive ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn recursive-from-group-component []
+  (when (= :collection (-> @download* :entity :type))
+    [:div.form-group
+     [:label "Recursive export: "]
+     [:br]
+     [:input {:type :checkbox
+              :on-click #(set-value :recursive (-> @form-data* :recursive not))
+              :checked (-> @form-data* :recursive)} ] " recurse"
+     [:p.help-block "Sets and media-entries  which are descendants of the selected set "
+      " will be exported  if this option is enabled.."
+      "Recurring entities will be replaced by symbolic links the file system and "
+      "therefore infinite recursion is avoided." ]]))
+
+;;; prefix ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn prefix-load-select-data []
+  (request/send-off
+    {:method :get
+     :path "/vocabularies/"}
+    {:title "Fetch Vocabularies"}))
+
+(defn prefix-component []
+  (reagent/create-class
+    {:component-did-mount prefix-load-select-data
+     :render (fn []
+               [:div.form-group.prefix
+                ])}))
+
+;;; form ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn form-component []
   [:div.form
-   (when (= :collection (-> @download* :entity :type))
-     [:div.form-group
-      [:label "Recursive export: "]
-      [:br]
-      [:input {:type :checkbox
-               :on-click #(set-value :recursive (-> @form-data* :recursive not))
-               :checked (-> @form-data* :recursive)} ] " recurse"
-      [:p.help-block "Sets and media-entries  which are descendants of the selected set "
-       " will be exported  if this option is enabled.."
-       "Recurring entities will be replaced by symbolic links the file system and "
-       "therefore infinite recursion is avoided." ]])
+   [recursive-from-group-component]
+   [prefix-component]
    [:div.pull-left
     [:button.btn.btn-warning
      {:on-click back}
