@@ -1,8 +1,8 @@
-(defproject madek "0.1.0-SNAPSHOT"
+(defproject madek "0.2.0"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
+  :license {:name "GPL"
+            :url "https://de.wikipedia.org/wiki/GNU_General_Public_License"}
   :dependencies [
 
                  [camel-snake-kebab "0.4.0"]

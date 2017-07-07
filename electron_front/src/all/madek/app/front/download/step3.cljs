@@ -43,7 +43,10 @@
          :on-click #(.openExternal
                       shell (-> @state/jvm-main-db :download :entity :url))}
      [:em (-> @state/jvm-main-db :download :entity :title)]]]
-   [:p "Export to " [:code (-> @state/jvm-main-db :download :target-directory)] "."]])
+   [:p "Export to " [:code (-> @state/jvm-main-db :download :target-directory)] "."]
+   [:p "Meta-key used for prefixing entities: " (if-let [pmk (-> @state/jvm-main-db :download :prefix_meta_key presence)]
+                                                 [:code pmk]
+                                                 [:span "none"]) "."]])
 
 (defn debug-component []
   (when (:debug @state/client-db)
@@ -54,9 +57,9 @@
 (defn form-component []
   [:div.form
    [:div.pull-left
-    [:button.btn.btn-warning
+    [:button.btn.btn-info
      {:on-click back}
-     "Back" ]]
+     "Back to step 2" ]]
    [:div.pull-right
     [:button.btn.btn-primary
      {:on-click submit}

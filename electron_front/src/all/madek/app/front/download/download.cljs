@@ -4,6 +4,7 @@
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.state :as state]
     [madek.app.front.request :as request]
+    [madek.app.front.connection :as connection]
 
     [inflections.core :refer [pluralize]]
 
@@ -49,7 +50,7 @@
    [:h2 "Downloading / Exporting Now!"]
    [progress-component] ])
 
-(defn submit-dismiss []
+(defn clear-export-steps []
   (let [req {:method :patch
              :json-params
              {:step1-completed false
@@ -62,11 +63,21 @@
     (request/send-off
       req {:title "Dismiss Download!"})))
 
+(defn disconnect []
+  (clear-export-steps)
+  (connection/disconnect)
+  (swap! state/client-db assoc-in [:connection :form :password] nil))
+
 (defn dismiss-component []
-  [:div.form.pull-right
-   [:button.btn.btn-primary
-    {:on-click submit-dismiss}
-    "Dismiss" ]])
+  [:div.dismiss
+   [:div.form.pull-left
+    [:button.btn.btn-primary
+     {:on-click clear-export-steps}
+     "Back to step 1 - start a new export" ]]
+   [:div.form.pull-right
+    [:button.btn.btn-warning
+     {:on-click disconnect}
+     "Disconnect" ]]])
 
 (defn downloaded-component []
   [:div

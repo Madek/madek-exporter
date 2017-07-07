@@ -39,7 +39,7 @@
 
 (defn submit []
   (let [req {:method :patch
-             :json-params (assoc @form-data*
+             :json-params (assoc (select-keys @form-data* [:prefix_meta_key :recursive])
                                  :step2-completed true)
              :path "/download"}]
     (request/send-off
@@ -71,18 +71,83 @@
 
 ;;; prefix ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn prefix-load-select-data []
-  (request/send-off
-    {:method :get
-     :path "/vocabularies/"}
-    {:title "Fetch Vocabularies"}))
+(def vocabulary* (reaction
+                   (-> @form-data* :vocabulary presence)))
+
+(defn load-vocabulary-meta-keys []
+  (when-let [vocabulary @vocabulary*]
+    (when-not (-> @form-data* (get vocabulary nil))
+      (request/send-off
+        {:method :get
+         :path (str "/vocabularies/" vocabulary "/meta-keys/")}
+        {:title (str "Fetch MetaKeys for " vocabulary)}
+        :callback (fn [resp]
+                    (when (:success resp)
+                      (set-value vocabulary
+                                 (conj (:body resp)
+                                       {:label "None"
+                                        :id nil
+                                        :vocabulary_id vocabulary }))))))))
+
+(add-watch vocabulary* :lazy-load-meta-keys-watch
+           (fn [_ _ _ vocabulary]
+             (when vocabulary
+               (when-not (get @form-data* vocabulary nil)
+                 (load-vocabulary-meta-keys)))))
+
+(defn prefix-meta-key-component []
+  (when-let [meta-keys-options (-> @form-data* (get @vocabulary* nil))]
+    [:div.form-group.meta-key
+     [:label "Meta-key:"]
+     [:select.form-control
+      {:on-change #(set-value :prefix_meta_key (.. % -target -value))
+       :default-value (or (-> @form-data* :prefix_meta_key) "")}
+      (for [option meta-keys-options]
+        [:option {:key (:id option) } (:id option)])]
+     [:p.help-block
+      "If the blank option is select neither prefix nor underscore will be present. "
+      "This is probably a good choice for automatized post processing. "]
+     [:p.help-block
+      "If the value of the corresponding meta-key is plank or if there is no "
+      " such meta-key present for the entity "
+      " the id will be still prefixed with an underscore."]
+     [:p.help-block
+      "Only \"simple\" meta-keys, e.g. text based ones, should be used here." ]]))
+
+(defn load-vocabularies []
+  (when-not (-> @form-data* :vocabularies)
+    (request/send-off
+      {:method :get
+       :path "/vocabularies/"}
+      {:title "Fetch Vocabularies"}
+      :callback (fn [req] (set-value :vocabularies (:body req))))))
+
+(defn vocabulary-form-group-component []
+  [:div.form-group.vocabulary
+   [:label "Vocabulary:"]
+   [:select.form-control
+    {:on-change #(let [voc (.. % -target -value)]
+                   (when-not (= voc (-> @form-data* :vocabulary))
+                     (set-value :prefix_meta_key nil))
+                   (set-value :vocabulary voc))
+     :default-value (-> @form-data* :vocabulary)}
+    (for [option (or (-> @form-data* :vocabularies) {})]
+      [:option {:key (:id option) }(:id option)])]])
+
+(defn prefix-vocabulary-component []
+  (reagent/create-class
+    {:component-did-mount load-vocabularies
+     :render vocabulary-form-group-component}))
 
 (defn prefix-component []
-  (reagent/create-class
-    {:component-did-mount prefix-load-select-data
-     :render (fn []
-               [:div.form-group.prefix
-                ])}))
+  [:div.prefix
+   [:h4 "Prefix"]
+   [:p "For every set or media-entry a folder will be created. "
+    "The name of the folder consists of a prefix, an underscore and the id of the entity."
+    "The prefix will be determined bye the meta-key given in this section."]
+   [prefix-vocabulary-component]
+   [prefix-meta-key-component]
+   ])
 
 ;;; form ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -91,13 +156,13 @@
    [recursive-from-group-component]
    [prefix-component]
    [:div.pull-left
-    [:button.btn.btn-warning
+    [:button.btn.btn-info
      {:on-click back}
-     "Back" ]]
+     "Back to step 1" ]]
    [:div.pull-right
     [:button.btn.btn-primary
      {:on-click submit}
-     "Next" ]]
+     "Continue to step 3" ]]
    [:div.clearfix]])
 
 (defn debug-component []
@@ -116,9 +181,15 @@
    [debug-component]
    ])
 
+(defn initialize-form-data []
+  (when-not (:vocabulary @form-data*)
+    (set-value :vocabulary "madek_core"))
+  (when-not (:prefix_meta_key @form-data*)
+    (set-value :prefix_meta_key "madek_core:title")))
+
 (defn component []
   (reagent/create-class
-    {:component-did-mount (fn [])
+    {:component-did-mount initialize-form-data
      :render main-component }))
 
 

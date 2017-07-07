@@ -14,19 +14,12 @@
     [logbug.thrown :as thrown]
     ))
 
-
 (defn auth-info [api-entry-point api-http-opts]
   (let [response (-> (roa/get-root api-entry-point :default-conn-opts api-http-opts)
                      (roa/relation :auth-info)
                      (roa/get {}))]
     (logging/debug (-> response roa/data))
     response))
-
-(defn connect-with-authentication []
-  )
-
-(defn connect-anonymously []
-  )
 
 (defn connect-to-madek-server [request]
   (catcher/snatch
@@ -65,7 +58,8 @@
                                              :body "Authentication failed. Check your credentials!"}
              :else (throw e))))))
 
-
+(defn disconnect [_]
+  (swap! state/db assoc-in [:connection] {}))
 
 ;### Debug ####################################################################
 ;(logging-config/set-logger! :level :debug)

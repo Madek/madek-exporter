@@ -121,13 +121,13 @@
                  [target-dir-input-component]
                  [:div.clearfix
                   [:div.pull-left
-                   [:a.btn.btn-warning
+                   [:a.btn.btn-info
                     {:href "/connection"}
                     "Back to connection"]]
                   [:button.btn.btn-primary.pull-right
                    (merge
                      {:on-click submit}
                      (when (not @form-valid?*) {:disabled true}))
-                   "Next"]] [:div.clearfix]]
+                   "Continue to step 2"]] [:div.clearfix]]
                 [debug-component]])}))
 

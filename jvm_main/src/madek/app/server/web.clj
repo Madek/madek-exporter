@@ -1,13 +1,12 @@
 (ns madek.app.server.web
-  (:refer-clojure :exclude [str keyword])
+  (:refer-clojure :exclude [str keyword ])
 
   (:require
 
     [madek.app.server.connection :as connection]
     [madek.app.server.export :as export]
     [madek.app.server.state :as state]
-    [madek.app.server.utils :as utils :refer [str keyword]]
-    [madek.app.server.utils :refer [deep-merge]]
+    [madek.app.server.utils :as utils :refer [str keyword deep-merge presence]]
 
     [inflections.core :refer [capitalize]]
     [cheshire.core :as cheshire]
@@ -97,7 +96,7 @@
                        e))
    :throwable Throwable})
 
-(defn start-download-future [id target-dir recursive? entry-point http-options]
+(defn start-download-future [id target-dir recursive? prefix-meta-key entry-point http-options]
   (reset! download-future
           (future
             (catcher/snatch
@@ -111,8 +110,12 @@
                                    e))
                :throwable Throwable}
               (case (-> @state/db :download :entity :type)
-                :collection (export/download-set id target-dir recursive? entry-point http-options)
-                :media-entry (export/download-media-entry id target-dir entry-point http-options))
+                :collection (export/download-set
+                              id target-dir recursive? prefix-meta-key
+                              entry-point http-options)
+                :media-entry (export/download-media-entry
+                               id target-dir prefix-meta-key
+                               entry-point http-options))
               (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true)))))))
 
 (defn download [request]
@@ -132,9 +135,10 @@
       (let [id (-> @state/db :download :entity :uuid)
             target-dir (-> @state/db :download :target-directory)
             recursive? (-> @state/db :download :recursive not not)
+            prefix-meta-key (-> @state/db :download :prefix_meta_key presence)
             entry-point (str (-> @state/db :connection :url) "/api")
             http-options (-> @state/db :connection :http-options)]
-        (start-download-future id target-dir recursive? entry-point http-options))
+        (start-download-future id target-dir recursive? prefix-meta-key entry-point http-options))
       {:status 202})))
 
 (defn patch-download-item [request]
@@ -195,10 +199,20 @@
                                 roa/coll-seq)
                             (map #(roa/get % {}))
                             (map roa/data))]
-      {:status 200
-       :body vocabularies})))
+      (response vocabularies))))
 
-;(vocabularies nil)
+(defn meta-keys [vocabulary]
+  (catcher/snatch
+    {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
+    (let [http-options (-> @state/db :connection :http-options)
+          meta-keys (->> (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
+                                           :default-conn-opts (-> @state/db :connection :http-options))
+                             (roa/relation :meta-keys)
+                             (roa/get {:vocabulary vocabulary})
+                             roa/coll-seq)
+                         (map #(roa/get % {}))
+                         (map roa/data))]
+      (response meta-keys))))
 
 ;##############################################################################
 
@@ -207,6 +221,7 @@
   (DELETE "/download" _ #'delete-download)
 
   (POST "/connect" _ #'connection/connect-to-madek-server)
+  (DELETE "/connect" _ #'connection/disconnect)
 
   (POST "/open" _ #'open)
 
@@ -223,6 +238,8 @@
   (ANY "/shutdown" _ #'shutdown)
 
   (GET "/vocabularies/" _ #'vocabularies)
+  (GET "/vocabularies/:vocabulary/meta-keys/"
+       [vocabulary] (#'meta-keys vocabulary))
 
   (resources "/")
 
@@ -232,12 +249,11 @@
   (I> wrap-handler-with-logging
       routes
       state/wrap
+      ring.middleware.json/wrap-json-response
       (wrap-defaults (assoc-in site-defaults [:security :anti-forgery] false))
       (ring.middleware.json/wrap-json-body {:keywords? true})
       ring.middleware.keyword-params/wrap-keyword-params
-      ring.middleware.params/wrap-params
-      ring.middleware.json/wrap-json-response
-      ))
+      ring.middleware.params/wrap-params))
 
 ;### Debug ####################################################################
 ;(logging-config/set-logger! :level :debug)

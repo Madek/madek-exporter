@@ -3,8 +3,7 @@
     [madek.app.server.state :as state]
     [madek.app.server.export.meta-data :as meta-data :refer [get-metadata write-meta-data]]
     [madek.app.server.export.files :as files :refer [download-media-files]]
-    [madek.app.server.utils :refer [deep-merge]]
-
+    [madek.app.server.utils :refer [deep-merge presence]]
 
     [json-roa.client.core :as roa]
     [clj-time.core :as time]
@@ -48,25 +47,25 @@
 
 ;### title and prefix #########################################################
 
-(defn get-title [media-resource]
+(defn get-prefix [prefix-meta-key media-resource]
   (-> media-resource
       (roa/relation :meta-data)
-      (roa/get {:meta_keys (cheshire/generate-string ["madek_core:title"])})
+      (roa/get {:meta_keys (cheshire/generate-string [(str prefix-meta-key)])})
       roa/coll-seq
       first
       (roa/get {})
       roa/data
-      :value))
+      :value str))
 
 (defn useableFileName [s]
   (.replaceAll s "[^a-zA-Z0-9 ]" ""))
 
-(defn path-prefix [media-resource]
-  (let [prefix
-        (if-let [title (get-title media-resource)]
-          (str (useableFileName title) "_")
-          "")]
-    (str prefix (-> media-resource roa/data :id))))
+(defn path-prefix [prefix-meta-key media-resource]
+  (let [prefix-part-one (if-not (presence prefix-meta-key) ""
+                          (if-let [mk-value (get-prefix
+                                              prefix-meta-key media-resource)]
+                            (str (useableFileName mk-value) "_") ""))]
+    (str prefix-part-one (-> media-resource roa/data :id))))
 
 
 ;### DL Media-Entry ###########################################################
@@ -83,18 +82,18 @@
          id))
 
 (defn download-media-entry
-  ([id target-dir api-entry-point api-http-opts]
+  ([id target-dir prefix-meta-key api-entry-point api-http-opts]
    (catcher/with-logging {}
      (let [media-entry (I> identity-with-logging
                            (roa/get-root api-entry-point
                                          :default-conn-opts api-http-opts)
                            (roa/relation :media-entry)
                            (roa/get {:id id}))]
-       (download-media-entry target-dir media-entry))))
-  ([dir-path media-entry]
+       (download-media-entry prefix-meta-key target-dir media-entry))))
+  ([prefix-meta-key dir-path media-entry]
    (catcher/with-logging {}
      (let [id (-> media-entry roa/data :id)
-           entry-prefix-path (path-prefix media-entry)
+           entry-prefix-path (path-prefix prefix-meta-key media-entry)
            entry-dir-path (str dir-path File/separator entry-prefix-path)
            meta-data (get-metadata media-entry)]
        (if (-> @state/db :download :items (get id))
@@ -127,7 +126,7 @@
 
 (declare download-set)
 
-(defn download-media-entries-for-set [id target-dir-path
+(defn download-media-entries-for-set [id target-dir-path prefix-meta-key
                                       api-entry-point api-http-opts]
   (let [me-get-opts (merge {:collection_id id}
                            (if (or (:basic-auth api-http-opts)
@@ -140,10 +139,10 @@
                        (roa/relation :media-entries)
                        (roa/get me-get-opts)
                        roa/coll-seq)]
-      (download-media-entry target-dir-path (roa/get me-rel {})))))
+      (download-media-entry prefix-meta-key target-dir-path (roa/get me-rel {})))))
 
 (defn download-collections-for-collection [collection target-dir-path recursive?
-                                           api-entry-point api-http-opts]
+                                           prefix-meta-key api-entry-point api-http-opts]
   (let [coll-get-opts (if (or (:basic-auth api-http-opts)
                               (-> api-http-opts :cookies (get "madek-session")))
                         {:me_get_full_size "true"}
@@ -157,14 +156,15 @@
                              (map #(roa/get % {})))]
       (download-set
         (-> collection roa/data :id)
-        target-dir-path recursive? api-entry-point api-http-opts))))
+        target-dir-path recursive? prefix-meta-key api-entry-point api-http-opts))))
 
-(defn download-set [id dl-path recursive? api-entry-point api-http-opts]
+(defn download-set [id dl-path recursive? prefix-meta-key
+                    api-entry-point api-http-opts]
   (let [collection (-> (roa/get-root api-entry-point
                                      :default-conn-opts api-http-opts)
                        (roa/relation :collection )
                        (roa/get {:id id}))
-        path-prefix (path-prefix collection)
+        path-prefix (path-prefix prefix-meta-key collection)
         target-dir-path (str dl-path File/separator path-prefix)
         meta-data (get-metadata collection)]
     (if (-> @state/db :download :items (get id))
@@ -183,10 +183,10 @@
         (io/make-parents target-dir-path)
         (write-meta-data target-dir-path meta-data id)
         (download-media-entries-for-set
-          id target-dir-path api-entry-point api-http-opts)
+          id target-dir-path prefix-meta-key api-entry-point api-http-opts)
         (when recursive?
           (download-collections-for-collection
-            collection target-dir-path recursive?
+            collection target-dir-path recursive? prefix-meta-key
             api-entry-point api-http-opts))
         (set-item-to-finished id)))))
 
