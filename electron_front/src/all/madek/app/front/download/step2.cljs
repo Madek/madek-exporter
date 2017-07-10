@@ -39,7 +39,8 @@
 
 (defn submit []
   (let [req {:method :patch
-             :json-params (assoc (select-keys @form-data* [:prefix_meta_key :recursive])
+             :json-params (assoc (select-keys @form-data*
+                                              [:prefix_meta_key :recursive :skip_media_files])
                                  :step2-completed true)
              :path "/download"}]
     (request/send-off
@@ -56,18 +57,31 @@
 
 ;;; recursive ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn recursive-from-group-component []
+(defn recursive-component []
   (when (= :collection (-> @download* :entity :type))
+    [:div.recursive
+     [:h4 "Recursion on sets"]
     [:div.form-group
-     [:label "Recursive export: "]
-     [:br]
      [:input {:type :checkbox
               :on-click #(set-value :recursive (-> @form-data* :recursive not))
               :checked (-> @form-data* :recursive)} ] " recurse"
      [:p.help-block "Sets and media-entries  which are descendants of the selected set "
-      " will be exported  if this option is enabled.."
+      " will be exported  if this option is enabled."
       "Recurring entities will be replaced by symbolic links the file system and "
-      "therefore infinite recursion is avoided." ]]))
+      "therefore infinite recursion is avoided." ]]]))
+
+;;; recursive ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn skip-media-files []
+  [:div.recursive
+   [:h4 "Skip files"]
+   [:div.form-group
+    [:input {:type :checkbox
+             :on-click #(set-value :skip_media_files (-> @form-data* :skip_media_files not))
+             :checked (-> @form-data* :skip_media_files)} ] " skip files"
+    [:p.help-block "The download of any media-files will be skipped if this is checked. "
+     "This means that only the meta-data of media-entries or sets will be downloaded. " ]]])
+
 
 ;;; prefix ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -153,8 +167,9 @@
 
 (defn form-component []
   [:div.form
-   [recursive-from-group-component]
+   [recursive-component]
    [prefix-component]
+   [skip-media-files]
    [:div.pull-left
     [:button.btn.btn-info
      {:on-click back}

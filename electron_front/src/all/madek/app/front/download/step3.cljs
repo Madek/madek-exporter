@@ -38,15 +38,20 @@
 
 (defn summary-component []
   [:div.summary
-   [:p " Export/Download the set "
+   [:p " Export/Download the " (case (-> @state/jvm-main-db :download :entity :type)
+                                 :collection "set"
+                                 :media-entry "media-entry"
+                                 "???") " "
     [:a {:href "#"
          :on-click #(.openExternal
                       shell (-> @state/jvm-main-db :download :entity :url))}
      [:em (-> @state/jvm-main-db :download :entity :title)]]]
    [:p "Export to " [:code (-> @state/jvm-main-db :download :target-directory)] "."]
+   [:p "Recursive: " [:code (-> @state/jvm-main-db :download :recursive not not str)] "."]
    [:p "Meta-key used for prefixing entities: " (if-let [pmk (-> @state/jvm-main-db :download :prefix_meta_key presence)]
-                                                 [:code pmk]
-                                                 [:span "none"]) "."]])
+                                                  [:code pmk]
+                                                  [:span "none"]) "."]
+   [:p "Skip media-files " [:code (-> @state/jvm-main-db :download :skip_media_files not not str)]"."]])
 
 (defn debug-component []
   (when (:debug @state/client-db)

@@ -96,7 +96,7 @@
                        e))
    :throwable Throwable})
 
-(defn start-download-future [id target-dir recursive? prefix-meta-key entry-point http-options]
+(defn start-download-future [id target-dir recursive? skip-media-files? prefix-meta-key entry-point http-options]
   (reset! download-future
           (future
             (catcher/snatch
@@ -111,10 +111,10 @@
                :throwable Throwable}
               (case (-> @state/db :download :entity :type)
                 :collection (export/download-set
-                              id target-dir recursive? prefix-meta-key
-                              entry-point http-options)
+                              id target-dir recursive? skip-media-files?
+                              prefix-meta-key entry-point http-options)
                 :media-entry (export/download-media-entry
-                               id target-dir prefix-meta-key
+                               id target-dir skip-media-files? prefix-meta-key
                                entry-point http-options))
               (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true)))))))
 
@@ -135,10 +135,11 @@
       (let [id (-> @state/db :download :entity :uuid)
             target-dir (-> @state/db :download :target-directory)
             recursive? (-> @state/db :download :recursive not not)
+            skip-media-files? (-> @state/db :download :skip_media_files not not)
             prefix-meta-key (-> @state/db :download :prefix_meta_key presence)
             entry-point (str (-> @state/db :connection :url) "/api")
             http-options (-> @state/db :connection :http-options)]
-        (start-download-future id target-dir recursive? prefix-meta-key entry-point http-options))
+        (start-download-future id target-dir recursive? skip-media-files? prefix-meta-key entry-point http-options))
       {:status 202})))
 
 (defn patch-download-item [request]
