@@ -9,6 +9,8 @@
     [madek.app.front.routes :as routes]
     [madek.app.front.state :as state]
     [madek.app.front.utils :refer [str keyword deep-merge]]
+
+    [accountant.core :as accountant]
     [reagent.core :as reagent :refer [atom]]
     [secretary.core :as secretary :include-macros true :refer [defroute]]
     ))
@@ -27,7 +29,6 @@
     [:ul.nav.navbar-nav.navbar-right
      [:li
       [:a [connection/compact-component]]]]]])
-
 
 (defn root-component []
   [:div.container-fluid

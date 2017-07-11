@@ -5,6 +5,9 @@
     [clojure.walk]
     ))
 
+(defn fix-path [path]
+  (clojure.string/replace path #"^/\w:" ""))
+
 (defn content []
   [:div.content
    [:div.form
@@ -12,6 +15,13 @@
      [:input {:type :checkbox :on-click #(swap! state/client-db assoc :debug (-> @state/client-db :debug not))
               :checked (-> @state/client-db :debug)}]
      " Show per page debug info"]]
+
+   [:div
+    [:h3 "PATH "]
+    [:pre
+     (with-out-str
+       (pprint (fix-path "/C:/debug")))]]
+
    [:p "Electron main "
     (if (empty? @state/electron-main-db)
       "waiting ..."

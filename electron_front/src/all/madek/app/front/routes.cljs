@@ -22,9 +22,16 @@
 (defroute debug-page "/debug" []
   (reset! madek.app.front.state/current-page madek.app.front.debug/page))
 
+
+; under windows the paths somehow come es e.g. "/C:/about" instead
+; of "/about"; this might not cover all cases but is also dangerous
+; to just remove everything before the colon
+(defn fix-path [path]
+  (clojure.string/replace path #"^/\w:" ""))
+
 (defn init []
   (accountant/configure-navigation!
-    {:nav-handler (fn [path] (secretary/dispatch! path))
-     :path-exists? (fn [path] (secretary/locate-route path))})
+    {:nav-handler (fn [path] (-> path fix-path secretary/dispatch!))
+     :path-exists? (fn [path] (-> path fix-path secretary/locate-route))})
   (secretary/dispatch! "/connection")
   (accountant/dispatch-current!))
