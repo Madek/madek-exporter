@@ -16,12 +16,6 @@
               :checked (-> @state/client-db :debug)}]
      " Show per page debug info"]]
 
-   [:div
-    [:h3 "PATH "]
-    [:pre
-     (with-out-str
-       (pprint (fix-path "/C:/debug")))]]
-
    [:p "Electron main "
     (if (empty? @state/electron-main-db)
       "waiting ..."

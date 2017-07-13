@@ -34,11 +34,11 @@
              :json-params nil
              :path "/download"}]
     (request/send-off
-      req {:title "Start Export/Download!"})))
+      req {:title "Start Export!"})))
 
 (defn summary-component []
   [:div.summary
-   [:p " Export/Download the " (case (-> @state/jvm-main-db :download :entity :type)
+   [:p " Export the " (case (-> @state/jvm-main-db :download :entity :type)
                                  :collection "set"
                                  :media-entry "media-entry"
                                  "???") " "

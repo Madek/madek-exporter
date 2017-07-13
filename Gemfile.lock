@@ -35,6 +35,8 @@ GEM
     faraday_middleware (0.11.0.1)
       faraday (>= 0.7.4, < 1.0)
     ffi (1.9.18)
+    filewatcher (0.5.4)
+      trollop (~> 2.0)
     git (1.3.0)
     http-cookie (1.0.3)
       domain_name (~> 0.5)
@@ -90,6 +92,7 @@ GEM
       websocket (~> 1.0)
     slop (3.6.0)
     thread_safe (0.3.6)
+    trollop (2.1.2)
     tzinfo (1.2.3)
       thread_safe (~> 0.1)
     unf (0.1.4)
@@ -112,6 +115,8 @@ DEPENDENCIES
   chromedriver-helper
   faker
   faraday
+  faraday_middleware
+  filewatcher
   git
   json_roa-client (>= 1.0.0, < 2.0.0)
   poltergeist
@@ -121,4 +126,4 @@ DEPENDENCIES
   selenium-webdriver
 
 BUNDLED WITH
-   1.14.5
+   1.14.6

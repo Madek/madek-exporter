@@ -45,7 +45,7 @@
 
 (defn page []
   [:div.page
-   [:h1 "Download / Export"]
+   [:h1 "Export"]
    (cond
      (-> @download* :download-finished) [download/downloaded-component]
      (-> @download* :download-started) [download/downloading-component]

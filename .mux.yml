@@ -28,4 +28,9 @@ windows:
       lein trampoline cljsbuild auto electron-main-dev
   7:
     name: css
-    command: lein sass watch
+    command: |
+      lein sass watch
+  9:
+    name: watch-releases
+    command: |
+      bundle exec ./bin/update-releases -w

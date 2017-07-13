@@ -75,7 +75,7 @@
 (defn url-input-component []
   [:div.form-group
    {:class (when-not @url-valid?* "has-error")}
-   [:label {:for "url"} "URL of the set to be exported:"]
+   [:label {:for "url"} "URL of the set or media-entry to be exported:"]
    [:input.form-control {:type "url"
                          :placeholder "https://your-madek-server/sets/UUID"
                          :value (:url @form-data*)
@@ -84,8 +84,8 @@
    [:p.help-block
     "The host and protocol must be equal to those from the connection. "]
    [:p.help-block
-    "Only sets can be downloaded and the url must be given in the UUID form. "
-    "Copy the first link of the " [:strong [:em "custom urls"]] " in the Madek web interface."]])
+    "The URL must be given in the UUID form. \"Speaking URLs\" are not permitted. "
+    "Copy the first link of the " [:strong [:em "custom urls"]] " from the Madek web interface."]])
 
 (defn target-dir-input-component []
   [:div.form-group

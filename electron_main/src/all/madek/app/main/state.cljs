@@ -8,13 +8,20 @@
 
 (def fs (nodejs/require "fs"))
 
+
 (def package-json
-  (.parse js/JSON (.readFileSync fs (str env/app-dir "/" "package.json"))))
+  (.parse js/JSON
+          (.readFileSync fs (str env/app-dir "/" "package.json"))))
+
+(def releases
+  (.parse js/JSON
+          (.readFileSync fs (str env/app-dir "/" "releases.json"))))
 
 (def db (atom {:timestamp (.now js/Date)
                :environment
                {:nodejs-version (.-version nodejs/process)
-                :package-json package-json}
+                :package-json package-json
+                :latest-release (first releases) }
                :jvm-process {:port env/jvm-port}}))
 
 (js/setInterval #(swap! db assoc :timestamp (.now js/Date)) 1000)

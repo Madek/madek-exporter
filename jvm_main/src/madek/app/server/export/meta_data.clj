@@ -46,7 +46,7 @@
        (map #(roa/get % {}))
        (map (fn [meta-datum]
               (case (-> meta-datum roa/data :type)
-                ("MetaDatum::Text" "TextDate") (get-scalar-meta-datum-value meta-datum)
+                ("MetaDatum::Text" "MetaDatum::TextDate") (get-scalar-meta-datum-value meta-datum)
                 (get-collection-meta-datum-values meta-datum)
                 )))))
 

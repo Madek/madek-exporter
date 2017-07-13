@@ -35,7 +35,7 @@
    ["-h" "--help"]])
 
 (defn usage [options-summary & more]
-  (->> ["Madek APP"
+  (->> ["Madek Exporter"
         ""
         "Options:"
         options-summary

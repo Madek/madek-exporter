@@ -10,6 +10,7 @@
 
     [cljs-http.client :as http]
     [cljs-uuid-utils.core :as uuid]
+    [cljs.core.async :refer [timeout]]
     [fipp.edn :refer [pprint]]
     [goog.string :as gstring]
     [goog.string.format]
@@ -19,7 +20,22 @@
 (def META-DEFAULTS
   {:show_request_modal true
    :show_response_success_modal false
-   :show_response_error_modal true })
+   :show_response_error_modal true
+   :autoremove-delay 1000
+   :autoremove-on-success true})
+
+;;; autoremove ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn response-success? [resp]
+  (<= 200 (-> resp :status) 299))
+
+(defn autoremove [id meta]
+  (go (<! (timeout 30000))
+      (swap! state/client-db update :requests
+             (fn [rqs] (dissoc rqs id)))))
+
+
+;;; send-off ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn send-off [req-opts meta-req & {:keys [callback]
                                      :or {callback nil}}]
@@ -35,16 +51,14 @@
     (go (let [resp (<! (http/request req))]
           (when (-> @state/client-db :requests (get id))
             (swap! state/client-db assoc-in [:requests id :response] resp))
-          (when callback (callback resp))
-          ; TODO dismiss it after 3 minutes or so when success
-          ))
+          (when (and (response-success? resp)
+                     (:autoremove-on-success meta-req))
+            (autoremove id meta-req))
+          (when callback (callback resp))))
     id))
 
 (defn response-pending? [request]
   (empty? (:response request)))
-
-(defn response-success? [resp]
-  (<= 200 (-> resp :status) 299))
 
 (defn show-modal? [request]
   (if (response-pending? request)

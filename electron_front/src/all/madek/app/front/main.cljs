@@ -5,6 +5,7 @@
     )
   (:require
     [madek.app.front.connection :as connection]
+    [madek.app.front.release]
     [madek.app.front.request :as request]
     [madek.app.front.routes :as routes]
     [madek.app.front.state :as state]
@@ -15,16 +16,14 @@
     [secretary.core :as secretary :include-macros true :refer [defroute]]
     ))
 
-
 (defn naviagation []
   [:nav.navbar.navbar-inverse
    [:div.container-fluid
     [:div.navbar-header
-     [:span.navbar-brand {:href "#"} "Madek"]]
+     [:a.navbar-brand {:href (routes/about-page)} "Madek Exporter"]]
     [:ul.navbar-nav.nav
      [:li [:a {:href (routes/connection-page)} "Connection"]]
      [:li [:a {:href (routes/download-page)} "Export"]]
-     [:li [:a {:href (routes/about-page)} "About"]]
      [:li [:a {:href (routes/debug-page)} "Debug"]]]
     [:ul.nav.navbar-nav.navbar-right
      [:li
@@ -34,6 +33,7 @@
   [:div.container-fluid
    [request/modal]
    [naviagation]
+   [madek.app.front.release/update-available-alert-component]
    (when-let [page @state/current-page]
      [:div.page [page]])])
 

@@ -46,15 +46,6 @@
     (request/send-off
       req {:title "Export/Download Step-2"})))
 
-(defn summary-component []
-  [:div.summary
-   [:p " Export/Download the set "
-    [:a {:href "#"
-         :on-click #(.openExternal
-                      shell (-> @state/jvm-main-db :download :entity :url))}
-     [:em (-> @state/jvm-main-db :download :entity :title)]]]
-   [:p "Export to " [:code (-> @state/jvm-main-db :download :target-directory)] "."]])
-
 ;;; recursive ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn recursive-component []
@@ -145,8 +136,8 @@
                      (set-value :prefix_meta_key nil))
                    (set-value :vocabulary voc))
      :default-value (-> @form-data* :vocabulary)}
-    (for [option (or (-> @form-data* :vocabularies) {})]
-      [:option {:key (:id option) }(:id option)])]])
+    (for [option (or (->> @form-data* :vocabularies) {})]
+      [:option {:key (:id option)}(:id option)])]])
 
 (defn prefix-vocabulary-component []
   (reagent/create-class
@@ -158,7 +149,7 @@
    [:h4 "Prefix"]
    [:p "For every set or media-entry a folder will be created. "
     "The name of the folder consists of a prefix, an underscore and the id of the entity."
-    "The prefix will be determined bye the meta-key given in this section."]
+    "The prefix will be determined by the meta-key given in this section."]
    [prefix-vocabulary-component]
    [prefix-meta-key-component]
    ])
@@ -191,7 +182,6 @@
 (defn main-component []
   [:div.download-form
    [:h2 "Step 2 - Set Advanced Options" ]
-   [summary-component]
    [form-component]
    [debug-component]
    ])

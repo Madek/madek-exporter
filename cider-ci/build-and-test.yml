@@ -1,0 +1,95 @@
+include:
+  - cider-ci/environment_variables.yml
+git_options:
+  submodules:
+    include_match: ^.*$
+trial_attachments:
+  screenshots:
+    include_match: 'tmp\/.+\.png$'
+    content_type: image/png
+  logs:
+    include_match: 'logs\/.+\.log$'
+    content_type: text/plain
+traits:
+  JDK: true
+  Leiningen: true
+  libgconf-2-4: true
+  nodejs: true
+  #nx-07288_linux-vm: true
+  ubuntu-desktop: true
+  ruby-install: true
+  wine: true
+  xorg: true
+scripts:
+  include:
+    - cider-ci/bundle-script.yml
+  build-stylesheets:
+    body:  bin/build-stylesheets-prod*
+  build-electron-front:
+    body: |
+      set -eoux
+      lein do \
+        externs electron-front-prod app/prod/js/front_externs.js, \
+        cljsbuild once electron-front-prod
+  build-electron-main:
+    body: |
+      set -eoux
+      lein do \
+        externs electron-main-prod app/prod/js/main_externs.js, \
+        cljsbuild once electron-main-prod
+  build-jvm-main:
+    body: lein uberjar
+  build-components-done:
+    # just a meta script to model dependencies easier
+    body: exit 0
+    start_when:
+      build jvm server has passed:
+        script_key: build-jvm-main
+      build electron-front has passed:
+        script_key: build-electron-front
+      build electron-main has passed:
+        script_key: build-electron-main
+      stylesheets have been built:
+        script_key: build-stylesheets
+  build-mac-os:
+    body: |
+      set -eoux
+      ./bin/build-mac-os
+      zip -r Madek-App_Mac-OS.zip madek-app-darwin-x64
+      # cp Madek-App_Mac-OS.zip /tmp/Madek-App_Mac-OS_${CIDER_CI_TREE_ID}.zip
+    start_when:
+      build-components has passed:
+        script_key: build-components-done
+  build-windows:
+    body: |
+      set -eoux
+      ./bin/build-win
+      zip -r Madek-App_Windows.zip madek-app-win32-x64
+      # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
+      #
+    start_when:
+      build-components has passed:
+        script_key: build-components-done
+  build-linux:
+    body: |
+      set -eoux
+      ./bin/build-linux
+      zip -r Madek-App_Linux.zip madek-app-linux-x64
+      # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
+    start_when:
+      build-components has passed:
+        script_key: build-components-done
+  test:
+    start_when:
+      bundle has passed:
+        script_key: bundle
+      build-linux has passed:
+        script_key: build-linux
+    body: |
+      #!/usr/bin/env bash
+      set -eux
+      export PATH=~/.rubies/$RUBY/bin:$PATH
+      mkdir -p logs
+      xvfb-run -a -e logs/xvfb.log \
+        bundle exec rspec
+

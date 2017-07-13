@@ -65,8 +65,7 @@
 
 (defn disconnect []
   (clear-export-steps)
-  (connection/disconnect)
-  (swap! state/client-db assoc-in [:connection :form :password] nil))
+  (connection/disconnect))
 
 (defn dismiss-component []
   [:div.dismiss

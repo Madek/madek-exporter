@@ -1,4 +1,60 @@
 jobs:
+  check-releases-file-is-up-to-date:
+    name: Check if app/prod/releases.json is up to date
+    run_when:
+      on any branch:
+        type: branch
+        include_match: ^.*$
+    context:
+      tasks:
+        build:
+          include:
+            - cider-ci/environment_variables.yml
+          traits:
+            ubuntu-desktop: true
+          scripts:
+            include:
+              - cider-ci/bundle-script.yml
+            check:
+              start_when:
+                bundle has passed:
+                  script_key: bundle
+              body: |
+                set -euxo
+                export PATH=~/.rubies/$RUBY/bin:$PATH
+                bundle exec ./bin/update-releases
+                git diff --stat --exit-code -- app/prod/releases.json
+
+  draft-release:
+    name: Draft a release on GH
+    run_when:
+      on the release branch:
+        type: branch
+        include_match: ^release$
+    context:
+      tasks:
+        release:
+          include:
+            - cider-ci/build-and-test.yml
+          traits:
+              ci-g2016-08: true
+          scripts:
+            # override the existing test; we don't care about the result
+            test:
+              body: exit 0
+            draft-release:
+              start_when:
+                build-linux has passed:
+                  script_key: build-linux
+                build-windows has passed:
+                  script_key: build-windows
+                build-mac-os has passed:
+                  script_key: build-mac-os
+              body: |
+                set -euxo
+                export PATH=~/.rubies/$RUBY/bin:$PATH
+                bundle exec ./bin/draft-gh-release
+
   build:
     name: Build the App
     run_when:
@@ -8,122 +64,5 @@ jobs:
     context:
       tasks:
         build:
-          git_options:
-            submodules:
-              include_match: ^.*$
-          trial_attachments:
-            screenshots:
-              include_match: 'tmp\/.+\.png$'
-              content_type: image/png
-            logs:
-              include_match: 'logs\/.+\.log$'
-              content_type: text/plain
-            binaries:
-              include_match: '\w+\.zip'
-              content_type: application/zip
-          environment_variables:
-            RUBY_ENGINE: ruby
-            RUBY_VERSION: 2.2.4
-            RUBY: '{{RUBY_ENGINE}}-{{RUBY_VERSION}}'
-          traits:
-            JDK: true
-            Leiningen: true
-            libgconf-2-4: true
-            nodejs: true
-            #nx-07288_linux-vm: true
-            ubuntu-desktop: true
-            ruby-install: true
-            wine: true
-            xorg: true
-          scripts:
-            build-stylesheets:
-              body:  bin/build-stylesheets-prod*
-            build-electron-front:
-              body: |
-                set -eoux
-                lein do \
-                  externs electron-front-prod app/prod/js/front_externs.js, \
-                  cljsbuild once electron-front-prod
-            build-electron-main:
-              body: |
-                set -eoux
-                lein do \
-                  externs electron-main-prod app/prod/js/main_externs.js, \
-                  cljsbuild once electron-main-prod
-            build-jvm-main:
-              body: lein uberjar
-            build-components-done:
-              # just a meta script to model dependencies easier
-              body: exit 0
-              start_when:
-                build jvm server has passed:
-                  script_key: build-jvm-main
-                build electron-front has passed:
-                  script_key: build-electron-front
-                build electron-main has passed:
-                  script_key: build-electron-main
-                stylesheets have been built:
-                  script_key: build-stylesheets
-            build-mac-os:
-              body: |
-                set -eoux
-                ./bin/build-mac-os
-                zip -r Madek-App_Mac-OS.zip madek-app-darwin-x64
-                # cp Madek-App_Mac-OS.zip /tmp/Madek-App_Mac-OS_${CIDER_CI_TREE_ID}.zip
-              start_when:
-                build-components has passed:
-                  script_key: build-components-done
-            build-windows:
-              body: |
-                set -eoux
-                ./bin/build-win
-                zip -r Madek-App_Windows.zip madek-app-win32-x64
-                # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
-                #
-              start_when:
-                build-components has passed:
-                  script_key: build-components-done
-            build-linux:
-              body: |
-                set -eoux
-                ./bin/build-linux
-                zip -r Madek-App_Linux.zip madek-app-linux-x64
-                # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
-              start_when:
-                build-components has passed:
-                  script_key: build-components-done
-            bundle:
-              exclusive_executor_resource: ruby-install_{{$RUBY}}
-              timeout: 20 Minutes
-              body: |
-                #!/usr/bin/env bash
-                set -eux
-                export PATH=~/.rubies/$RUBY/bin:$PATH
-
-                rm -f .bundle/config
-
-                if [ ! -d ~/.rubies/$RUBY ]; then
-                  ruby-install --no-install-deps $RUBY_ENGINE $RUBY_VERSION
-                fi
-
-                if [ ! -f ~/.rubies/$RUBY/bin/bundle ]; then
-                  gem install bundler
-                fi
-
-                bundle install
-            test:
-              start_when:
-                bundle has passed:
-                  script_key: bundle
-                build-linux has passed:
-                  script_key: build-linux
-              body: |
-                #!/usr/bin/env bash
-                set -eux
-                export PATH=~/.rubies/$RUBY/bin:$PATH
-                mkdir -p logs
-                xvfb-run -a -e logs/xvfb.log \
-                  bundle exec rspec
-
-
-
+          include:
+            - cider-ci/build-and-test.yml

@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+
+require 'active_support/all'
+require 'json'
+require 'optparse'
+require 'pry'
+require 'yaml'
+require 'filewatcher'
+
+
+options = {watch: false, help: false}
+
+def update
+  begin
+    releases_json = YAML.load_file("releases.yml").to_json
+    IO.write("app/prod/releases.json", releases_json)
+    IO.write("app/dev/releases.json", releases_json)
+    puts "Updated app/(prod|dev)/releases.json"
+  rescue Exception => e
+    puts e
+  end
+end
+
+parser = OptionParser.new do|opts|
+	opts.banner = "Usage: update-releases [options]"
+	opts.on('-w', '--watch', 'Wach and update continously') do
+		options[:watch] = true
+	end
+
+	opts.on('-h', '--help', 'Displays Help') do
+    options[:help] = true
+		puts opts
+		exit
+	end
+end
+
+parser.parse!
+
+if not options[:help]
+  update
+end
+
+if options[:watch]
+  puts "Watching releases.yml ..."
+  FileWatcher.new(['releases.yml']).watch do |filename|
+    update
+  end
+end

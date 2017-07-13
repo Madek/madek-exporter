@@ -1,3 +1,4 @@
+; just switch to json :-(
 (defproject madek "0.4.0"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
@@ -20,7 +21,7 @@
                  [logbug "4.2.2"]
                  [org.apache.commons/commons-lang3 "3.5"]
                  [org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.9.521" :exclusions [org.apache.ant/ant]]
+                 [org.clojure/clojurescript "1.9.671" :exclusions [org.apache.ant/ant]]
                  [org.clojure/core.async "0.3.442"]
                  [org.clojure/data.codec "0.1.0"]
                  [org.immutant/web "2.1.6" :exclusions [ch.qos.logback/logback-classic]]
@@ -114,7 +115,8 @@
               :compiler {:output-to "app/dev/js/main.js"
                          :externs ["app/dev/js/main_externs.js"
                                    "node_modules/closurecompiler-externs/path.js"
-                                   "node_modules/closurecompiler-externs/process.js"]
+                                   "node_modules/closurecompiler-externs/process.js"
+                                   "js-yaml_externs.js"]
                          :warnings true
                          :elide-asserts true
                          :target :nodejs

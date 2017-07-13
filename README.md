@@ -1,4 +1,4 @@
-# The Madek App
+# The Madek Exporter
 
 
 ## Building the App for Production
@@ -7,12 +7,7 @@ We do this via our CI system, see the file [cider-ci.yml](cider-ci.yml).
 
 ## Development
 
-The setup of the project is based on
-[descjop](https://github.com/karad/lein_template_descjop). It has been adjusted
-and cleaned up in many ways. Descjop consists essentially of conventions
-and a number of of `lein` aliases. See the file [project.clj](project.clj).
-
-See also the file [.mux.yml](.mux.yml).
+See the files [project.clj](project.clj) and [.mux.yml](.mux.yml).
 
 ### First time preparation
 

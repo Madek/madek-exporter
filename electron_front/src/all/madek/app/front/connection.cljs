@@ -56,7 +56,9 @@
              :path "/connect"}]
     (request/send-off
       req {:title "Disconnect!"}
-      :callback (fn [_] (accountant/navigate! "/connection")))))
+      :callback (fn [_]
+                  (swap! state/client-db assoc-in [:connection :form :password] nil)
+                  (accountant/navigate! "/connection")))))
 
 (defn update-form-data [fun]
   (swap! state/client-db

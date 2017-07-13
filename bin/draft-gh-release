@@ -1,0 +1,84 @@
+#!/usr/bin/env ruby
+
+require 'active_support/all'
+require 'addressable/template'
+require 'addressable/uri'
+require 'faraday'
+require 'faraday_middleware'
+require 'json'
+require 'pry'
+require 'yaml'
+
+user = ENV['GH_USER'].presence || raise('gh username missing')
+token = ENV['GH_TOKEN'].presence || raise('gh token missing')
+
+conn = Faraday.new() do |conn|
+  conn.token_auth(token)
+  conn.basic_auth(user, token)
+  conn.headers['Content-Type'] = 'application/json'
+  conn.request :json
+  conn.response :json, :content_type => /\bjson$/
+  conn.adapter Faraday.default_adapter
+end
+
+def _version
+  release= YAML.load_file('releases.yml').first.with_indifferent_access
+  "#{release[:version_major]}.#{release[:version_minor]}.#{release[:version_patch]}" \
+    + ( (pre = release[:version_pre])  ?  "-#{pre}" : "") \
+    + ( (build = release[:version_build])  ?  "+#{build}" : "")
+end
+
+def version
+  @version ||= _version
+end
+
+def commitish
+  JSON.parse(ENV['CIDER_CI_CURRENT_BRANCH_HEADS']).first.presence.try(:strip) \
+    || `git log -n 1 --pretty='%H'`.strip
+end
+
+def create_data
+  { "tag_name": version,
+    "target_commitish": commitish,
+    "name": version,
+    "body": "Version #{version} of the Madek Exporter",
+    "draft": true }
+end
+
+existing_release = conn.get do |req|
+  req.url "https://api.github.com/repos/madek/madek-exporter/releases/tags/#{version}"
+end
+
+if existing_release.status == 200
+  raise "tag #{version} already exists"
+end
+
+unless existing_release.status == 404
+  raise 'expected response for existing_release is 404'
+end
+
+created_release = conn.post do |req|
+  req.url "https://api.github.com/repos/madek/madek-exporter/releases"
+  req.body = create_data.to_json
+end
+
+unless created_release.status == 201
+  raise "create release #{version} failed"
+end
+
+upload_url_template = Addressable::Template.new(created_release.body["upload_url"])
+
+%w(Madek-App_Linux.zip Madek-App_Mac-OS.zip Madek-App_Windows.zip).each do |filename|
+  url = upload_url_template.expand(name: filename).to_s
+  file_content = IO.binread(filename)
+  uploaded = conn.post do |req|
+    req.url url
+    conn.headers['Content-Type'] = 'application/json'
+    req.body = file_content
+  end
+  unless uploaded.status == 201
+    raise "upload #{filename} failed"
+  end
+end
+
+exit 0

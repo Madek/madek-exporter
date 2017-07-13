@@ -1,0 +1,23 @@
+### 5.0 #######################################################################
+
+- version_major: 0
+  version_minor: 5
+  version_patch: 0
+  version_pre: NULL
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Changes
+    =======
+
+    * Rename the application from "Madek APP" to "Madek Exporter".
+    * Include release info.
+
+    Fixes
+    =====
+
+    * Fix export of meta-data of the Type MetaDatum::TextType.
+    * Disconnect on the connection page will now delete the saved token, too.
+    * Fix spelling and unnecessary involved language in many places.
