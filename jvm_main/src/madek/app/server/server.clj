@@ -34,7 +34,7 @@
   {:status 401
    :headers
    {"WWW-Authenticate"
-    (str "Basic realm=\"Madek Exporter - "
+    (str "Basic realm=\"Madek-Exporter - "
          "Password Required!\"")}})
 
 (defn- decode-base64

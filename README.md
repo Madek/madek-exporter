@@ -1,4 +1,4 @@
-# The Madek Exporter
+# The Madek-Exporter
 
 
 ## Building the App for Production

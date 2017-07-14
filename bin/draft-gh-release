@@ -41,7 +41,7 @@ def create_data
   { "tag_name": version,
     "target_commitish": commitish,
     "name": version,
-    "body": "Version #{version} of the Madek Exporter",
+    "body": "Version #{version} of the Madek-Exporter",
     "draft": true }
 end
 

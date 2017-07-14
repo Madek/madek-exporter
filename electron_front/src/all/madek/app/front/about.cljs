@@ -36,7 +36,7 @@
 
 (defn page []
   [:div.about
-   [:h1 "About the Madek Exporter"]
+   [:h1 "About the Madek-Exporter"]
    [version-component]
    [electron-component]
    ])

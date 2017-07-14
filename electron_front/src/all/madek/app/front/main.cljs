@@ -20,7 +20,7 @@
   [:nav.navbar.navbar-inverse
    [:div.container-fluid
     [:div.navbar-header
-     [:a.navbar-brand {:href (routes/about-page)} "Madek Exporter"]]
+     [:a.navbar-brand {:href (routes/about-page)} "Madek-Exporter"]]
     [:ul.navbar-nav.nav
      [:li [:a {:href (routes/connection-page)} "Connection"]]
      [:li [:a {:href (routes/download-page)} "Export"]]

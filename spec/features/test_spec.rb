@@ -11,10 +11,10 @@ feature "The Madek App Window" do
     end
 
     wait_until do
-      page.has_content? "Madek Exporter"
+      page.has_content? "Madek-Exporter"
     end
 
-    click_on 'Madek Exporter'
+    click_on 'Madek-Exporter'
     # wait_until do
     #   page.has_content? /Electron-main DB .* nodejs-version/
     # end

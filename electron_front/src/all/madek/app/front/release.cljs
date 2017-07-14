@@ -64,7 +64,7 @@
 (defn update-available-alert-component []
   (when @update-available?
     [:div.alert.alert-warning
-     [:h3 "An update of the Madek Exporter is available"]
+     [:h3 "An update of the Madek-Exporter is available"]
      [:p "The latest published release on the download site has version "
       [:code (-> @state/client-db :github :latest-release :tag_name)]
       " but the version of this instance is " [:code @version*] "."]

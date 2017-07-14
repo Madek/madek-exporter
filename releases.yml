@@ -1,3 +1,24 @@
+##### 0.7.0 #######################################################################
+
+- version_major: 0
+  version_minor: 7
+  version_patch: 0
+  version_pre: NULL
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Changes
+    =======
+
+    * Rename from "Madek Exporter" to "Madek-Exporter"
+
+    Fixes
+    =====
+
+
+
 #### 0.6.0 #######################################################################
 
 - version_major: 0
