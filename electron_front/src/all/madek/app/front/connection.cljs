@@ -193,8 +193,7 @@
     [:div.panel.panel-body
      [:p.text-success
       "Your are connected to " [:code (-> @connection* :url)]
-      " as " [:code [:em (-> @connection* :email_address)]] "."]
-     [:pre (with-out-str (pprint @connection*))]]]])
+      " as " [:code [:em (-> @connection* :email_address)]] "."]]]])
 
 (defn connection-pending-component []
   [:div.pending
