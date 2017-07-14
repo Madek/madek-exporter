@@ -40,14 +40,10 @@
 (defn options-to-http-options [options]
   (let [{login :login password :password
          session-token :session-token} options]
-    (cond-> {}
-      (and (presence login)
-           (presence password)) (assoc :basic-auth
-                                       [login password])
-      (presence password) (assoc :basic-auth [password])
-      session-token (assoc :cookies
-                           {"madek-session"
-                            {:value session-token}}))))
+    (if (and (presence login)
+             (presence password))
+      {:basic-auth [login password]}
+      {:basic-auth [password]})))
 
 (defn str
   "Like clojure.core/str but maps keywords to strings without preceding colon."

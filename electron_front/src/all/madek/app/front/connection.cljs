@@ -35,30 +35,8 @@
              (when-let [p (.getPort gurl)]
                (str ":" p)))))))
 
-(defn compact-component []
-  [:span
-   (when-let [ce @connected-entity*]
-     [:span ce])
-   (when-let [ct @connected-target*]
-     [:span
-      " " ; utf-8 m-space!
-      [:span ct ]])])
 
-(defn connect []
-  (let [req {:method :post
-             :json-params @form-data
-             :path "/connect"}]
-    (request/send-off
-      req {:title "Connect!"})))
-
-(defn disconnect []
-  (let [req {:method :delete
-             :path "/connect"}]
-    (request/send-off
-      req {:title "Disconnect!"}
-      :callback (fn [_]
-                  (swap! state/client-db assoc-in [:connection :form :password] nil)
-                  (accountant/navigate! "/connection")))))
+;;; data ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn update-form-data [fun]
   (swap! state/client-db
@@ -82,6 +60,42 @@
 (def sign-in-method*
   (reaction (or (:sign-in-method @form-data)
                 :token)))
+
+
+;;; connect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn compact-component []
+  [:span
+   (when-let [ce @connected-entity*]
+     [:span ce])
+   (when-let [ct @connected-target*]
+     [:span
+      " " ; utf-8 m-space!
+      [:span ct ]])])
+
+(defn connect []
+  (let [req {:method :post
+             :json-params @form-data
+             :path "/connect"}]
+    (request/send-off
+      req {:title "Connect!"})))
+
+
+;;; disconnect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn clear-form-sign-in-data []
+  (update-form-data-value :login nil)
+  (update-form-data-value :password nil))
+
+(defn disconnect []
+  (let [req {:method :delete
+             :path "/connect"}]
+    (request/send-off
+      req {:title "Disconnect!"}
+      :callback (fn [_]
+                  (clear-form-sign-in-data)
+                  (accountant/navigate! "/connection")))))
+
 
 ;;; form ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -125,17 +139,22 @@
      :on-change #(update-form-data-value
                    :password(-> % .-target .-value presence))}]])
 
+
 (defn connect-form []
   [:div.form
    [base-url-form-component]
    [:ul.nav.nav-tabs {:style {:margin-bottom "1em"}}
     [:li {:class (when (= @sign-in-method* :token) "active")}
      [:a {:href "#"
-          :on-click #(update-form-data-value :sign-in-method :token)}
+          :on-click (fn [_]
+                      (clear-form-sign-in-data)
+                      (update-form-data-value :sign-in-method :token))}
       "Sign in with token"]]
     [:li {:class (when (= @sign-in-method* :login) "active")}
      [:a {:href "#"
-          :on-click #(update-form-data-value :sign-in-method :login)}
+          :on-click (fn [_]
+                      (clear-form-sign-in-data)
+                      (update-form-data-value :sign-in-method :login))}
       "Sign in with login and password"]]]
    [login-form-component]
    [token-form-component]

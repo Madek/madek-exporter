@@ -1,4 +1,25 @@
-### 5.0 #######################################################################
+#### 0.6.0 #######################################################################
+
+- version_major: 0
+  version_minor: 6
+  version_patch: 0
+  version_pre: NULL
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Changes
+    =======
+
+    * Improve the UX of the sign-in page: swapping tags deletes existing sign in info.
+
+    Fixes
+    =====
+
+    * Fix sign in with login and password.
+
+### 0.5.0 #######################################################################
 
 - version_major: 0
   version_minor: 5

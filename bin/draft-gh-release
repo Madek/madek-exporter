@@ -33,8 +33,8 @@ def version
 end
 
 def commitish
-  JSON.parse(ENV['CIDER_CI_CURRENT_BRANCH_HEADS']).first.presence.try(:strip) \
-    || `git log -n 1 --pretty='%H'`.strip
+  JSON.parse(ENV['CIDER_CI_CURRENT_BRANCH_HEADS'].presence || "[]").compact \
+    .first.presence.try(:strip) || `git log -n 1 --pretty='%H'`.strip
 end
 
 def create_data
