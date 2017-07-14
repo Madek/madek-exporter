@@ -25,6 +25,9 @@
 
 (def download* (reaction (-> @state/jvm-main-db :download)))
 
+(def vocabulary* (reaction
+                   (-> @form-data* :vocabulary presence)))
+
 (def set-value
   (form-utils/create-update-form-data-setter
     state/client-db
@@ -74,10 +77,7 @@
      "This means that only the meta-data of media-entries or sets will be downloaded. " ]]])
 
 
-;;; prefix ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def vocabulary* (reaction
-                   (-> @form-data* :vocabulary presence)))
+;;; prefix meta-key ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn load-vocabulary-meta-keys []
   (when-let [vocabulary @vocabulary*]
@@ -89,10 +89,18 @@
         :callback (fn [resp]
                     (when (:success resp)
                       (set-value vocabulary
-                                 (conj (:body resp)
-                                       {:label "None"
-                                        :id nil
-                                        :vocabulary_id vocabulary }))))))))
+                                 (conj (->> (:body resp)
+                                            (filter #(= (:meta_datum_object_type %)
+                                                        "MetaDatum::Text"))
+                                            (map #(assoc % :key (:id %)))
+                                            (sort-by :label)
+                                            (into []))
+                                       {:label "NO META-KEY PREFIX"
+                                        :id ""
+                                        :key ""
+                                        :vocabulary_id vocabulary
+                                        :meta_datum_object_type "MetaDatum::Text"
+                                        }))))))))
 
 (add-watch vocabulary* :lazy-load-meta-keys-watch
            (fn [_ _ _ vocabulary]
@@ -106,18 +114,23 @@
      [:label "Meta-key:"]
      [:select.form-control
       {:on-change #(set-value :prefix_meta_key (.. % -target -value))
-       :default-value (or (-> @form-data* :prefix_meta_key) "")}
+       :value (-> @form-data* :prefix_meta_key)}
       (for [option meta-keys-options]
-        [:option {:key (:id option) } (:id option)])]
+        [:option
+         {:key (:id option)
+          :value (:id option)}
+         (:label option)])]
      [:p.help-block
-      "If the blank option is select neither prefix nor underscore will be present. "
+      "If the " [:code "NO META-KEY PREFIX"]
+      " option is select neither prefix nor underscore will be present. "
       "This is probably a good choice for automatized post processing. "]
      [:p.help-block
-      "If the value of the corresponding meta-key is plank or if there is no "
+      "If the value of the corresponding meta-key is blank or if there is no "
       " such meta-key present for the entity "
-      " the id will be still prefixed with an underscore."]
-     [:p.help-block
-      "Only \"simple\" meta-keys, e.g. text based ones, should be used here." ]]))
+      " the id will be still prefixed with an underscore."]]))
+
+
+;;; prefix vocabulary ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn load-vocabularies []
   (when-not (-> @form-data* :vocabularies)
@@ -125,7 +138,10 @@
       {:method :get
        :path "/vocabularies/"}
       {:title "Fetch Vocabularies"}
-      :callback (fn [req] (set-value :vocabularies (:body req))))))
+      :callback (fn [req] (set-value :vocabularies
+                                     (->> (:body req)
+                                          (map #(assoc % :key (:id %)))
+                                          (sort-by :label)))))))
 
 (defn vocabulary-form-group-component []
   [:div.form-group.vocabulary
@@ -133,16 +149,24 @@
    [:select.form-control
     {:on-change #(let [voc (.. % -target -value)]
                    (when-not (= voc (-> @form-data* :vocabulary))
-                     (set-value :prefix_meta_key nil))
+                     (set-value :prefix_meta_key ""))
                    (set-value :vocabulary voc))
-     :default-value (-> @form-data* :vocabulary)}
-    (for [option (or (->> @form-data* :vocabularies) {})]
-      [:option {:key (:id option)}(:id option)])]])
+     :value (-> @form-data* :vocabulary)}
+    (for [option (or (-> @form-data* :vocabularies) {})]
+      [:option
+       {:key (:id option)
+        :value (:id option)
+        :data-id (:id option)
+        :data-label (:label option)}
+       (:label option)])]])
 
 (defn prefix-vocabulary-component []
   (reagent/create-class
     {:component-did-mount load-vocabularies
      :render vocabulary-form-group-component}))
+
+
+;;; prefix ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn prefix-component []
   [:div.prefix
@@ -153,6 +177,7 @@
    [prefix-vocabulary-component]
    [prefix-meta-key-component]
    ])
+
 
 ;;; form ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -183,8 +208,7 @@
   [:div.download-form
    [:h2 "Step 2 - Set Advanced Options" ]
    [form-component]
-   [debug-component]
-   ])
+   [debug-component]])
 
 (defn initialize-form-data []
   (when-not (:vocabulary @form-data*)
@@ -194,7 +218,8 @@
 
 (defn component []
   (reagent/create-class
-    {:component-did-mount initialize-form-data
+    {;:component-will-mount #(swap! state/client-db assoc-in [:download :download-form] {})
+     :component-did-mount initialize-form-data
      :render main-component }))
 
 

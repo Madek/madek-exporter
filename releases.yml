@@ -1,4 +1,21 @@
-##### 0.7.3 #######################################################################
+###### 0.8.0 #######################################################################
+
+- version_major: 0
+  version_minor: 8
+  version_patch: 0
+  version_pre: NULL
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Changes
+    =======
+
+    * Improve UI and UI when selecting the meta-key prefix.
+
+
+#### 0.7.3 #######################################################################
 
 - version_major: 0
   version_minor: 7

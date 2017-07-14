@@ -234,5 +234,4 @@
      [connect-form]
      [continue-form])
    [:div.clearfix]
-   [debug-component]
-   ])
+   [debug-component]])
