@@ -42,7 +42,7 @@
 
 (js/setTimeout
   #(fetch-gh-release)
-  (* 30 1000))
+  (* 3 1000))
 
 (def version*
   (reaction
