@@ -182,7 +182,8 @@
 
 (def connected?*
   (reaction (and (-> @connection* :url presence boolean)
-                 (-> @connection* :email_address presence boolean))))
+                 (or (-> @connection* :email_address presence boolean)
+                     (-> @connection* :login presence boolean)))))
 
 (defn connection-connected-component []
   [:div.connected
@@ -213,6 +214,9 @@
     [:div.debug
      [:hr]
      [:h3 "Debug"]
+     [:section.data
+      [:h4 "Connection"]
+      [:pre (with-out-str (pprint @connection*))]]
      [:section.data
       [:h4 "form-data"]
       [:pre (with-out-str (pprint @form-data))]]

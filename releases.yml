@@ -2,7 +2,7 @@
 
 - version_major: 0
   version_minor: 7
-  version_patch: 0
+  version_patch: 1
   version_pre: NULL
   version_build: NULL
   name: NULL
@@ -17,6 +17,7 @@
     Fixes
     =====
 
+    * Fix sign in as API-client.
 
 
 #### 0.6.0 #######################################################################
