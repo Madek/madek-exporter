@@ -193,7 +193,9 @@
     [:div.panel.panel-body
      [:p.text-success
       "Your are connected to " [:code (-> @connection* :url)]
-      " as " [:code [:em (-> @connection* :email_address)]] "."]]]])
+      " as " [:code [:em (-> @connection* :auth-info :type)]] " "
+      [:em (or (-> @connection* :auth-info :email_address presence)
+               (-> @connection* :auth-info :login presence))] "."]]]])
 
 (defn connection-pending-component []
   [:div.pending

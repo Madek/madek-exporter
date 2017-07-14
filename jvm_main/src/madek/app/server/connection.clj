@@ -49,7 +49,8 @@
                             (assoc-in db [:connection] conn-params))
                           (merge
                             (select-keys connect-body [:url])
-                            {:http-options http-options}
+                            {:http-options http-options
+                             :auth-info auth-info}
                             (select-keys auth-info [:login :email_address])))
                    {:status 202})))))
          (catch Exception e
