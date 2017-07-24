@@ -142,7 +142,7 @@
                        roa/coll-seq)]
       (download-media-entry skip-media-files? prefix-meta-key target-dir-path (roa/get me-rel {})))))
 
-(defn download-collections-for-collection [collection target-dir-path recursive?
+(defn download-collections-for-collection [collection target-dir-path recursive? skip-media-files?
                                            prefix-meta-key api-entry-point api-http-opts]
   (let [coll-get-opts (if (or (:basic-auth api-http-opts)
                               (-> api-http-opts :cookies (get "madek-session")))
@@ -157,7 +157,7 @@
                              (map #(roa/get % {})))]
       (download-set
         (-> collection roa/data :id)
-        target-dir-path recursive? prefix-meta-key api-entry-point api-http-opts))))
+        target-dir-path recursive? skip-media-files? prefix-meta-key api-entry-point api-http-opts))))
 
 (defn download-set [id dl-path recursive? skip-media-files? prefix-meta-key
                     api-entry-point api-http-opts]
@@ -187,7 +187,7 @@
           id target-dir-path skip-media-files? prefix-meta-key api-entry-point api-http-opts)
         (when recursive?
           (download-collections-for-collection
-            collection target-dir-path recursive? prefix-meta-key
+            collection target-dir-path recursive? skip-media-files? prefix-meta-key
             api-entry-point api-http-opts))
         (set-item-to-finished id)))))
 

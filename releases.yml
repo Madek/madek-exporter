@@ -1,8 +1,8 @@
-###### 0.8.0 #######################################################################
+###### 0.8.1 #######################################################################
 
 - version_major: 0
   version_minor: 8
-  version_patch: 0
+  version_patch: 1
   version_pre: NULL
   version_build: NULL
   name: NULL
@@ -13,6 +13,12 @@
     =======
 
     * Improve UI and UI when selecting the meta-key prefix.
+
+    Fixes:
+    ------
+
+    * Fix recursive download of sets "ArityException"
+
 
 
 #### 0.7.3 #######################################################################
