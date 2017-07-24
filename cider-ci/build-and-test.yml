@@ -55,8 +55,8 @@ scripts:
     body: |
       set -eoux
       ./bin/build-mac-os
-      zip -r Madek-App_Mac-OS.zip madek-app-darwin-x64
-      # cp Madek-App_Mac-OS.zip /tmp/Madek-App_Mac-OS_${CIDER_CI_TREE_ID}.zip
+      zip -r Madek-Exporter_Mac-OS.zip madek-exporter-darwin-x64
+      # cp Madek-Exporter_Mac-OS.zip /tmp/Madek-Exporter_Mac-OS_${CIDER_CI_TREE_ID}.zip
     start_when:
       build-components has passed:
         script_key: build-components-done
@@ -64,8 +64,8 @@ scripts:
     body: |
       set -eoux
       ./bin/build-win
-      zip -r Madek-App_Windows.zip madek-app-win32-x64
-      # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
+      zip -r Madek-Exporter_Windows.zip madek-exporter-win32-x64
+      # cp Madek-Exporter_Linux.zip /tmp/Madek-Exporter_Linux_${CIDER_CI_TREE_ID}.zip
       #
     start_when:
       build-components has passed:
@@ -74,8 +74,8 @@ scripts:
     body: |
       set -eoux
       ./bin/build-linux
-      zip -r Madek-App_Linux.zip madek-app-linux-x64
-      # cp Madek-App_Linux.zip /tmp/Madek-App_Linux_${CIDER_CI_TREE_ID}.zip
+      zip -r Madek-Exporter_Linux.zip madek-exporter-linux-x64
+      # cp Madek-Exporter_Linux.zip /tmp/Madek-Exporter_Linux_${CIDER_CI_TREE_ID}.zip
     start_when:
       build-components has passed:
         script_key: build-components-done

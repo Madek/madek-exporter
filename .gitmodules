@@ -1,6 +1,6 @@
 [submodule "node_modules"]
 	path = node_modules
-	url = https://github.com/Madek/madek-app_node-modules.git
+	url = https://github.com/Madek/madek-exporter_node-modules.git
 [submodule "vendor"]
 	path = vendor
-	url = https://github.com/Madek/madek-app_vendor.git
+	url = https://github.com/Madek/madek-exporter_vendor.git

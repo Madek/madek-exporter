@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -eoux
-rm -rf ./madek-app-win32-x64
+rm -rf ./madek-exporter-win32-x64
 
 ./node_modules/electron-packager/cli.js \
   --overwrite --platform=win32 --arch=x64 --electron-version=1.6.0 \
   --icon=Madek.icns \
-  ./app/prod madek-app
+  ./app/prod madek-exporter
 
-cp -Lrf vendor/jre_win ./madek-app-win32-x64/resources/jre
+cp -Lrf vendor/jre_win ./madek-exporter-win32-x64/resources/jre

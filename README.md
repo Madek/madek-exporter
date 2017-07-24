@@ -72,4 +72,4 @@ The electron parts can be build with
 
 The next steps depend on the OS. On MacOS:
 3. `bin/build-mac-os`
-4. `./madek-app-darwin-x64/madek-app.app/Contents/MacOS/madek-app`
+4. `./madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter`

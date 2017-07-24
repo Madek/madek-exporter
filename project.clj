@@ -98,11 +98,11 @@
                                  ["cljsbuild" "once" "electron-main-prod"]
                                  ["cljsbuild" "once" "electron-front-prod"]]
             ;; electron packager for production
-            "descjop-uberapp-osx" ["shell" "electron-packager" "./app/prod" "madek-app" "--platform=darwin" "--arch=x64" "--electron-version=1.6.0"]
-            "descjop-uberapp-app-store" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-app" "--platform=mas" "--arch=x64" "--electron-version=1.6.0"]
-            "descjop-uberapp-linux" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-app" "--platform=linux" "--arch=x64" "--electron-version=1.6.0"]
-            "descjop-uberapp-win64" ["shell" "electron-packager" "./app/prod" "madek-app" "--platform=win32" "--arch=x64" "--electron-version=1.6.0"]
-            "descjop-uberapp-win32" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-app" "--platform=win32" "--arch=ia32" "--electron-version=1.6.0"]
+            "descjop-uberapp-osx" ["shell" "electron-packager" "./app/prod" "madek-exporter" "--platform=darwin" "--arch=x64" "--electron-version=1.6.0"]
+            "descjop-uberapp-app-store" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-exporter" "--platform=mas" "--arch=x64" "--electron-version=1.6.0"]
+            "descjop-uberapp-linux" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-exporter" "--platform=linux" "--arch=x64" "--electron-version=1.6.0"]
+            "descjop-uberapp-win64" ["shell" "electron-packager" "./app/prod" "madek-exporter" "--platform=win32" "--arch=x64" "--electron-version=1.6.0"]
+            "descjop-uberapp-win32" ["shell" "cmd.exe" "/c" "electron-packager" "./app/prod" "madek-exporter" "--platform=win32" "--arch=ia32" "--electron-version=1.6.0"]
             }
 ;:hooks [leiningen.cljsbuild]
 

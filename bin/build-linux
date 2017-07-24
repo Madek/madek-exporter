@@ -4,6 +4,6 @@ set -eoux
 ./node_modules/electron-packager/cli.js \
   --overwrite --platform=linux --arch=x64 --electron-version=1.6.0 \
   --icon=Madek.icns \
-  ./app/prod madek-app
+  ./app/prod madek-exporter
 
-cp -Lrf vendor/jre_linux ./madek-app-linux-x64/resources/jre
+cp -Lrf vendor/jre_linux ./madek-exporter-linux-x64/resources/jre

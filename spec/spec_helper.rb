@@ -17,9 +17,9 @@ APP_BINARY = \
   case RUBY_PLATFORM
   when 'x86_64-darwin16'
     APP_ROOT_DIR.join(
-      'madek-app-darwin-x64/madek-app.app/Contents/MacOS/madek-app').to_s
+      'madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter').to_s
   when 'x86_64-linux', 'x86_64-linux-gnu'
-    APP_ROOT_DIR.join( 'madek-app-linux-x64/madek-app').to_s
+    APP_ROOT_DIR.join( 'madek-exporter-linux-x64/madek-exporter').to_s
   else
     raise "#{RUBY_PLATFORM} system not configured / not supported"
   end
