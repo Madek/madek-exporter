@@ -3,6 +3,7 @@
     [madek.app.server.state :as state]
     [madek.app.server.export.meta-data :as meta-data :refer [get-metadata write-meta-data]]
     [madek.app.server.export.files :as files :refer [download-media-files]]
+    [madek.app.server.export.meta-data-schema :as meta-data-schema]
     [madek.app.server.utils :refer [deep-merge presence]]
 
     [json-roa.client.core :as roa]
@@ -192,10 +193,14 @@
         (set-item-to-finished id)))))
 
 
+;### download meta-data schema ################################################
+
+(def download-meta-data-schema meta-data-schema/download)
+
 ;### Debug ####################################################################
 ;(logging-config/set-logger! :level :debug)
 ;(logging-config/set-logger! :level :info)
 ;(debug/debug-ns 'ring.middleware.resource)
-(debug/debug-ns *ns*)
+;(debug/debug-ns *ns*)
 ;(debug/debug-ns 'json-roa.client.core)
 ;(debug/debug-ns 'uritemplate-clj.core)
