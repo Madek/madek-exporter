@@ -15,7 +15,7 @@
                  [fipp "0.6.9"]
                  [hiccup "1.0.5"]
                  [inflections "0.13.0"]
-                 [json-roa_clj-client "0.2.0"]
+                 [json-roa_clj-client "0.2.1"]
                  [log4j/log4j "1.2.17" :exclusions [javax.mail/mail javax.jms/jms com.sun.jdmk/jmxtools com.sun.jmx/jmxri]]
                  [logbug "4.2.2"]
                  [org.apache.commons/commons-lang3 "3.5"]

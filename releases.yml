@@ -1,8 +1,31 @@
+####### 0.9.x #######################################################################
+
+- version_major: 0
+  version_minor: 9
+  version_patch: 1
+  version_pre: NULL
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Changes
+    =======
+
+    * Download and store the meta-data schema (public vocabularies with meta-keys).
+    * Export a index.html file for every entry.
+
+    Fixes:
+    ------
+
+    * Sort meta-data in the same way as webapp.
+
+
 ###### 0.8.x #######################################################################
 
 - version_major: 0
   version_minor: 8
-  version_patch: 4
+  version_patch: 2
   version_pre: NULL
   version_build: NULL
   name: NULL
@@ -13,8 +36,6 @@
     =======
 
     * Improve UI and UI when selecting the meta-key prefix.
-    * Download and store the meta-data schema (public vocabularies with meta-keys).
-    * Export a index.html file for every entry.
 
     Fixes:
     ------
