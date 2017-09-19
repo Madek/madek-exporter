@@ -2,7 +2,7 @@
 
 - version_major: 0
   version_minor: 8
-  version_patch: 3
+  version_patch: 4
   version_pre: NULL
   version_build: NULL
   name: NULL
@@ -14,6 +14,7 @@
 
     * Improve UI and UI when selecting the meta-key prefix.
     * Download and store the meta-data schema (public vocabularies with meta-keys).
+    * Export a index.html file for every entry.
 
     Fixes:
     ------

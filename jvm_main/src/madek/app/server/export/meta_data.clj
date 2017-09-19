@@ -15,10 +15,7 @@
     )
 
   (:import
-    [java.io File]
-    )
-
-  )
+    [java.io File]))
 
 
 ;### meta data ################################################################
@@ -38,7 +35,7 @@
   (-> meta-datum
       roa/data))
 
-(defn get-metadata [media-resource]
+(defn meta-data_unmemoized [media-resource]
   (->> (-> media-resource
            (roa/relation :meta-data)
            (roa/get {})
@@ -49,6 +46,8 @@
                 ("MetaDatum::Text" "MetaDatum::TextDate") (get-scalar-meta-datum-value meta-datum)
                 (get-collection-meta-datum-values meta-datum)
                 )))))
+
+(def meta-data (memoize meta-data_unmemoized))
 
 (defn title [meta-data]
   (:value (some (fn [meta-datum]

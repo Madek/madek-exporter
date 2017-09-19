@@ -1,9 +1,10 @@
 (ns madek.app.server.export
   (:require
-    [madek.app.server.state :as state]
-    [madek.app.server.export.meta-data :as meta-data :refer [get-metadata write-meta-data]]
     [madek.app.server.export.files :as files :refer [download-media-files]]
+    [madek.app.server.export.index-html :as index-html]
+    [madek.app.server.export.meta-data :as meta-data :refer [meta-data write-meta-data]]
     [madek.app.server.export.meta-data-schema :as meta-data-schema]
+    [madek.app.server.state :as state]
     [madek.app.server.utils :refer [deep-merge presence]]
 
     [json-roa.client.core :as roa]
@@ -96,7 +97,7 @@
      (let [id (-> media-entry roa/data :id)
            entry-prefix-path (path-prefix prefix-meta-key media-entry)
            entry-dir-path (str dir-path File/separator entry-prefix-path)
-           meta-data (get-metadata media-entry)]
+           meta-data (meta-data media-entry)]
        (if (-> @state/db :download :items (get id))
          (let [target  (-> @state/db :download :items (get id) :path)]
            (symlink id entry-dir-path target))
@@ -110,6 +111,9 @@
                               :download_started-at (str (time/now))))
              (io/make-parents entry-dir-path)
              (write-meta-data entry-dir-path meta-data id)
+             (index-html/write entry-dir-path
+                               meta-data
+                               (-> media-entry roa/data (assoc :type :media-entry)))
              (when-not skip-media-files?
                (download-media-files entry-dir-path media-entry))
              (set-item-to-finished id)))))))
@@ -168,7 +172,7 @@
                        (roa/get {:id id}))
         path-prefix (path-prefix prefix-meta-key collection)
         target-dir-path (str dl-path File/separator path-prefix)
-        meta-data (get-metadata collection)]
+        meta-data (meta-data collection)]
     (if (-> @state/db :download :items (get id))
       (let [target  (-> @state/db :download :items (get id) :path)]
         (symlink id target-dir-path target))
@@ -184,6 +188,9 @@
                          :download_started-at (str (time/now))))
         (io/make-parents target-dir-path)
         (write-meta-data target-dir-path meta-data id)
+        (index-html/write target-dir-path
+                          meta-data
+                          (-> collection roa/data (assoc :type :collection)))
         (download-media-entries-for-set
           id target-dir-path skip-media-files? prefix-meta-key api-entry-point api-http-opts)
         (when recursive?
