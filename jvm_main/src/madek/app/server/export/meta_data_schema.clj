@@ -32,14 +32,15 @@
          :meta-keys (meta-keys vocabulary)))
 
 (defn meta-data-schema_unmemoized [entry-point http-options]
-  (->> (-> (roa/get-root entry-point
-                         :default-conn-opts http-options)
-           (roa/relation :vocabularies)
-           (roa/get {})
-           roa/coll-seq)
-       (map #(roa/get % {}))
-       (map vocablulary-with-meta-keys)
-       (sort-by :position)))
+  {:vocabularies
+   (->> (-> (roa/get-root entry-point
+                          :default-conn-opts http-options)
+            (roa/relation :vocabularies)
+            (roa/get {})
+            roa/coll-seq)
+        (map #(roa/get % {}))
+        (map vocablulary-with-meta-keys)
+        (sort-by :position))})
 
 (def meta-data-schema (memoize meta-data-schema_unmemoized))
 
