@@ -136,7 +136,7 @@
             target-dir (-> @state/db :download :target-directory)
             recursive? (-> @state/db :download :recursive not not)
             skip-media-files? (-> @state/db :download :skip_media_files not not)
-            download-meta-data-schema? (-> @state/db :download :download_meta_data_schema not not)
+            download-meta-data-schema? true
             prefix-meta-key (-> @state/db :download :prefix_meta_key presence)
             entry-point (str (-> @state/db :connection :url) "/api")
             http-options (-> @state/db :connection :http-options)]

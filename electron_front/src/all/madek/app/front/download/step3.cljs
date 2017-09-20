@@ -51,8 +51,7 @@
    [:p "Meta-key used for prefixing entities: " (if-let [pmk (-> @state/jvm-main-db :download :prefix_meta_key presence)]
                                                   [:code pmk]
                                                   [:span "none"]) "."]
-   [:p "Skip media-files " [:code (-> @state/jvm-main-db :download :skip_media_files not not str)]"."]
-   [:p "Download meta-data schema " [:code (-> @state/jvm-main-db :download :download_meta_data_schema not not str)]"."]])
+   [:p "Skip media-files " [:code (-> @state/jvm-main-db :download :skip_media_files not not str)]"."]])
 
 (defn debug-component []
   (when (:debug @state/client-db)

@@ -42,9 +42,11 @@
 
 (defn submit []
   (let [req {:method :patch
-             :json-params (assoc (select-keys @form-data*
-                                              [:prefix_meta_key :recursive :skip_media_files :download_meta_data_schema])
-                                 :step2-completed true)
+             :json-params (assoc
+                            (select-keys
+                              @form-data*
+                              [:prefix_meta_key :recursive :skip_media_files])
+                            :step2-completed true)
              :path "/download"}]
     (request/send-off
       req {:title "Export/Download Step-2"})))
@@ -75,17 +77,6 @@
              :checked (-> @form-data* :skip_media_files)} ] " skip files"
     [:p.help-block "The download of any media-files will be skipped if this is checked. "
      "This means that only the meta-data of media-entries or sets will be downloaded. " ]]])
-
-;;; download meta-data schema ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn download-meta-data-schema-component []
-  [:div.meta-data-schema
-   [:h4 "Meta-Data Schema"]
-   [:div.form-group
-    [:input {:type :checkbox
-             :on-click #(set-value :download_meta_data_schema (-> @form-data* :download_meta_data_schema not))
-             :checked (-> @form-data* :download_meta_data_schema)} ] " download meta-data schema"
-    [:p.help-block "If this is checked the file `meta-data_schema.json` will be created in your download directory."]]])
 
 
 ;;; prefix meta-key ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -197,7 +188,6 @@
    [recursive-component]
    [prefix-component]
    [skip-media-files-component]
-   [download-meta-data-schema-component]
    [:div.pull-left
     [:button.btn.btn-info
      {:on-click back}

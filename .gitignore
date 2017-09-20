@@ -12,6 +12,7 @@
 .nrepl-port
 .sass-cache/
 /logs
+/log
 app/dev/css/
 app/dev/js/
 app/prod/css/

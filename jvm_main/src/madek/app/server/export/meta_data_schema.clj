@@ -45,9 +45,9 @@
 (def meta-data-schema (memoize meta-data-schema_unmemoized))
 
 (defn download [target-dir entry-point http-options]
-  (io/make-parents target-dir)
   (let [path (str target-dir File/separator "meta-data_schema.json")
         schema (meta-data-schema entry-point http-options)]
+    (io/make-parents path)
     (spit path (cheshire/generate-string schema {:pretty true}))))
 
 
