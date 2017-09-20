@@ -62,6 +62,7 @@
   (html5
     [:head
      [:title (title media-resource)]
+     [:meta {:charset "utf-8"}]
      [:body
       [:h2 (title media-resource)]
       [:p "URL: " (url media-resource)]
