@@ -138,10 +138,10 @@
             skip-media-files? (-> @state/db :download :skip_media_files not not)
             download-meta-data-schema? true
             prefix-meta-key (-> @state/db :download :prefix_meta_key presence)
-            entry-point (str (-> @state/db :connection :url) "/api")
-            http-options (-> @state/db :connection :http-options)]
+            entry-point (state/connection-entry-point)
+            http-options (state/connection-http-options)]
         (when download-meta-data-schema?
-          (export/download-meta-data-schema target-dir entry-point http-options))
+          (export/download-meta-data-schema target-dir))
         (start-download-future id target-dir recursive? skip-media-files? prefix-meta-key entry-point http-options))
       {:status 202})))
 

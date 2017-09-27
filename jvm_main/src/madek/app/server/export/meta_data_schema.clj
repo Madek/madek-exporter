@@ -31,10 +31,10 @@
   (assoc (roa/data vocabulary)
          :meta-keys (meta-keys vocabulary)))
 
-(defn meta-data-schema_unmemoized [entry-point http-options]
+(defn meta-data-schema_unmemoized []
   {:vocabularies
-   (->> (-> (roa/get-root entry-point
-                          :default-conn-opts http-options)
+   (->> (-> (roa/get-root (state/connection-entry-point)
+                          :default-conn-opts (state/connection-http-options))
             (roa/relation :vocabularies)
             (roa/get {})
             roa/coll-seq)
@@ -44,9 +44,9 @@
 
 (def meta-data-schema (memoize meta-data-schema_unmemoized))
 
-(defn download [target-dir entry-point http-options]
+(defn download [target-dir]
   (let [path (str target-dir File/separator "meta-data_schema.json")
-        schema (meta-data-schema entry-point http-options)]
+        schema (meta-data-schema)]
     (io/make-parents path)
     (spit path (cheshire/generate-string schema {:pretty true}))))
 

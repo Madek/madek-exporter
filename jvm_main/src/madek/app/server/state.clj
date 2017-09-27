@@ -33,6 +33,17 @@
 
 (defonce clients (atom {}))
 
+;### connection params ########################################################
+
+(defn connection-entry-point []
+  (let [url (or (-> @db :connection :url)
+                (throw (ex-info "The connection entry-point is not available at this time." {})))]
+    (str url "/api")))
+
+(defn connection-http-options []
+  (or (-> @db :connection :http-options)
+      (throw (ex-info "The connection options are not available at this time." {}))))
+
 ;### sente setup ##############################################################
 
 (declare chsk-send! connected-uids)
