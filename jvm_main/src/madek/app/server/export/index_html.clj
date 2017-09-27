@@ -50,6 +50,9 @@
    [:h3 (:meta_key_id meta-datum) ]
    (case (:type meta-datum)
      "MetaDatum::Keywords" (html-keywords-values meta-datum)
+     "MetaDatum::People" (-> (->> (:values meta-datum)
+                                  (map #(dissoc % :date_of_birth :date_of_death :id)))
+                             (cheshire/generate-string {:pretty true}))
      (html-generic-meta-datum-value meta-datum))])
 
 (defn html-meta-data [meta-data]
