@@ -20,6 +20,19 @@
   (:import
     [java.io File]))
 
+(defn meta-keys_unmemoized []
+  (->> (-> (roa/get-root (state/connection-entry-point)
+                         :default-conn-opts (state/connection-http-options))
+           (roa/relation :meta-keys)
+           (roa/get {})
+           roa/coll-seq)
+       (map #(roa/get % {}))
+       (map roa/data)
+       (map (fn [k] [(:id k) k]))
+       (into {})))
+
+(def meta-keys (memoize meta-keys_unmemoized))
+
 (defn title [media-resource]
   (str (-> media-resource :type name ->PascalCase )
        " "
@@ -51,12 +64,13 @@
       (cheshire/generate-string {:pretty true})))
 
 (defn html-meta-datum [meta-datum]
-  [:div.meta-datum {:class (:meta_key_id meta-datum)}
-   [:h3 (:meta_key_id meta-datum) ]
-   (case (:type meta-datum)
-     "MetaDatum::Keywords" (html-keywords-values meta-datum)
-     ("MetaDatum::TextDate" "MetaDatum::Text") (:value meta-datum)
-     "MetaDatum::People" (html-people-values meta-datum))])
+  (let [meta-key-id (:meta_key_id meta-datum)]
+    [:div.meta-datum {:class (:meta_key_id meta-datum)}
+     [:h3 (or (:label (get (meta-keys) meta-key-id nil)) meta-key-id)]
+     (case (:type meta-datum)
+       "MetaDatum::Keywords" (html-keywords-values meta-datum)
+       ("MetaDatum::TextDate" "MetaDatum::Text") (:value meta-datum)
+       "MetaDatum::People" (html-people-values meta-datum))]))
 
 (defn html-meta-data [meta-data]
   [:div.meta-data
