@@ -43,17 +43,20 @@
   [:pre
    (->> (:values meta-datum)
         (map :term)
-        (cheshire/generate-string ))])
+        (clojure.string/join ", "))])
+
+(defn html-people-values [meta-datum]
+  (-> (->> (:values meta-datum)
+           (map #(dissoc % :date_of_birth :date_of_death :id)))
+      (cheshire/generate-string {:pretty true})))
 
 (defn html-meta-datum [meta-datum]
   [:div.meta-datum {:class (:meta_key_id meta-datum)}
    [:h3 (:meta_key_id meta-datum) ]
    (case (:type meta-datum)
      "MetaDatum::Keywords" (html-keywords-values meta-datum)
-     "MetaDatum::People" (-> (->> (:values meta-datum)
-                                  (map #(dissoc % :date_of_birth :date_of_death :id)))
-                             (cheshire/generate-string {:pretty true}))
-     (html-generic-meta-datum-value meta-datum))])
+     ("MetaDatum::TextDate" "MetaDatum::Text") (:value meta-datum)
+     "MetaDatum::People" (html-people-values meta-datum))])
 
 (defn html-meta-data [meta-data]
   [:div.meta-data
