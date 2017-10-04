@@ -2,8 +2,8 @@
 
 - version_major: 0
   version_minor: 9
-  version_patch: 4
-  version_pre: 0
+  version_patch: 5
+  version_pre: NULL
   version_build: NULL
   name: NULL
 
