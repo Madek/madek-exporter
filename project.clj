@@ -40,6 +40,13 @@
                  [com.google.guava/guava "21.0"]
 
                  ]
+
+  ; jdk 9 needs ["--add-modules" "java.xml.bind"]
+  :jvm-opts #=(eval (if (re-matches #"^9\..*" (System/getProperty "java.version"))
+                      ["--add-modules" "java.xml.bind"]
+                      []))
+
+
   :plugins [
             [lein-cljsbuild "1.1.5"]
             [lein-environ "1.0.2"]
