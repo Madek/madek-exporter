@@ -50,6 +50,7 @@ jobs:
                   script_key: build-windows
                 build-mac-os has passed:
                   script_key: build-mac-os
+              timeout: 10 Minutes
               body: |
                 set -euxo
                 export PATH=~/.rubies/$RUBY/bin:$PATH

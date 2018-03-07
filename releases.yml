@@ -2,6 +2,26 @@
 
 - version_major: 0
   version_minor: 9
+  version_patch: 6
+  version_pre: NULL
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Changes
+    =======
+
+    * Write meta-data.json and index.html twice: once with and once without prefix.
+
+    Fixes:
+    ------
+
+    * Fix build on JDK9.
+
+
+- version_major: 0
+  version_minor: 9
   version_patch: 5
   version_pre: NULL
   version_build: NULL

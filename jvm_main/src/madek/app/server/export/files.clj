@@ -1,21 +1,46 @@
 (ns madek.app.server.export.files
   (:require
     [madek.app.server.state :as state]
-    [json-roa.client.core :as roa]
-    [madek.app.server.utils :refer [deep-merge]]
+    [madek.app.server.utils :refer [deep-merge presence]]
 
+    [json-roa.client.core :as roa]
     [cheshire.core :as cheshire]
     [clojure.java.io :as io]
 
     [clj-logging-config.log4j :as logging-config]
     [clojure.tools.logging :as logging]
     [logbug.catcher :as catcher]
+    [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
     [logbug.thrown :as thrown]
     )
 
   (:import
     [java.io File]
     ))
+
+;### title and prefix #########################################################
+
+(defn get-prefix [prefix-meta-key media-resource]
+  (-> media-resource
+      (roa/relation :meta-data)
+      (roa/get {:meta_keys (cheshire/generate-string [(str prefix-meta-key)])})
+      roa/coll-seq
+      first
+      (roa/get {})
+      roa/data
+      :value str))
+
+(defn useableFileName [s]
+  (.replaceAll s "[^a-zA-Z0-9 ]" ""))
+
+(defn path-prefix [prefix-meta-key media-resource]
+  (let [prefix-part-one (if-not (presence prefix-meta-key) ""
+                          (if-let [mk-value (get-prefix
+                                              prefix-meta-key media-resource)]
+                            (str (useableFileName mk-value) "_") ""))]
+    (str prefix-part-one (-> media-resource roa/data :id))))
+
+
 
 ;### DL Previews ##############################################################
 
@@ -84,3 +109,10 @@
           )))))
 
 
+;### Debug ####################################################################
+;(logging-config/set-logger! :level :debug)
+;(logging-config/set-logger! :level :info)
+;(debug/debug-ns 'ring.middleware.resource)
+;(debug/debug-ns *ns*)
+;(debug/debug-ns 'json-roa.client.core)
+;(debug/debug-ns 'uritemplate-clj.core)

@@ -1,6 +1,6 @@
 (ns madek.app.server.export
   (:require
-    [madek.app.server.export.files :as files :refer [download-media-files]]
+    [madek.app.server.export.files :as files :refer [download-media-files path-prefix]]
     [madek.app.server.export.index-html :as index-html]
     [madek.app.server.export.meta-data :as meta-data :refer [meta-data write-meta-data]]
     [madek.app.server.export.meta-data-schema :as meta-data-schema]
@@ -47,28 +47,6 @@
       (nio-path target)
       (make-array java.nio.file.attribute.FileAttribute 0))))
 
-;### title and prefix #########################################################
-
-(defn get-prefix [prefix-meta-key media-resource]
-  (-> media-resource
-      (roa/relation :meta-data)
-      (roa/get {:meta_keys (cheshire/generate-string [(str prefix-meta-key)])})
-      roa/coll-seq
-      first
-      (roa/get {})
-      roa/data
-      :value str))
-
-(defn useableFileName [s]
-  (.replaceAll s "[^a-zA-Z0-9 ]" ""))
-
-(defn path-prefix [prefix-meta-key media-resource]
-  (let [prefix-part-one (if-not (presence prefix-meta-key) ""
-                          (if-let [mk-value (get-prefix
-                                              prefix-meta-key media-resource)]
-                            (str (useableFileName mk-value) "_") ""))]
-    (str prefix-part-one (-> media-resource roa/data :id))))
-
 
 ;### DL Media-Entry ###########################################################
 
@@ -110,10 +88,11 @@
                               :path entry-dir-path
                               :download_started-at (str (time/now))))
              (io/make-parents entry-dir-path)
-             (write-meta-data entry-dir-path meta-data id)
+             (write-meta-data entry-dir-path meta-data id entry-prefix-path)
              (index-html/write entry-dir-path
                                meta-data
-                               (-> media-entry roa/data (assoc :type :media-entry)))
+                               (-> media-entry roa/data (assoc :type :media-entry))
+                               entry-prefix-path)
              (when-not skip-media-files?
                (download-media-files entry-dir-path media-entry))
              (set-item-to-finished id)))))))
@@ -187,10 +166,11 @@
                          :path target-dir-path
                          :download_started-at (str (time/now))))
         (io/make-parents target-dir-path)
-        (write-meta-data target-dir-path meta-data id)
+        (write-meta-data target-dir-path meta-data id path-prefix)
         (index-html/write target-dir-path
                           meta-data
-                          (-> collection roa/data (assoc :type :collection)))
+                          (-> collection roa/data (assoc :type :collection))
+                          path-prefix)
         (download-media-entries-for-set
           id target-dir-path skip-media-files? prefix-meta-key api-entry-point api-http-opts)
         (when recursive?

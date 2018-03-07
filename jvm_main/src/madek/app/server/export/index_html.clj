@@ -1,5 +1,6 @@
 (ns madek.app.server.export.index-html
   (:require
+    [madek.app.server.export.files :as files :refer [path-prefix]]
     [madek.app.server.state :as state]
     [madek.app.server.utils :refer [deep-merge]]
 
@@ -88,11 +89,12 @@
       [:p "URL: " (url media-resource)]
       (html-meta-data meta-data)]]))
 
-(defn write [target-dir meta-data media-resource]
+(defn write [target-dir meta-data media-resource prefix-path]
   (io/make-parents target-dir)
-  (let [path (str target-dir File/separator "index.html")
-        html (html media-resource meta-data)]
-    (spit path html)))
+  (let [html (html media-resource meta-data)]
+    (doseq [path [(str target-dir File/separator "index.html")
+                  (str target-dir File/separator prefix-path "_index.html")]]
+      (spit path html))))
 
 ;### Debug ####################################################################
 ;(debug/re-apply-last-argument #'write)
