@@ -63,8 +63,6 @@
                    :repl-options {:init-ns madek.app.server.main}
                    :source-paths ["jvm_main/src", "electron_front/src/dev"]
                    :resource-paths["jvm_main/resources/dev"]
-                   ; TODO watch & build sass in dev mode
-                   ; :sass {:src "electron_front/sass" :dst "app/dev/css" }
                    }
 
              :prod {}

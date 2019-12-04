@@ -130,18 +130,19 @@
                                            prefix-meta-key api-entry-point api-http-opts]
   (let [coll-get-opts (if (or (:basic-auth api-http-opts)
                               (-> api-http-opts :cookies (get "madek-session")))
-                        {:me_get_full_size "true"}
-                        {:public_get_full_size "true"})]
+                        {:me_get_metadata_and_previews "true"}
+                        {:public_get_metadata_and_previews "true"})]
     (doseq [collection  (I>> identity-with-logging
                              (I> identity-with-logging
                                  collection
                                  (roa/relation :collections)
-                                 (roa/get {}) ;TODO set coll-get-opts
+                                 (roa/get coll-get-opts)
                                  roa/coll-seq)
                              (map #(roa/get % {})))]
       (download-set
         (-> collection roa/data :id)
         target-dir-path recursive? skip-media-files? prefix-meta-key api-entry-point api-http-opts))))
+
 
 (defn download-set [id dl-path recursive? skip-media-files? prefix-meta-key
                     api-entry-point api-http-opts]
