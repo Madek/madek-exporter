@@ -24,7 +24,7 @@ scripts:
   include:
     - cider-ci/bundle-script.yml
   install-npm-packages:
-    body: npm install
+    body: npm clean-install
   build-stylesheets:
     body:  bin/build-stylesheets-prod*
     start_when:
