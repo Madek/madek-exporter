@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-set -eou
-lein with-profile prod sass once
+set -euxo
+npx sass -s compressed --no-source-map electron_front/sass/site.sass app/prod/css/site.css

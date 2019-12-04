@@ -3,10 +3,11 @@
   "version": "0.4.0",
   "description": "",
   "devDependencies": {
+    "closurecompiler-externs": "^1.0.4",
+    "electron-packager": "^14.1.1",
     "grunt": "^1.0.1",
     "grunt-download-electron": "^2.1.4",
-    "closurecompiler-externs": "^1.0.4",
-    "electron-packager": "^8.5.1"
+    "sass": "^1.23.7"
   },
   "license": "MIT",
   "repository": "YOUR_OWN_REPOSITORY",

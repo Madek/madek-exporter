@@ -42,10 +42,9 @@
                  ]
 
   ; jdk 9 needs ["--add-modules" "java.xml.bind"]
-  :jvm-opts #=(eval (if (re-matches #"^9\..*" (System/getProperty "java.version"))
+  :jvm-opts #=(eval (if (re-matches #"^(9|10)\..*" (System/getProperty "java.version"))
                       ["--add-modules" "java.xml.bind"]
                       []))
-
 
   :plugins [
             [lein-cljsbuild "1.1.5"]
@@ -64,14 +63,12 @@
                    :repl-options {:init-ns madek.app.server.main}
                    :source-paths ["jvm_main/src", "electron_front/src/dev"]
                    :resource-paths["jvm_main/resources/dev"]
-                   :sass {:src "electron_front/sass"
-                          :dst "app/dev/css" }
+                   ; TODO watch & build sass in dev mode
+                   ; :sass {:src "electron_front/sass" :dst "app/dev/css" }
                    }
 
-             :prod {:sass {:src "electron_front/sass"
-                           :dst "app/prod/css"
-                           :style :compressed }
-                    }
+             :prod {}
+
              :uberjar {
                        :prep-tasks ["compile"]
                        :source-paths ["jvm_main/src"]

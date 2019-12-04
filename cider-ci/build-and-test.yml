@@ -23,20 +23,31 @@ traits:
 scripts:
   include:
     - cider-ci/bundle-script.yml
+  install-npm-packages:
+    body: npm install
   build-stylesheets:
     body:  bin/build-stylesheets-prod*
+    start_when:
+      install-npm-packages has passed:
+        script_key: install-npm-packages
   build-electron-front:
     body: |
       set -eoux
       lein do \
         externs electron-front-prod app/prod/js/front_externs.js, \
         cljsbuild once electron-front-prod
+    start_when:
+      install-npm-packages has passed:
+        script_key: install-npm-packages
   build-electron-main:
     body: |
       set -eoux
       lein do \
         externs electron-main-prod app/prod/js/main_externs.js, \
         cljsbuild once electron-main-prod
+    start_when:
+      install-npm-packages has passed:
+        script_key: install-npm-packages
   build-jvm-main:
     body: lein uberjar
   build-components-done:

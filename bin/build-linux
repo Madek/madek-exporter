@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eoux
 
-./node_modules/electron-packager/cli.js \
+npx electron-packager \
   --overwrite --platform=linux --arch=x64 --electron-version=1.6.0 \
   --icon=Madek.icns \
   ./app/prod madek-exporter

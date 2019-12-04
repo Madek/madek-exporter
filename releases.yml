@@ -1,4 +1,16 @@
-####### 0.9.x #######################################################################
+####### 0.9.7 #######################################################################
+
+- version_major: 0
+  version_minor: 9
+  version_patch: 7
+  version_pre: PRE1
+  version_build: NULL
+  name: NULL
+
+  description: |
+    WIP Fix missing permissions-parameter when recursing sets
+
+####### 0.9.6 #######################################################################
 
 - version_major: 0
   version_minor: 9

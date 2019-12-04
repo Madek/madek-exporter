@@ -2,7 +2,7 @@
 set -eoux
 rm -rf ./madek-exporter-darwin-x64
 
-./node_modules/electron-packager/cli.js \
+npx electron-packager \
   --overwrite --platform=darwin --arch=x64 --electron-version=1.6.0 \
   --icon=Madek.icns \
   ./app/prod madek-exporter
