@@ -37,7 +37,7 @@ jobs:
           include:
             - cider-ci/build-and-test.yml
           traits:
-              ci-g2016-08: true
+              ci-g2018-04: true
           scripts:
             # override the existing test; we don't care about the result
             test:
