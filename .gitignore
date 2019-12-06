@@ -22,6 +22,7 @@ electron/*
 lib/*
 madek-app-darwin-x64/
 madek-exporter-darwin-x64/
+madek-exporter-linux-x64/
 node_modules/*
 out/*
 pom.xml

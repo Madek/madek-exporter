@@ -54,7 +54,7 @@ if existing_release.status == 200
 end
 
 unless existing_release.status == 404
-  raise 'expected response for existing_release is 404'
+  raise "expected response for existing_release is 404 but we got #{existing_release.status}"
 end
 
 created_release = conn.post do |req|
