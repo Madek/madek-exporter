@@ -1,0 +1,3 @@
+
+lein run -- cli --token ARG107Z0FE94230T2SYN0T1F36QR6BT2
+

@@ -8,10 +8,7 @@ jobs:
     context:
       tasks:
         build:
-          include:
-            - cider-ci/environment_variables.yml
-          traits:
-            ubuntu-desktop: true
+          traits: []
           scripts:
             include:
               - cider-ci/bundle-script.yml
@@ -20,8 +17,8 @@ jobs:
                 bundle has passed:
                   script_key: bundle
               body: |
-                set -euxo
-                export PATH=~/.rubies/$RUBY/bin:$PATH
+                #!/usr/bin/env bash
+                set -euo pipefail
                 bundle exec ./bin/update-releases
                 git diff --stat --exit-code -- app/prod/releases.json
 
@@ -36,8 +33,7 @@ jobs:
         release:
           include:
             - cider-ci/build-and-test.yml
-          traits:
-              ci-g2018-04: true
+          traits: {}
           scripts:
             # override the existing test; we don't care about the result
             test:
@@ -46,14 +42,14 @@ jobs:
               start_when:
                 build-linux has passed:
                   script_key: build-linux
-                build-windows has passed:
-                  script_key: build-windows
+#               build-windows has passed:
+#                 script_key: build-windows
                 build-mac-os has passed:
                   script_key: build-mac-os
               timeout: 10 Minutes
               body: |
-                set -euxo
-                export PATH=~/.rubies/$RUBY/bin:$PATH
+                #!/usr/bin/env bash
+                set -euo pipefail
                 bundle exec ./bin/draft-gh-release
 
   build:

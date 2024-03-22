@@ -1,20 +1,15 @@
-(ns madek.app.server.main
+(ns madek.exporter.server.main
   (:gen-class)
   (:require
-    [madek.app.server.server :as server]
-    [madek.app.server.state :as state]
-    [madek.app.server.utils :as utils :refer [exit presence]]
-
-
-    [environ.core :refer [env]]
-    [clojure.pprint :refer [pprint]]
-    [clojure.string :as string]
-    [clojure.tools.cli :refer [parse-opts]]
-
-    [clj-logging-config.log4j :as logging-config]
-    [clojure.tools.logging :as logging]
-    [logbug.catcher :as catcher]
-    ))
+   [clojure.pprint :refer [pprint]]
+   [clojure.string :as string]
+   [clojure.tools.cli :refer [parse-opts]]
+   [environ.core :refer [env]]
+   [logbug.catcher :as catcher]
+   [logbug.thrown]
+   [madek.exporter.server.http-server :as server]
+   [madek.exporter.state :as state]
+   [madek.exporter.utils :as utils :refer [exit presence]]))
 
 (def cli-options
   [["-u" "--madek-url  URL" "Madek URL"
@@ -35,7 +30,7 @@
    ["-h" "--help"]])
 
 (defn usage [options-summary & more]
-  (->> ["Madek-Exporter"
+  (->> ["Madek-Exporter Server"
         ""
         "Options:"
         options-summary
@@ -47,30 +42,29 @@
            "-------------------------------------------------------------------"])]
        flatten (string/join \newline)))
 
-(defn -main [& args]
+(defn main [global-opts args]
   (logbug.thrown/reset-ns-filter-regex #".*madek.*")
   (catcher/snatch
-    {:level :fatal
-     :throwable Throwable
-     :return-fn (fn [_] (System/exit -1))}
-    (let [{:keys [options arguments errors summary]}
-          (parse-opts args cli-options)]
-      (cond
-        (:help options) (exit 0 (usage summary {:options options})))
-      (println (usage summary {:options options}))
-      (let [{target-dir :download-dir madke-url :madek-url} options]
-        (state/initialize
-          {:jvm-main-options options
-           :download-parameters
-           {:target-dir target-dir }
-           :connection
-           {:madek-url madke-url}}))
-      (let[{port :port host :interface password :password} options]
-        (server/initialize
-          {:port port
-           :host host}
-          {:password password})))))
-
+   {:level :fatal
+    :throwable Throwable
+    :return-fn (fn [_] (System/exit -1))}
+   (let [{:keys [options arguments errors summary]}
+         (parse-opts args cli-options)]
+     (cond
+       (:help options) (exit 0 (usage summary {:options options})))
+     (println (usage summary {:options options}))
+     (let [{target-dir :download-dir madek-url :madek-url} options]
+       (state/initialize
+        {:jvm-main-options options
+         :download-parameters
+         {:target-dir target-dir}
+         :connection
+         {:madek-url madek-url}}))
+     (let [{port :port host :interface password :password} options]
+       (server/initialize
+        {:port port
+         :host host}
+        {:password password})))))
 
 ;(-> (Desktop/getDesktop)(.browse (URI. "file:///Users/Thomas")))
 ;(sh "open" "http://localhost:3000")

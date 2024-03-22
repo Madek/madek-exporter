@@ -23,6 +23,7 @@
     (reset! jvm-main-process-child
             (.spawn child-process java-path
                     (clj->js ["-jar" jar-path
+                              "server"
                               "-p" env/jvm-port
                               "-s" env/jvm-password])))
     (.on @jvm-main-process-child "error" #(.log js/console (str "JVM-MAIN_PROC-ERR " %)))

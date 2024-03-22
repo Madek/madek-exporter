@@ -1,27 +1,17 @@
-(ns madek.app.server.server
+(ns madek.exporter.server.http-server
   (:require
-    [madek.app.server.web :as web]
-    [madek.app.server.utils :as utils :refer [presence]]
-
-    [clojure.data.codec.base64 :as base64]
-    [environ.core :refer [env]]
-    ;[ring.adapter.jetty :refer [run-jetty]]
-    ;[ring.adapter.undertow :refer [run-undertow]]
-    [immutant.web :refer [run]]
-    [clojure.walk]
-
-    [logbug.catcher :as catcher]
-    [logbug.thrown]
-    [clojure.tools.logging :as logging]
-
-    [logbug.catcher :as catcher]
-    [logbug.thrown]
-    [logbug.debug :as debug :refer [ I> ]]
-    [logbug.ring :as logbug-ring :refer [wrap-handler-with-logging]]
-
-    )
-  (:gen-class))
-
+   [clojure.data.codec.base64 :as base64]
+   [clojure.tools.logging :as logging]
+   [clojure.walk]
+   [environ.core :refer [env]]
+   [immutant.web :refer [run]]
+   [logbug.catcher :as catcher]
+   [logbug.catcher :as catcher]
+   [logbug.debug :as debug :refer [I>]]
+   [logbug.ring :as logbug-ring :refer [wrap-handler-with-logging]]
+   [logbug.thrown]
+   [madek.exporter.server.web :as web]
+   [madek.exporter.utils :as utils :refer [presence]]))
 
 (def web-server (atom nil))
 
@@ -55,7 +45,6 @@
   (fn [request]
     (http-basic-authorize request handler password)))
 
-
 ;;; Initialize ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn initialize [server-config app-config]
@@ -76,8 +65,6 @@
                  ;(utils/os-browse uri)
                  (utils/exit 0))
              (throw e))))))
-
-
 
 ;### Debug ####################################################################
 ;(logging-config/set-logger! :level :debug)

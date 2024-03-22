@@ -6,4 +6,6 @@ ${PROJECT_DIR}/bin/env/lein-setup
 ${PROJECT_DIR}/bin/env/clojure-setup
 ${PROJECT_DIR}/bin/env/java-setup
 
-lein uberjar
+lein "$@"
+
+#vi ft=sh

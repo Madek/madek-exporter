@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-set -eoux
+set -euo pipefail
 rm -rf ./madek-exporter-darwin-x64
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+
+cd ${PROJECT_DIR}
+
+# ./bin/env/python-setup
+./bin/env/nodejs-setup
 
 npx electron-packager \
   --overwrite --platform=darwin --arch=x64 --electron-version=1.6.0 \
   --icon=Madek.icns \
   ./app/prod madek-exporter
 
-cp -Lrf vendor/jre_darwin/Contents/Home ./madek-exporter-darwin-x64/madek-exporter.app/Contents/Resources/jre
+cp -Lrf ${PROJECT_DIR}/vendor/jre_macosx_x64  ./madek-exporter-darwin-x64/madek-exporter.app/Contents/Resources/jre

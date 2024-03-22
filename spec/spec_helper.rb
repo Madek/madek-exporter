@@ -1,5 +1,4 @@
 require 'active_support/all'
-require 'capybara/poltergeist'
 require 'capybara/rspec'
 require 'chromedriver/helper'
 require 'logger'
@@ -15,7 +14,7 @@ APP_ROOT_DIR = \
 
 APP_BINARY = \
   case RUBY_PLATFORM
-  when 'x86_64-darwin16'
+  when 'x86_64-darwin16', 'arm64-darwin22'
     APP_ROOT_DIR.join(
       'madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter').to_s
   when 'x86_64-linux', 'x86_64-linux-gnu'
@@ -71,12 +70,6 @@ RSpec.configure do |config|
       when :selenium, :selenium_chrome, :chrome
         begin
           page.driver.browser.save_screenshot(path)
-        rescue
-          nil
-        end
-      when :poltergeist
-        begin
-          page.driver.render(path, full: true)
         rescue
           nil
         end

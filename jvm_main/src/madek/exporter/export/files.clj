@@ -1,22 +1,17 @@
-(ns madek.app.server.export.files
+(ns madek.exporter.export.files
   (:require
-    [madek.app.server.state :as state]
-    [madek.app.server.utils :refer [deep-merge presence]]
-
-    [json-roa.client.core :as roa]
-    [cheshire.core :as cheshire]
-    [clojure.java.io :as io]
-
-    [clj-logging-config.log4j :as logging-config]
-    [clojure.tools.logging :as logging]
-    [logbug.catcher :as catcher]
-    [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
-    [logbug.thrown :as thrown]
-    )
+   [cheshire.core :as cheshire]
+   [clojure.java.io :as io]
+   [clojure.tools.logging :as logging]
+   [json-roa.client.core :as roa]
+   [logbug.catcher :as catcher]
+   [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
+   [logbug.thrown :as thrown]
+   [madek.exporter.state :as state]
+   [madek.exporter.utils :refer [deep-merge presence]])
 
   (:import
-    [java.io File]
-    ))
+   [java.io File]))
 
 ;### title and prefix #########################################################
 
@@ -35,12 +30,10 @@
 
 (defn path-prefix [prefix-meta-key media-resource]
   (let [prefix-part-one (if-not (presence prefix-meta-key) ""
-                          (if-let [mk-value (get-prefix
-                                              prefix-meta-key media-resource)]
-                            (str (useableFileName mk-value) "_") ""))]
+                                (if-let [mk-value (get-prefix
+                                                   prefix-meta-key media-resource)]
+                                  (str (useableFileName mk-value) "_") ""))]
     (str prefix-part-one (-> media-resource roa/data :id))))
-
-
 
 ;### DL Previews ##############################################################
 
@@ -48,14 +41,14 @@
   (let [previews-dir (str target-dir File/separator "previews")]
     (doseq [preview-rel (-> media-file roa/coll-seq)]
       (let [preview (roa/get preview-rel {})
-            preview-id  (-> preview roa/data :id)
+            preview-id (-> preview roa/data :id)
             preview-path (str previews-dir File/separator
                               (-> preview roa/data :filename))
             preview-response (-> preview
                                  (roa/relation :data-stream)
                                  (roa/get {} :mod-conn-opts #(assoc % :as :stream)))]
         (swap! state/db
-               (fn [db  params]
+               (fn [db params]
                  (deep-merge db params))
                {:download
                 {:items
@@ -67,8 +60,7 @@
                       {:path preview-path}}}}}}}})
         (io/make-parents preview-path)
         (clojure.java.io/copy (-> preview-response :body)
-                              (clojure.java.io/file preview-path))
-        ))))
+                              (clojure.java.io/file preview-path))))))
 
 ;### DL Media-Files ###########################################################
 
@@ -92,8 +84,7 @@
                 {:path file-path}}}}}})
     (io/make-parents file-path)
     (clojure.java.io/copy (-> response :body) (clojure.java.io/file file-path))
-    (download-previews target-dir media-file item-id media-file-id)
-    ))
+    (download-previews target-dir media-file item-id media-file-id)))
 
 (defn download-media-files [target-dir media-entry]
   (catcher/with-logging {}
@@ -105,9 +96,7 @@
               media-file-data-path (str media-file-dir File/separator "data.json")]
           (io/make-parents media-file-data-path)
           (spit media-file-data-path (cheshire/generate-string media-file-data {:pretty true}))
-          (download-media-file media-file-dir media-file item-id)
-          )))))
-
+          (download-media-file media-file-dir media-file item-id))))))
 
 ;### Debug ####################################################################
 ;(logging-config/set-logger! :level :debug)

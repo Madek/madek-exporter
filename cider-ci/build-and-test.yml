@@ -1,5 +1,3 @@
-include:
-  - cider-ci/environment_variables.yml
 git_options:
   submodules:
     include_match: ^.*$
@@ -11,20 +9,20 @@ trial_attachments:
     include_match: 'logs\/.+\.log$'
     content_type: text/plain
 traits:
-  JDK: true
-  Leiningen: true
-  libgconf-2-4: true
-  nodejs: true
-  #nx-07288_linux-vm: true
-  ubuntu-desktop: true
-  ruby-install: true
-  wine: true
-  xorg: true
+  asdf: true
+  ci-executor-madek: true
+  # libgconf-2-4: true
+  # ubuntu-desktop: true
+  # wine: true
+  # xorg: true
 scripts:
   include:
     - cider-ci/bundle-script.yml
   install-npm-packages:
-    body: npm clean-install
+    body: |
+      #!/usr/bin/env bash
+      ./bin/env/nodejs-setup
+      npm clean-install
   build-stylesheets:
     body:  bin/build-stylesheets-prod*
     start_when:
@@ -32,24 +30,24 @@ scripts:
         script_key: install-npm-packages
   build-electron-front:
     body: |
-      set -eoux
-      lein do \
-        externs electron-front-prod app/prod/js/front_externs.js, \
-        cljsbuild once electron-front-prod
+      #!/usr/bin/env bash
+      set -euo pipefail
+      ./bin/build-electron-front-prod
     start_when:
       install-npm-packages has passed:
         script_key: install-npm-packages
   build-electron-main:
     body: |
-      set -eoux
-      lein do \
-        externs electron-main-prod app/prod/js/main_externs.js, \
-        cljsbuild once electron-main-prod
+      #!/usr/bin/env bash
+      set -euo pipefail
+      ./bin/build-electron-main-prod
     start_when:
       install-npm-packages has passed:
         script_key: install-npm-packages
   build-jvm-main:
-    body: lein uberjar
+    body: |
+      #!/usr/bin/env bash
+      ./bin/build-jvm-main-prod
   build-components-done:
     # just a meta script to model dependencies easier
     body: exit 0
@@ -64,16 +62,20 @@ scripts:
         script_key: build-stylesheets
   build-mac-os:
     body: |
-      set -eoux
+      #!/usr/bin/env bash
+      set -euo pipefail
       ./bin/build-mac-os
       zip -r Madek-Exporter_Mac-OS.zip madek-exporter-darwin-x64
-      # cp Madek-Exporter_Mac-OS.zip /tmp/Madek-Exporter_Mac-OS_${CIDER_CI_TREE_ID}.zip
+      cp Madek-Exporter_Mac-OS.zip /tmp/Madek-Exporter_Mac-OS_${CIDER_CI_TREE_ID}.zip
     start_when:
       build-components has passed:
         script_key: build-components-done
   build-windows:
+    ignore_state: true
     body: |
-      set -eoux
+      #!/usr/bin/env bash
+      set -euo pipefail
+      echo "THE STATE OF THIS SCRIPT IS IGNORED SINCE THE WINDOWS BUILD FAILS ON NEWER SYSTEMS"
       ./bin/build-win
       zip -r Madek-Exporter_Windows.zip madek-exporter-win32-x64
       # cp Madek-Exporter_Linux.zip /tmp/Madek-Exporter_Linux_${CIDER_CI_TREE_ID}.zip
@@ -83,7 +85,8 @@ scripts:
         script_key: build-components-done
   build-linux:
     body: |
-      set -eoux
+      #!/usr/bin/env bash
+      set -euo pipefail
       ./bin/build-linux
       zip -r Madek-Exporter_Linux.zip madek-exporter-linux-x64
       # cp Madek-Exporter_Linux.zip /tmp/Madek-Exporter_Linux_${CIDER_CI_TREE_ID}.zip
@@ -91,6 +94,7 @@ scripts:
       build-components has passed:
         script_key: build-components-done
   test:
+    ignore_state: true
     start_when:
       bundle has passed:
         script_key: bundle
@@ -98,9 +102,8 @@ scripts:
         script_key: build-linux
     body: |
       #!/usr/bin/env bash
-      set -eux
-      export PATH=~/.rubies/$RUBY/bin:$PATH
-      mkdir -p logs
-      xvfb-run -a -e logs/xvfb.log \
-        bundle exec rspec
-
+      set -euo pipefail
+      echo "THE STATE OF THIS SCRIPT IS IGNORED SINCE THE CHROMEDRIVER CRASHES ON NEWER SYSTEMS"
+      which chromedriver
+      chromedriver --version
+      xvfb-run -a -e logs/xvfb.log ./bin/rspec spec

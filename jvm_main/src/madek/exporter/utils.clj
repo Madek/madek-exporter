@@ -1,21 +1,16 @@
-(ns madek.app.server.utils
+(ns madek.exporter.utils
   (:refer-clojure :exclude [str keyword])
   (:require
-    [json-roa.client.core :as roa]
-    [clojure.string :as string]
-    [clojure.java.shell :refer [sh]]
-
-    [clj-logging-config.log4j :as logging-config]
-    [clojure.tools.logging :as logging]
-    [logbug.catcher :as catcher]
-    [logbug.debug :as debug]
-    [logbug.thrown :as thrown]
-    )
+   [clojure.java.shell :refer [sh]]
+   [clojure.string :as string]
+   [json-roa.client.core :as roa]
+   [logbug.catcher :as catcher]
+   [logbug.debug :as debug]
+   [logbug.thrown :as thrown])
   (:import
-    [org.apache.commons.lang3 SystemUtils]
-    [java.awt Desktop]
-    [java.net URI]
-    ))
+   [java.awt Desktop]
+   [java.net URI]
+   [org.apache.commons.lang3 SystemUtils]))
 
 (defn deep-merge [& vals]
   (if (every? map? vals)
@@ -53,7 +48,7 @@
      (subs (clojure.core/str x) 1)
      (clojure.core/str x)))
   ([x & yx]
-   (apply clojure.core/str  (concat [(str x)] (apply str yx)))))
+   (apply clojure.core/str (concat [(str x)] (apply str yx)))))
 
 (defn keyword
   "Like clojure.core/keyword but coerces an unknown single argument x

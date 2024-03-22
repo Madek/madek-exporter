@@ -1,22 +1,16 @@
-(ns madek.app.server.export.meta-data-schema
+(ns madek.exporter.export.meta-data-schema
   (:require
-    [madek.app.server.state :as state]
-    [json-roa.client.core :as roa]
-    [madek.app.server.utils :refer [deep-merge]]
-
-    [cheshire.core :as cheshire]
-    [clojure.java.io :as io]
-
-    [clj-logging-config.log4j :as logging-config]
-    [clojure.tools.logging :as logging]
-    [logbug.catcher :as catcher]
-    [logbug.thrown :as thrown]
-    [logbug.debug :as debug :refer [I> I>>]]
-    )
+   [cheshire.core :as cheshire]
+   [clojure.java.io :as io]
+   [json-roa.client.core :as roa]
+   [logbug.catcher :as catcher]
+   [logbug.debug :as debug :refer [I> I>>]]
+   [logbug.thrown :as thrown]
+   [madek.exporter.state :as state]
+   [madek.exporter.utils :refer [deep-merge]])
 
   (:import
-    [java.io File]
-    ))
+   [java.io File]))
 
 (defn meta-keys [vocabulary]
   (->> (-> vocabulary
@@ -49,7 +43,6 @@
         schema (meta-data-schema)]
     (io/make-parents path)
     (spit path (cheshire/generate-string schema {:pretty true}))))
-
 
 ;### Debug ####################################################################
 ;(debug/re-apply-last-argument #'meta-data-schema_unmemoized)

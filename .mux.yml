@@ -6,9 +6,9 @@ windows:
     command: >
       rm -rf target &&
       sleep 5 &&
-      lein do repl
+      ./bin/lein do repl
     post_command_send_keys: |
-      (-main)
+      (-main "server")
   3:
     name: electron-app
     command: >
@@ -20,16 +20,16 @@ windows:
       rm -rf \
         app/dev/js/front.js \
         app/dev/js/out_front.js &&
-      lein trampoline figwheel electron-front-dev
+      ./bin/lein trampoline figwheel electron-front-dev
   6:
     name: electron-main
     command: >
       rm -rf app/dev/js/out_main app/dev/js/main.js &&
-      lein trampoline cljsbuild auto electron-main-dev
+      ./bin/lein trampoline cljsbuild auto electron-main-dev
   7:
     name: css
     command: |
-      lein sass watch
+      ./bin/lein sass watch
   9:
     name: watch-releases
     command: |

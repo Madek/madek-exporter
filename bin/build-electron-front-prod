@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+${PROJECT_DIR}/bin/env/java-setup
+${PROJECT_DIR}/bin/env/clojure-setup
+${PROJECT_DIR}/bin/env/lein-setup
+
+rm -rf \
+  app/prod/js/front.js \
+  app/prod/js/out_front.js
+#lein do \
+
+lein externs electron-front-prod app/prod/js/front_externs.js
+
+lein cljsbuild once electron-front-prod

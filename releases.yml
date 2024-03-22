@@ -1,3 +1,31 @@
+
+####### 0.9.8 #######################################################################
+
+- version_major: 0
+  version_minor: 10
+  version_patch: 0
+  version_pre: 0
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Fix certificate issues.
+    * Fix html page with respect to roles.
+    * Resolve and display role data within roles.
+    * Resolve and display person data within roles.
+
+    Notes
+    -----
+
+    * The exporter only supports Mac OS from this release on.
+    * The CSS (re-)build doesn't work.
+
+
+
 ####### 0.9.7 #######################################################################
 
 - version_major: 0

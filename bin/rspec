@@ -2,8 +2,8 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
-${PROJECT_DIR}/bin/env/lein-setup
-${PROJECT_DIR}/bin/env/clojure-setup
-${PROJECT_DIR}/bin/env/java-setup
+${PROJECT_DIR}/bin/env/ruby-setup
 
-lein uberjar
+bundle exec rspec "$@"
+
+#vi ft=sh

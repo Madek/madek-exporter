@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
-set -eoux
-rm -rf ./madek-exporter-win32-x64
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+
+cd $PROJECT_DIR
+
+rm -rf madek-exporter-win32-x64
 
 
 npx electron-packager \
@@ -8,4 +13,4 @@ npx electron-packager \
   --icon=Madek.icns \
   ./app/prod madek-exporter
 
-cp -Lrf vendor/jre_win ./madek-exporter-win32-x64/resources/jre
+cp -Lrf vendor/jre_win_x64 ./madek-exporter-win32-x64/resources/jre

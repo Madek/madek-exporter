@@ -5,19 +5,23 @@
 
 We do this via our CI system, see the file [cider-ci.yml](cider-ci.yml).
 
+### Requirements
+
+Debian:
+
+* task-desktop
+* zip, unzip
+* libgconf-2-4
+* wine
+* libxss1
+
+
 ## Development
 
 See the files [project.clj](project.clj) and [.mux.yml](.mux.yml).
 
-### First time preparation
+Most dependecies are managed via https://asdf-vm.com/
 
-`node` and `npm` must be installed and in the execution PATH. Run
-
-    npm install
-
-Download Electron for your platform. One way to do it is via grunt
-
-    ./node_modules/grunt/bin/grunt download-electron
 
 
 ### Development targets
@@ -29,27 +33,22 @@ There are the following build targets:
 3. Electron front, also known as the "renderer", the code is located in `electron_front/`.
 4. Stylesheets compiled from sass.
 
-We build each one "continuously" in its own window when developing. A forth
-window holds the electron app.
+
+The watched dev builds are kind of broken now. Until we update the whole app use prod builds.
 
 ### JVM main
 
-    rm -rf target
-    lein repl
-    # it will open a repl in the main namespace, where we can start the server with
-    (-main)
+    ./bin/build-jvm-main-prod
 
+    The jvm app can be started with _debug_ and _repl_ options for development ; see cli options.
 
 ### Electron main
 
-    rm -rf app/dev/js/out_main app/dev/js/main.js
-    lein cljsbuild auto electron-main-dev
-
+    ./bin/build-electron-main-prod
 
 ### Electron front
 
-    rm -rf app/dev/js/front.js app/dev/js/out_front.js
-    lein descjop-figwheel
+    ./bin/build-electron-front-prod
 
 ### Stylesheets
 
@@ -59,20 +58,8 @@ The Electron front includes stylesheets which we are building continuously with
 
 ### The Electron app
 
-Wait until all the three previous ones are ready. Then e.g. on MacOS:
+    ./bin/build-stylesheets-prod
 
-    ./electron/Electron.app/Contents/MacOS/Electron app/dev
-
-
-### Running and Debugging the Production App
-
-The electron parts can be build with
-1. `bin/build-electron-prod` and the jvm with
-2. `lein uberjar`.
-
-The next steps depend on the OS. On MacOS:
-3. `bin/build-mac-os`
-4. `./madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter`
 
 
 ## Copyright and license

@@ -4,6 +4,7 @@
 *.log
 *jar
 .DS_Store
+.calva/
 .lein-deps-sum
 .lein-env
 .lein-failures
@@ -11,8 +12,6 @@
 .lein-repl-history
 .nrepl-port
 .sass-cache/
-/logs
-/log
 app/dev/css/
 app/dev/js/
 app/prod/css/
@@ -20,6 +19,8 @@ app/prod/js/
 classes/*
 electron/*
 lib/*
+log/
+logs/
 madek-app-darwin-x64/
 madek-exporter-darwin-x64/
 madek-exporter-linux-x64/

@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-set -eoux
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+
+cd $PROJECT_DIR
+
+rm -rf madek-exporter-linux-x64
 
 npx electron-packager \
   --overwrite --platform=linux --arch=x64 --electron-version=1.6.0 \
   --icon=Madek.icns \
   ./app/prod madek-exporter
 
-cp -Lrf vendor/jre_linux ./madek-exporter-linux-x64/resources/jre
+cp -Lrf vendor/jre_linux_x64 ./madek-exporter-linux-x64/resources/jre

@@ -68,7 +68,7 @@ end
 
 upload_url_template = Addressable::Template.new(created_release.body["upload_url"])
 
-%w(Madek-Exporter_Linux.zip Madek-Exporter_Mac-OS.zip Madek-Exporter_Windows.zip).each do |filename|
+%w(Madek-Exporter_Linux.zip Madek-Exporter_Mac-OS.zip).each do |filename|
   url = upload_url_template.expand(name: filename).to_s
   file_content = IO.binread(filename)
   uploaded = conn.post do |req|

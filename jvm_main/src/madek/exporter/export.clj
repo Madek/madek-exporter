@@ -1,30 +1,23 @@
-(ns madek.app.server.export
+(ns madek.exporter.export
   (:require
-    [madek.app.server.export.files :as files :refer [download-media-files path-prefix]]
-    [madek.app.server.export.index-html :as index-html]
-    [madek.app.server.export.meta-data :as meta-data :refer [meta-data write-meta-data]]
-    [madek.app.server.export.meta-data-schema :as meta-data-schema]
-    [madek.app.server.state :as state]
-    [madek.app.server.utils :refer [deep-merge presence]]
+   [cheshire.core :as cheshire]
+   [clj-time.core :as time]
+   [clojure.java.io :as io]
+   [json-roa.client.core :as roa]
+   [logbug.catcher :as catcher :refer [snatch]]
+   [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
+   [logbug.thrown :as thrown]
+   [madek.exporter.export.files :as files :refer [download-media-files path-prefix]]
+   [madek.exporter.export.index-html :as index-html]
+   [madek.exporter.export.meta-data :as meta-data :refer [meta-data write-meta-data]]
+   [madek.exporter.export.meta-data-schema :as meta-data-schema]
+   [madek.exporter.state :as state]
+   [madek.exporter.utils :refer [deep-merge presence]]
+   [taoensso.timbre :as logging :refer [debug]])
 
-    [json-roa.client.core :as roa]
-    [clj-time.core :as time]
-
-    [cheshire.core :as cheshire]
-    [clojure.java.io :as io]
-
-
-    [clj-logging-config.log4j :as logging-config]
-    [clojure.tools.logging :as logging]
-    [logbug.catcher :as catcher :refer [snatch]]
-    [logbug.thrown :as thrown]
-    [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
-    )
-
-    (:import
-    [java.io File]
-    [java.nio.file Files Paths]))
-
+  (:import
+   [java.io File]
+   [java.nio.file Files Paths]))
 
 ;### Path Helper ##############################################################
 
@@ -32,21 +25,20 @@
 
 (defn symlink [id source target]
   (snatch
-    {:level :debug
-     :throwable java.nio.file.FileAlreadyExistsException}
-    (swap! state/db
-           (fn [db id source target]
-             (deep-merge db {:download
-                             {:items
-                              {id
-                               {:links
-                                {source target}}}}}))
-           id source target)
-    (Files/createSymbolicLink
-      (nio-path source)
-      (nio-path target)
-      (make-array java.nio.file.attribute.FileAttribute 0))))
-
+   {:level :debug
+    :throwable java.nio.file.FileAlreadyExistsException}
+   (swap! state/db
+          (fn [db id source target]
+            (deep-merge db {:download
+                            {:items
+                             {id
+                              {:links
+                               {source target}}}}}))
+          id source target)
+   (Files/createSymbolicLink
+    (nio-path source)
+    (nio-path target)
+    (make-array java.nio.file.attribute.FileAttribute 0))))
 
 ;### DL Media-Entry ###########################################################
 
@@ -77,7 +69,7 @@
            entry-dir-path (str dir-path File/separator entry-prefix-path)
            meta-data (meta-data media-entry)]
        (if (-> @state/db :download :items (get id))
-         (let [target  (-> @state/db :download :items (get id) :path)]
+         (let [target (-> @state/db :download :items (get id) :path)]
            (symlink id entry-dir-path target))
          (do (swap! state/db (fn [db uuid media-entry]
                                (assoc-in db [:download :items (str id)] media-entry))
@@ -97,15 +89,13 @@
                (download-media-files entry-dir-path media-entry))
              (set-item-to-finished id)))))))
 
-
 ;### check credentials ########################################################
 
 (defn check-credentials [api-entry-point api-http-opts]
   (let [response (-> (roa/get-root api-entry-point :default-conn-opts api-http-opts)
                      (roa/relation :auth-info)
                      (roa/get {}))]
-    (logging/debug (-> response roa/data))))
-
+    (debug (-> response roa/data))))
 
 ;### DL Set ###################################################################
 
@@ -132,29 +122,28 @@
                               (-> api-http-opts :cookies (get "madek-session")))
                         {:me_get_metadata_and_previews "true"}
                         {:public_get_metadata_and_previews "true"})]
-    (doseq [collection  (I>> identity-with-logging
-                             (I> identity-with-logging
-                                 collection
-                                 (roa/relation :collections)
-                                 (roa/get coll-get-opts)
-                                 roa/coll-seq)
-                             (map #(roa/get % {})))]
+    (doseq [collection (I>> identity-with-logging
+                            (I> identity-with-logging
+                                collection
+                                (roa/relation :collections)
+                                (roa/get coll-get-opts)
+                                roa/coll-seq)
+                            (map #(roa/get % {})))]
       (download-set
-        (-> collection roa/data :id)
-        target-dir-path recursive? skip-media-files? prefix-meta-key api-entry-point api-http-opts))))
-
+       (-> collection roa/data :id)
+       target-dir-path recursive? skip-media-files? prefix-meta-key api-entry-point api-http-opts))))
 
 (defn download-set [id dl-path recursive? skip-media-files? prefix-meta-key
                     api-entry-point api-http-opts]
   (let [collection (-> (roa/get-root api-entry-point
                                      :default-conn-opts api-http-opts)
-                       (roa/relation :collection )
+                       (roa/relation :collection)
                        (roa/get {:id id}))
         path-prefix (path-prefix prefix-meta-key collection)
         target-dir-path (str dl-path File/separator path-prefix)
         meta-data (meta-data collection)]
     (if (-> @state/db :download :items (get id))
-      (let [target  (-> @state/db :download :items (get id) :path)]
+      (let [target (-> @state/db :download :items (get id) :path)]
         (symlink id target-dir-path target))
       (catcher/with-logging {}
         (swap! state/db (fn [db id] (deep-merge db {:download {:items {id {}}}})) id)
@@ -173,13 +162,12 @@
                           (-> collection roa/data (assoc :type :collection))
                           path-prefix)
         (download-media-entries-for-set
-          id target-dir-path skip-media-files? prefix-meta-key api-entry-point api-http-opts)
+         id target-dir-path skip-media-files? prefix-meta-key api-entry-point api-http-opts)
         (when recursive?
           (download-collections-for-collection
-            collection target-dir-path recursive? skip-media-files? prefix-meta-key
-            api-entry-point api-http-opts))
+           collection target-dir-path recursive? skip-media-files? prefix-meta-key
+           api-entry-point api-http-opts))
         (set-item-to-finished id)))))
-
 
 ;### download meta-data schema ################################################
 
@@ -189,6 +177,6 @@
 ;(logging-config/set-logger! :level :debug)
 ;(logging-config/set-logger! :level :info)
 ;(debug/debug-ns 'ring.middleware.resource)
-;(debug/debug-ns *ns*)
+(debug/debug-ns *ns*)
 ;(debug/debug-ns 'json-roa.client.core)
 ;(debug/debug-ns 'uritemplate-clj.core)

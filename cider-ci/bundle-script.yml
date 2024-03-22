@@ -1,19 +1,8 @@
 bundle:
-  exclusive_executor_resource: ruby-install_{{$RUBY}}
+  exclusive_executor_resource: asdf-ruby
   timeout: 20 Minutes
   body: |
     #!/usr/bin/env bash
-    set -eux
-    export PATH=~/.rubies/$RUBY/bin:$PATH
+    set -euo pipefail
+    ./bin/env/ruby-setup
 
-    rm -f .bundle/config
-
-    if [ ! -d ~/.rubies/$RUBY ]; then
-      ruby-install --no-install-deps $RUBY_ENGINE $RUBY_VERSION
-    fi
-
-    if [ ! -f ~/.rubies/$RUBY/bin/bundle ]; then
-      gem install bundler
-    fi
-
-    bundle install

@@ -4,4 +4,6 @@ set -euo pipefail
 PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
 ${PROJECT_DIR}/bin/env/nodejs-setup
 
-${PROJECT_DIR}/bin/npx sass -s compressed --no-source-map electron_front/sass/site.sass app/prod/css/site.css
+npx "$@"
+
+#vi ft=sh

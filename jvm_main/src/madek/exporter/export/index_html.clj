@@ -1,25 +1,20 @@
-(ns madek.app.server.export.index-html
+(ns madek.exporter.export.index-html
   (:require
-    [madek.app.server.export.files :as files :refer [path-prefix]]
-    [madek.app.server.state :as state]
-    [madek.app.server.utils :refer [deep-merge]]
-
-    [hiccup.core :as hiccup]
-    [hiccup.page :refer [html5]]
-    [json-roa.client.core :as roa]
-    [cheshire.core :as cheshire]
-    [clojure.java.io :as io]
-    [camel-snake-kebab.core :refer [->PascalCase]]
-
-    [clj-logging-config.log4j :as logging-config]
-    [clojure.tools.logging :as logging]
-    [logbug.catcher :as catcher]
-    [logbug.thrown :as thrown]
-    [logbug.debug :as debug :refer [I> I>>]]
-    )
+   [camel-snake-kebab.core :refer [->PascalCase]]
+   [cheshire.core :as cheshire]
+   [clojure.java.io :as io]
+   [hiccup.core :as hiccup]
+   [hiccup.page :refer [html5]]
+   [json-roa.client.core :as roa]
+   [logbug.catcher :as catcher]
+   [logbug.debug :as debug :refer [I> I>>]]
+   [logbug.thrown :as thrown]
+   [madek.exporter.export.files :as files :refer [path-prefix]]
+   [madek.exporter.state :as state]
+   [madek.exporter.utils :refer [deep-merge]])
 
   (:import
-    [java.io File]))
+   [java.io File]))
 
 (defn meta-keys_unmemoized []
   (->> (-> (roa/get-root (state/connection-entry-point)
@@ -35,29 +30,32 @@
 (def meta-keys (memoize meta-keys_unmemoized))
 
 (defn title [media-resource]
-  (str (-> media-resource :type name ->PascalCase )
+  (str (-> media-resource :type name ->PascalCase)
        " "
        (-> media-resource :id)))
 
 (defn url [media-resource]
   (let [url (str (-> @state/db :connection :url)
                  (case (:type media-resource)
-                        :media-entry "/entries/"
-                        :collection "/sets/")
+                   :media-entry "/entries/"
+                   :collection "/sets/")
                  (:id media-resource))]
     [:a
      {:href url}
      url]))
 
 (defn html-generic-meta-datum-value [meta-datum]
-  [:pre (cheshire/generate-string (or (:value meta-datum) (:values meta-datum)) {:pretty true})]
-  )
+  [:pre (cheshire/generate-string (or (:value meta-datum) (:values meta-datum)) {:pretty true})])
 
 (defn html-keywords-values [meta-datum]
   [:pre
    (->> (:values meta-datum)
         (map :term)
         (clojure.string/join ", "))])
+
+(defn html-generic [meta-datum]
+  [:pre
+   (cheshire/generate-string meta-datum {:pretty true})])
 
 (defn html-people-values [meta-datum]
   (-> (->> (:values meta-datum)
@@ -70,8 +68,10 @@
      [:h3 (or (:label (get (meta-keys) meta-key-id nil)) meta-key-id)]
      (case (:type meta-datum)
        "MetaDatum::Keywords" (html-keywords-values meta-datum)
-       ("MetaDatum::TextDate" "MetaDatum::Text") (:value meta-datum)
-       "MetaDatum::People" (html-people-values meta-datum))]))
+       "MetaDatum::People" (html-people-values meta-datum)
+       ("MetaDatum::Text"
+        "MetaDatum::TextDate") (:value meta-datum)
+       (html-generic meta-datum))]))
 
 (defn html-meta-data [meta-data]
   [:div.meta-data
@@ -81,13 +81,13 @@
 
 (defn html [media-resource meta-data]
   (html5
-    [:head
-     [:title (title media-resource)]
-     [:meta {:charset "utf-8"}]
-     [:body
-      [:h2 (title media-resource)]
-      [:p "URL: " (url media-resource)]
-      (html-meta-data meta-data)]]))
+   [:head
+    [:title (title media-resource)]
+    [:meta {:charset "utf-8"}]
+    [:body
+     [:h2 (title media-resource)]
+     [:p "URL: " (url media-resource)]
+     (html-meta-data meta-data)]]))
 
 (defn write [target-dir meta-data media-resource prefix-path]
   (io/make-parents target-dir)
