@@ -16,8 +16,8 @@
    repl/cli-options))
 
 (defn main-usage [options-summary & more]
-  (->> ["Usage: madek-exporter <opts> SCORE <opts>"
-        "scopes: server, cli"
+  (->> ["Usage: madek-exporter <opts> SCOPE <opts>"
+        "scopes: server, cli (default: server)"
         ""
         options-summary
         ""
@@ -34,8 +34,12 @@
     (logging/init)
     (let [{:keys [options arguments errors summary]}
           (cli/parse-opts args cli-options :in-order true)
-          cmd (some-> arguments first keyword)
-          pass-on-args (->> (rest arguments) flatten (into []))
+          cmd-candidate (some-> arguments first keyword)
+          known-cmd? (contains? #{:server :cli} cmd-candidate)
+          cmd (if known-cmd? cmd-candidate :server)
+          pass-on-args (if known-cmd?
+                         (->> (rest arguments) flatten (into []))
+                         (vec args))
           options (into (sorted-map) options)
           print-summary #(println (main-usage summary {:args args :options options}))]
       (info {'args args 'options options 'cmd cmd 'pass-on-args pass-on-args})

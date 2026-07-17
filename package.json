@@ -2,17 +2,46 @@
   "name": "madek-exporter",
   "version": "0.4.0",
   "description": "",
+  "scripts": {
+    "ci:node": "./bin/with-node22",
+    "build:clean": "./bin/build-clean",
+    "build:electron:prod": "./bin/build-electron-prod",
+    "build:jvm:prod": "./bin/build-jvm-main-prod",
+    "build:mac:prod": "./bin/build-mac-os",
+    "build:mac:x64:prod": "./bin/build-mac-os",
+    "build:mac:arm64:prod": "./bin/build-mac-os-arm64",
+    "build:linux:prod": "./bin/build-linux",
+    "build:linux:arm64:prod": "./bin/build-linux-arm64",
+    "build:win:prod": "./bin/build-win",
+    "build:mac:zip:prod": "./bin/build-mac-zip",
+    "build:mac:x64:zip:prod": "./bin/build-mac-zip",
+    "build:mac:arm64:zip:prod": "./bin/build-mac-os-arm64-zip",
+    "build:linux:zip:prod": "./bin/build-linux-zip",
+    "build:linux:arm64:zip:prod": "./bin/build-linux-arm64-zip",
+    "build:win:zip:prod": "./bin/build-win-zip",
+    "build:prod": "./bin/build-electron-prod && ./bin/build-jvm-main-prod && ./bin/build-mac-os && ./bin/build-mac-os-arm64",
+    "build:all:prod": "./bin/build-clean && ./bin/build-all-platforms",
+    "run:prod": "bash -c 'arch=$(uname -m); if [ \"$arch\" = arm64 ]; then exec ./target/packages/madek-exporter-darwin-arm64/madek-exporter.app/Contents/MacOS/madek-exporter; else exec ./target/packages/madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter; fi'",
+    "smoke": "./bin/smoke-run",
+    "check:artifacts": "./bin/validate-build-artifacts",
+    "audit:security": "./bin/security-audit"
+  },
+  "config": {
+    "electronVersion": "43.1.1"
+  },
   "devDependencies": {
+    "@electron/packager": "^20.0.3",
     "closurecompiler-externs": "^1.0.4",
-    "electron-packager": "^14.1.1",
-    "grunt": "^1.0.4",
-    "grunt-download-electron": "^2.1.4",
-    "sass": "^1.23.7"
+    "electron": "^43.1.1",
+    "sass": "^1.101.0"
   },
   "license": "MIT",
   "repository": "YOUR_OWN_REPOSITORY",
   "dependencies": {
-    "electron-context-menu": "^0.15.1",
-    "js-yaml": "^3.9.0"
+    "electron-context-menu": "^4.1.2",
+    "js-yaml": "^5.2.2"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8"
   }
 }

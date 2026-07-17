@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_BIN="${1:-}"
+SMOKE_SECONDS="${SMOKE_SECONDS:-12}"
+LOG_FILE="${SMOKE_LOG:-/tmp/madek_smoke_run.log}"
+APP_PID=""
+
+cleanup() {
+  if [ -n "$APP_PID" ] && ps -p "$APP_PID" >/dev/null 2>&1; then
+    kill "$APP_PID" >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup EXIT INT TERM
+
+if [ -z "$APP_BIN" ]; then
+  if [ -x "./target/packages/madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter" ]; then
+    APP_BIN="./target/packages/madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter"
+  elif [ -x "./target/packages/madek-exporter-linux-x64/madek-exporter" ]; then
+    APP_BIN="./target/packages/madek-exporter-linux-x64/madek-exporter"
+  else
+    echo "[smoke] ERROR: no app binary found; pass explicit path" >&2
+    exit 1
+  fi
+fi
+
+# Ensure a clean process state for deterministic smoke checks.
+pkill -f "jvm-main.jar" >/dev/null 2>&1 || true
+pkill -f "madek-exporter.app/Contents/MacOS/madek-exporter" >/dev/null 2>&1 || true
+
+rm -f "$LOG_FILE"
+"$APP_BIN" >"$LOG_FILE" 2>&1 &
+PID=$!
+APP_PID="$PID"
+
+FOUND_CHILD_JVM=0
+for _ in $(seq 1 "$SMOKE_SECONDS"); do
+  if ! ps -p "$PID" >/dev/null 2>&1; then
+    echo "[smoke] ERROR: app exited too early" >&2
+    tail -n 120 "$LOG_FILE" >&2 || true
+    exit 1
+  fi
+
+  JVM_PIDS="$(pgrep -f "jvm-main.jar" || true)"
+  for JVM_PID in $JVM_PIDS; do
+    JVM_PPID="$(ps -o ppid= -p "$JVM_PID" 2>/dev/null | tr -d '[:space:]')"
+    if [ "$JVM_PPID" = "$PID" ]; then
+      FOUND_CHILD_JVM=1
+      break
+    fi
+  done
+
+  if [ "$FOUND_CHILD_JVM" -eq 1 ]; then
+    break
+  fi
+
+  sleep 1
+done
+
+if [ "$FOUND_CHILD_JVM" -ne 1 ]; then
+  echo "[smoke] ERROR: no JVM child process detected for app pid=$PID" >&2
+  ps -ax -o pid=,ppid=,command= | grep -E "madek-exporter|jvm-main.jar|/jre/bin/java" | grep -v grep >&2 || true
+  tail -n 120 "$LOG_FILE" >&2 || true
+  exit 1
+fi
+
+# Stop after smoke window.
+kill "$PID" >/dev/null 2>&1 || true
+sleep 1
+APP_PID=""
+
+if grep -Eq "A JavaScript error occurred in the main process|JVM-MAIN_PROC-ERR|Unable to access jarfile|spawn ENO" "$LOG_FILE"; then
+  echo "[smoke] ERROR: fatal pattern found in logs" >&2
+  tail -n 120 "$LOG_FILE" >&2 || true
+  exit 1
+fi
+
+echo "[smoke] OK (${APP_BIN})"
+
+
+
+
+
+

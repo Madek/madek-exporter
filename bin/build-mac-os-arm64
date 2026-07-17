@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# Package Electron app for macOS ARM64 (Apple Silicon) with a pinned Temurin 21 aarch64 JRE.
+# JRE archive is cached under target/vendor-cache/ (downloaded + SHA256-verified once).
+# Safe to run on Linux CI (cross-packaging): the macOS JRE is copied, not executed.
+set -euo pipefail
+
+# shellcheck disable=SC1091
+source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/packager-tmpdir.bash"
+
+PACKAGES_DIR="./target/packages"
+OUTPUT_DIR="$PACKAGES_DIR/madek-exporter-darwin-arm64"
+CACHE_DIR="./target/vendor-cache"
+JRE_ARCHIVE="OpenJDK21U-jre_aarch64_mac_hotspot_21.0.11_10.tar.gz"
+JRE_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/${JRE_ARCHIVE}"
+JRE_SHA256="4b7a8cd23102c251c8b8be42a9a5f1263fb337cf1037f6f64b25f3070efe4b76"
+JRE_CACHE_PATH="${CACHE_DIR}/${JRE_ARCHIVE}"
+JRE_EXTRACT_DIR="${CACHE_DIR}/temurin-21.0.11+10-jre-macos_aarch64"
+
+remove_output_dir() {
+  local retries=3
+  local try=1
+
+  while [ "$try" -le "$retries" ]; do
+    rm -rf "$OUTPUT_DIR" 2>/dev/null || true
+
+    if [ -d "$OUTPUT_DIR" ]; then
+      find "$OUTPUT_DIR" -name '.DS_Store' -delete 2>/dev/null || true
+      rmdir "$OUTPUT_DIR" 2>/dev/null || true
+    fi
+
+    if [ ! -e "$OUTPUT_DIR" ]; then
+      return 0
+    fi
+
+    sleep 1
+    try=$((try + 1))
+  done
+
+  echo "ERROR: failed to remove ${OUTPUT_DIR}; remove it manually and retry." >&2
+  ls -la "$OUTPUT_DIR" >&2 || true
+  exit 1
+}
+
+# Resolve a JDK/JRE root that contains bin/java (follow symlinks → Contents/Home on macOS).
+resolve_jre_home() {
+  local java_bin="$1"
+  local java_bin_dir
+  java_bin_dir="$(cd -- "$(dirname "$java_bin")" > /dev/null 2>&1 && pwd -P)"
+  cd -- "$java_bin_dir/.." > /dev/null 2>&1 && pwd -P
+}
+
+java_major_from_release() {
+  local jre_home="$1"
+  local release="$jre_home/release"
+  if [[ ! -f "$release" ]]; then
+    return 1
+  fi
+  sed -nE 's/^JAVA_VERSION="([0-9]+).*/\1/p' "$release" | head -n 1
+}
+
+ensure_aarch64_mac_jre() {
+  if [[ -e "${JRE_EXTRACT_DIR}/bin/java" ]] || [[ -e "${JRE_EXTRACT_DIR}/Contents/Home/bin/java" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f "$JRE_CACHE_PATH" ]]; then
+    echo "Downloading Temurin 21 macOS aarch64 JRE → ${JRE_CACHE_PATH}"
+    curl -fsSL "$JRE_URL" -o "$JRE_CACHE_PATH"
+  fi
+
+  local actual
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "$JRE_CACHE_PATH" | awk '{ print $1 }')"
+  else
+    actual="$(shasum -a 256 "$JRE_CACHE_PATH" | awk '{ print $1 }')"
+  fi
+  if [[ "$actual" != "$JRE_SHA256" ]]; then
+    echo "ERROR: SHA256 mismatch for ${JRE_ARCHIVE}" >&2
+    echo "  expected: ${JRE_SHA256}" >&2
+    echo "  actual:   ${actual}" >&2
+    rm -f "$JRE_CACHE_PATH"
+    exit 1
+  fi
+
+  rm -rf "$JRE_EXTRACT_DIR"
+  mkdir -p "$JRE_EXTRACT_DIR"
+  tar -xf "$JRE_CACHE_PATH" -C "$JRE_EXTRACT_DIR" --strip-components=1
+}
+
+mkdir -p "$PACKAGES_DIR" "$CACHE_DIR"
+remove_output_dir
+ensure_aarch64_mac_jre
+
+JAVA_BIN=""
+if [[ -e "${JRE_EXTRACT_DIR}/bin/java" ]]; then
+  JAVA_BIN="${JRE_EXTRACT_DIR}/bin/java"
+elif [[ -e "${JRE_EXTRACT_DIR}/Contents/Home/bin/java" ]]; then
+  JAVA_BIN="${JRE_EXTRACT_DIR}/Contents/Home/bin/java"
+else
+  echo "ERROR: extracted macOS aarch64 JRE has no bin/java under ${JRE_EXTRACT_DIR}" >&2
+  exit 1
+fi
+
+JRE_SRC="$(resolve_jre_home "$JAVA_BIN")"
+JAVA_MAJOR="$(java_major_from_release "$JRE_SRC" || true)"
+
+if [[ -z "$JAVA_MAJOR" ]] || [[ "$JAVA_MAJOR" -lt 21 ]]; then
+  echo "ERROR: Java >= 21 required for runtime packaging, got major='${JAVA_MAJOR:-unknown}' from $JRE_SRC" >&2
+  if [[ -f "$JRE_SRC/release" ]]; then
+    grep -E '^JAVA_VERSION=' "$JRE_SRC/release" >&2 || true
+  fi
+  exit 1
+fi
+
+if [[ ! -e "$JRE_SRC/bin/java" ]]; then
+  echo "ERROR: resolved JRE source has no bin/java: $JRE_SRC" >&2
+  exit 1
+fi
+
+ELECTRON_VERSION=$(node -p "require('./package.json').config.electronVersion")
+
+npx @electron/packager \
+  --overwrite --platform=darwin --arch=arm64 --electron-version="$ELECTRON_VERSION" --asar \
+  --icon=Madek.icns \
+  --out="$PACKAGES_DIR" \
+  ./app/prod madek-exporter
+
+mkdir -p "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jre"
+# Flat runtime (bin/java at jre/bin/java). Skip macOS bundle wrappers / JDK extras.
+rsync -a --delete \
+  --exclude='Contents' \
+  --exclude='jmods' \
+  --exclude='include' \
+  --exclude='man' \
+  "$JRE_SRC"/ "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jre/"
+cp -Lf app/prod/jvm-main.jar "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jvm-main.jar"
+
+if [[ ! -e "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jre/bin/java" ]]; then
+  echo "ERROR: packaged jre/bin/java missing after rsync from $JRE_SRC" >&2
+  exit 1
+fi
+
+cp packaging/mac/README.txt "$OUTPUT_DIR/README.txt"
+cp packaging/mac/remove-quarantine-lock.sh "$OUTPUT_DIR/remove-quarantine-lock.sh"
+chmod +x "$OUTPUT_DIR/remove-quarantine-lock.sh"
+
+echo "Packaged macOS ARM64 app with JRE major=${JAVA_MAJOR} from ${JRE_SRC}"
+echo "  ${OUTPUT_DIR}/"

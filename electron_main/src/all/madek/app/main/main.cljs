@@ -3,6 +3,7 @@
     [cljs.nodejs :as nodejs]
 
     [madek.app.main.jvm-main-process]
+    [madek.app.main.file-logger :as file-log]
     [madek.app.main.menu]
     [madek.app.main.windows]
     ))
@@ -11,12 +12,16 @@
 
 ; this will enable the "inspect" context menu; only in dev mode
 (when (= madek.app.main.env/env :dev)
-  ((nodejs/require "electron-context-menu")
-   (clj->js
-     {:prepend
-      (fn [params, bw]
-        (clj->js [{:label "Rainbow"
-                   :visible (= (.-mediaType params) "image")}]))})))
+  (let [context-menu-module (nodejs/require "electron-context-menu")
+        context-menu-fn (or (.-default context-menu-module)
+                            context-menu-module)]
+    (when context-menu-fn
+      (context-menu-fn
+        (clj->js
+          {:prepend
+           (fn [_params _win]
+             (clj->js [{:label "Rainbow"
+                        :visible (fn [params] (= (.-mediaType params) "image"))}]))})))))
 
 (def crash-reporter (.-crashReporter Electron))
 
@@ -24,25 +29,46 @@
 
 (def app (.-app Electron))
 
+;; Citrix/VDI and other environments often fail Chromium's GPU process
+;; (error_code=18 / "GPU process isn't usable"). Disable before app ready.
+(.disableHardwareAcceleration app)
+(.appendSwitch (.-commandLine app) "disable-gpu")
+(.appendSwitch (.-commandLine app) "in-process-gpu")
+
 (.log js/console "__dirname" (js* "__dirname"))
 
 (defn -main []
-  (.start crash-reporter
-          (clj->js
-            {:productName "Madek"
-             :companyName "ZHdK"
-             :submitURL   "https://wiki.zhdk.ch/madek-hilfe/doku.php"
-             :uploadToServer false }))
-  (madek.app.main.jvm-main-process/init app)
-  (.on nodejs/process "error"
-       (fn [err] (.log js/console err)))
-  (.on app "window-all-closed"
-       (fn [] (if (not= (.-platform nodejs/process) "darwin")
-                (.quit app))))
-  (.on app "ready" (fn []
-                     (madek.app.main.menu/initialize)
-                     (madek.app.main.windows/open-new)
-                     )))
+  (file-log/init!)
+  (if-not (.requestSingleInstanceLock app)
+    (do
+      (file-log/log! "WARN" "Another instance already running; quitting")
+      (.quit app))
+    (do
+      (file-log/log! "INFO" (str "Start Madek application on " (.type Os) "."))
+      (file-log/log! "INFO" "GPU disabled (disableHardwareAcceleration, disable-gpu, in-process-gpu)")
+      (.start crash-reporter
+              (clj->js
+                {:productName "Madek"
+                 :submitURL   "https://wiki.zhdk.ch/madek-hilfe/doku.php"
+                 :uploadToServer false }))
+      (madek.app.main.jvm-main-process/init app)
+      (.on nodejs/process "error"
+           (fn [err]
+             (file-log/log! "ERROR" "process:error" {:error (str err)})
+             (.log js/console err)))
+      (.on nodejs/process "uncaughtException"
+           (fn [err]
+             (file-log/log! "ERROR" "process:uncaughtException" {:error (str err)})
+             (.error js/console err)))
+      (.on nodejs/process "unhandledRejection"
+           (fn [reason _promise]
+             (file-log/log! "ERROR" "process:unhandledRejection" {:reason (str reason)})))
+      (.on app "window-all-closed"
+           (fn []
+             (.quit app)))
+      (.on app "ready" (fn []
+                          (madek.app.main.menu/initialize)
+                          (madek.app.main.windows/open-new))))))
 
 (nodejs/enable-util-print!)
 

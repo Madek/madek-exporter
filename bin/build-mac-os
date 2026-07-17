@@ -1,17 +1,143 @@
 #!/usr/bin/env bash
+# Package Electron app for macOS (darwin/x64). Safe to run on Linux CI (cross-packaging):
+# the vendored macOS Temurin tree is copied into the app; it is not executed on Linux.
 set -euo pipefail
-rm -rf ./madek-exporter-darwin-x64
 
-PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+# shellcheck disable=SC1091
+source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/packager-tmpdir.bash"
 
-cd ${PROJECT_DIR}
+PACKAGES_DIR="./target/packages"
+OUTPUT_DIR="$PACKAGES_DIR/madek-exporter-darwin-x64"
+VENDORED_TEMURIN_DIR="./vendor/temurin-21.0.11+10-macosx_x64"
 
-# ./bin/env/python-setup
-./bin/env/nodejs-setup
+remove_output_dir() {
+  local retries=3
+  local try=1
 
-npx electron-packager \
-  --overwrite --platform=darwin --arch=x64 --electron-version=1.6.0 \
+  while [ "$try" -le "$retries" ]; do
+    rm -rf "$OUTPUT_DIR" 2>/dev/null || true
+
+    # Finder/metadata races can recreate .DS_Store while removing.
+    if [ -d "$OUTPUT_DIR" ]; then
+      find "$OUTPUT_DIR" -name '.DS_Store' -delete 2>/dev/null || true
+      rmdir "$OUTPUT_DIR" 2>/dev/null || true
+    fi
+
+    if [ ! -e "$OUTPUT_DIR" ]; then
+      return 0
+    fi
+
+    sleep 1
+    try=$((try + 1))
+  done
+
+  echo "ERROR: failed to remove ${OUTPUT_DIR}; remove it manually and retry." >&2
+  ls -la "$OUTPUT_DIR" >&2 || true
+  exit 1
+}
+
+# Resolve a JDK/JRE root that contains bin/java (follow symlinks).
+resolve_jre_home() {
+  local java_bin="$1"
+  local java_bin_dir
+  java_bin_dir="$(cd -- "$(dirname "$java_bin")" > /dev/null 2>&1 && pwd -P)"
+  cd -- "$java_bin_dir/.." > /dev/null 2>&1 && pwd -P
+}
+
+# Read major version from a JRE tree's release file (no need to execute java — works cross-OS).
+java_major_from_release() {
+  local jre_home="$1"
+  local release="$jre_home/release"
+  if [[ ! -f "$release" ]]; then
+    return 1
+  fi
+  sed -nE 's/^JAVA_VERSION="([0-9]+).*/\1/p' "$release" | head -n 1
+}
+
+java_major_from_binary() {
+  local java_bin="$1"
+  "$java_bin" -version 2>&1 | sed -nE 's/.*version "([0-9]+).*/\1/p' | head -n 1
+}
+
+mkdir -p "$PACKAGES_DIR"
+remove_output_dir
+
+ELECTRON_VERSION=$(node -p "require('./package.json').config.electronVersion")
+
+npx @electron/packager \
+  --overwrite --platform=darwin --arch=x64 --electron-version="$ELECTRON_VERSION" --asar \
   --icon=Madek.icns \
+  --out="$PACKAGES_DIR" \
   ./app/prod madek-exporter
 
-cp -Lrf ${PROJECT_DIR}/vendor/jre_macosx_x64  ./madek-exporter-darwin-x64/madek-exporter.app/Contents/Resources/jre
+JRE_SRC=""
+JAVA_MAJOR=""
+
+# Prefer vendored macOS Temurin as the runtime to *bundle* (do not execute on Linux).
+if [[ -e "$VENDORED_TEMURIN_DIR/bin/java" ]]; then
+  JRE_SRC="$(resolve_jre_home "$VENDORED_TEMURIN_DIR/bin/java")"
+  JAVA_MAJOR="$(java_major_from_release "$JRE_SRC" || true)"
+fi
+
+# On macOS (or when vendor tree is absent), fall back to mise / PATH java — only if executable here.
+if [[ -z "$JRE_SRC" ]] || [[ -z "$JAVA_MAJOR" ]]; then
+  HOST_JAVA_BIN=""
+  if command -v mise >/dev/null 2>&1; then
+    MISE_JAVA_HOME_DIR="$(mise --no-config where java@temurin-21.0.11+10.0.LTS 2>/dev/null || true)"
+    if [[ -n "$MISE_JAVA_HOME_DIR" && -x "$MISE_JAVA_HOME_DIR/bin/java" ]]; then
+      # Only use mise java as *bundle source* on macOS hosts.
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        HOST_JAVA_BIN="$MISE_JAVA_HOME_DIR/bin/java"
+      fi
+    fi
+  fi
+  if [[ -z "$HOST_JAVA_BIN" && "$(uname -s)" == "Darwin" ]]; then
+    HOST_JAVA_BIN="$(command -v java || true)"
+  fi
+  if [[ -n "$HOST_JAVA_BIN" ]]; then
+    JRE_SRC="$(resolve_jre_home "$HOST_JAVA_BIN")"
+    JAVA_MAJOR="$(java_major_from_release "$JRE_SRC" || true)"
+    if [[ -z "$JAVA_MAJOR" ]]; then
+      JAVA_MAJOR="$(java_major_from_binary "$HOST_JAVA_BIN" || true)"
+    fi
+  fi
+fi
+
+if [[ -z "$JRE_SRC" ]]; then
+  echo "ERROR: no macOS JRE source found (expected ${VENDORED_TEMURIN_DIR})" >&2
+  exit 1
+fi
+
+if [[ -z "$JAVA_MAJOR" ]] || [[ "$JAVA_MAJOR" -lt 21 ]]; then
+  echo "ERROR: Java >= 21 required for runtime packaging, got major='${JAVA_MAJOR:-unknown}' from $JRE_SRC" >&2
+  if [[ -f "$JRE_SRC/release" ]]; then
+    grep -E '^JAVA_VERSION=' "$JRE_SRC/release" >&2 || true
+  fi
+  exit 1
+fi
+
+if [[ ! -e "$JRE_SRC/bin/java" ]]; then
+  echo "ERROR: resolved JRE source has no bin/java: $JRE_SRC" >&2
+  exit 1
+fi
+
+mkdir -p "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jre"
+# Copy a flat runtime (bin/java at jre/bin/java). Skip macOS bundle wrappers / JDK extras.
+rsync -a --delete \
+  --exclude='Contents' \
+  --exclude='jmods' \
+  --exclude='include' \
+  --exclude='man' \
+  "$JRE_SRC"/ "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jre/"
+cp -Lf app/prod/jvm-main.jar "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jvm-main.jar"
+
+if [[ ! -e "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jre/bin/java" ]]; then
+  echo "ERROR: packaged jre/bin/java missing after rsync from $JRE_SRC" >&2
+  exit 1
+fi
+
+cp packaging/mac/README.txt "$OUTPUT_DIR/README.txt"
+cp packaging/mac/remove-quarantine-lock.sh "$OUTPUT_DIR/remove-quarantine-lock.sh"
+chmod +x "$OUTPUT_DIR/remove-quarantine-lock.sh"
+
+echo "Packaged macOS app with JRE major=${JAVA_MAJOR} from ${JRE_SRC}"

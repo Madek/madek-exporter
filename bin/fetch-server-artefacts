@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# Fetch Madek-Exporter zips from a Cider executor into target/server-artefacts/.
+#
+# Timing (important):
+#   Run this soon after the platform *build* jobs in the Cider trial have finished
+#   (mac/linux/win package + zip steps). Do *not* wait for the whole trial to
+#   complete — the executor cleans /ramdisk/ci-working-dir shortly after, and the
+#   dist zips disappear.
+#
+#   This script therefore copies the zips on the executor into a durable backup
+#   under /var/tmp/madek-exporter-artefacts-<job-id>/ first, then rsyncs from that
+#   backup. You can re-fetch later from an existing backup path without touching
+#   the (possibly already cleaned) ramdisk working tree.
+#
+# Usage:
+#   ./bin/fetch-server-artefacts <user@host|ssh-alias> [remote-path]
+#
+# Examples:
+#   ./bin/fetch-server-artefacts root@ci-ax101-05
+#   ./bin/fetch-server-artefacts root@ci-ax101-05 /ramdisk/ci-working-dir/<uuid>
+#   ./bin/fetch-server-artefacts root@ci-ax101-05 /var/tmp/madek-exporter-artefacts-<uuid>
+#   ./bin/fetch-server-artefacts root@ci-ax101-05 /var/tmp/madek-exporter-artefacts/<uuid>  # legacy
+#
+# <user@host|ssh-alias>  SSH target: user@host, or a Host alias from ~/.ssh/config
+# [remote-path]          Optional. Either:
+#                          - CI working tree → snapshot then fetch
+#                          - Existing backup:
+#                              /var/tmp/madek-exporter-artefacts-<uuid>
+#                              /var/tmp/madek-exporter-artefacts/<uuid>  (legacy)
+#                            → fetch only (re-fetch without touching ramdisk)
+#                        If omitted, uses the newest /ramdisk/ci-working-dir/* that
+#                        has target/dist/Madek-Exporter_*.zip
+set -euo pipefail
+
+BACKUP_PREFIX="/var/tmp/madek-exporter-artefacts"
+REMOTE_CI_BASE="/ramdisk/ci-working-dir"
+
+usage() {
+  cat >&2 <<EOF
+Usage: $0 <user@host|ssh-alias> [remote-repo-root|remote-backup-dir]
+
+Run soon after Cider *build* jobs finish (do not wait for the whole trial):
+ramdisk cleanup removes target/dist zips quickly. This script snapshots
+Madek-Exporter_*.zip on the CI executor to ${BACKUP_PREFIX}-<job-id>/, then
+rsyncs into target/server-artefacts/.
+
+Examples:
+  $0 root@ci-ax101-05
+  $0 root@ci-ax101-05 /ramdisk/ci-working-dir/<uuid>
+  $0 root@ci-ax101-05 ${BACKUP_PREFIX}-<uuid>
+  $0 root@ci-ax101-05 ${BACKUP_PREFIX}/<uuid>   # legacy nested layout
+
+Arguments:
+  user@host|ssh-alias   SSH target (e.g. root@ci-ax101-05, or a ~/.ssh/config Host)
+  remote-repo-root      CI working tree; snapshot then fetch (optional)
+  remote-backup-dir     Existing ${BACKUP_PREFIX}-... or ${BACKUP_PREFIX}/... path; fetch only
+EOF
+  exit 1
+}
+
+[[ $# -ge 1 && $# -le 2 ]] || usage
+case "${1:-}" in
+  -h|--help) usage ;;
+esac
+
+SSH_HOST="$1"
+REMOTE_ARG="${2:-}"
+LOCAL_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/target/server-artefacts"
+
+is_backup_path() {
+  # Flat (current): /var/tmp/madek-exporter-artefacts-<id>
+  # Nested (legacy): /var/tmp/madek-exporter-artefacts/<id>
+  [[ "$1" == "${BACKUP_PREFIX}-"* || "$1" == "${BACKUP_PREFIX}/"* ]]
+}
+
+resolve_newest_ci_root() {
+  echo "Resolving newest CI working dir with dist zips on ${SSH_HOST}..." >&2
+  ssh -o BatchMode=yes "$SSH_HOST" bash -s -- "$REMOTE_CI_BASE" <<'EOF'
+set -euo pipefail
+base="$1"
+[[ -d "$base" ]] || { echo "missing ${base}" >&2; exit 1; }
+newest=""
+newest_mtime=0
+for dir in "$base"/*; do
+  [[ -d "$dir" ]] || continue
+  shopt -s nullglob
+  zips=( "$dir"/target/dist/Madek-Exporter_*.zip )
+  shopt -u nullglob
+  ((${#zips[@]} > 0)) || continue
+  mtime="$(stat -c %Y "$dir" 2>/dev/null || stat -f %m "$dir")"
+  if (( mtime >= newest_mtime )); then
+    newest_mtime=$mtime
+    newest=$dir
+  fi
+done
+[[ -n "$newest" ]] || {
+  echo "no ${base}/*/target/dist/Madek-Exporter_*.zip found" >&2
+  exit 1
+}
+printf '%s\n' "$newest"
+EOF
+}
+
+snapshot_zips() {
+  local remote_root="$1"
+  local dest="${BACKUP_PREFIX}-$(basename "$remote_root")"
+  echo "Snapshotting dist zips on ${SSH_HOST} → ${dest}/..." >&2
+  ssh -o BatchMode=yes "$SSH_HOST" bash -s -- "$remote_root" "$dest" <<'EOF'
+set -euo pipefail
+remote_root="$1"
+dest="$2"
+src="${remote_root}/target/dist"
+[[ -d "$src" ]] || { echo "missing ${src}" >&2; exit 1; }
+shopt -s nullglob
+zips=( "$src"/Madek-Exporter_*.zip )
+shopt -u nullglob
+((${#zips[@]} > 0)) || {
+  echo "no Madek-Exporter_*.zip in ${src} (already cleaned?)" >&2
+  exit 1
+}
+mkdir -p "$dest"
+cp -a "${zips[@]}" "$dest"/
+printf '%s\n' "$dest"
+EOF
+}
+
+if [[ -z "$REMOTE_ARG" ]]; then
+  REMOTE_ROOT="$(resolve_newest_ci_root)"
+  echo "Remote root: ${REMOTE_ROOT}"
+  BACKUP_DIR="$(snapshot_zips "$REMOTE_ROOT")"
+elif is_backup_path "$REMOTE_ARG"; then
+  BACKUP_DIR="$REMOTE_ARG"
+  echo "Using existing backup: ${BACKUP_DIR}"
+else
+  REMOTE_ROOT="$REMOTE_ARG"
+  echo "Remote root: ${REMOTE_ROOT}"
+  BACKUP_DIR="$(snapshot_zips "$REMOTE_ROOT")"
+fi
+
+echo "Remote backup: ${BACKUP_DIR}"
+
+clean_local_dir() {
+  local dir="$1"
+  local retries=5
+  local try=1
+
+  if [[ ! -e "$dir" ]]; then
+    return 0
+  fi
+
+  # Unzipped .app trees / Finder .DS_Store races can make a single rm -rf fail
+  # with "Directory not empty" on macOS.
+  while [[ "$try" -le "$retries" ]]; do
+    chmod -R u+w "$dir" 2>/dev/null || true
+    find "$dir" -name '.DS_Store' -delete 2>/dev/null || true
+    rm -rf "$dir" 2>/dev/null || true
+
+    if [[ ! -e "$dir" ]]; then
+      return 0
+    fi
+
+    sleep 1
+    try=$((try + 1))
+  done
+
+  echo "ERROR: failed to remove ${dir}; remove it manually and retry." >&2
+  ls -la "$dir" >&2 || true
+  exit 1
+}
+
+echo "Cleaning ${LOCAL_DIR}/..."
+clean_local_dir "$LOCAL_DIR"
+mkdir -p "$LOCAL_DIR"
+
+echo "Fetching Madek-Exporter_*.zip → ${LOCAL_DIR}/"
+rsync -avz --include='Madek-Exporter_*.zip' --exclude='*' \
+  "${SSH_HOST}:${BACKUP_DIR}/" \
+  "${LOCAL_DIR}/"
+
+echo "Fetched:"
+ls -lah "$LOCAL_DIR"/Madek-Exporter_*.zip

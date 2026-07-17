@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Package Electron app for Linux ARM64 with a pinned Temurin 21 aarch64 JRE.
+# JRE archive is cached under target/vendor-cache/ (downloaded + SHA256-verified once).
+set -euo pipefail
+
+# shellcheck disable=SC1091
+source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/packager-tmpdir.bash"
+
+PACKAGES_DIR="./target/packages"
+OUTPUT_DIR="$PACKAGES_DIR/madek-exporter-linux-arm64"
+CACHE_DIR="./target/vendor-cache"
+JRE_ARCHIVE="OpenJDK21U-jre_aarch64_linux_hotspot_21.0.11_10.tar.gz"
+JRE_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/${JRE_ARCHIVE}"
+JRE_SHA256="fa23d9d9945053e67bcc7638410eabf1e17a7672c7c95a24f70cd08b8407d36e"
+JRE_CACHE_PATH="${CACHE_DIR}/${JRE_ARCHIVE}"
+JRE_EXTRACT_DIR="${CACHE_DIR}/temurin-21.0.11+10-jre-linux_aarch64"
+
+mkdir -p "$PACKAGES_DIR" "$CACHE_DIR"
+rm -rf "$OUTPUT_DIR"
+
+ensure_aarch64_jre() {
+  if [[ -x "${JRE_EXTRACT_DIR}/bin/java" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f "$JRE_CACHE_PATH" ]]; then
+    echo "Downloading Temurin 21 aarch64 JRE → ${JRE_CACHE_PATH}"
+    curl -fsSL "$JRE_URL" -o "$JRE_CACHE_PATH"
+  fi
+
+  local actual
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "$JRE_CACHE_PATH" | awk '{ print $1 }')"
+  else
+    actual="$(shasum -a 256 "$JRE_CACHE_PATH" | awk '{ print $1 }')"
+  fi
+  if [[ "$actual" != "$JRE_SHA256" ]]; then
+    echo "ERROR: SHA256 mismatch for ${JRE_ARCHIVE}" >&2
+    echo "  expected: ${JRE_SHA256}" >&2
+    echo "  actual:   ${actual}" >&2
+    rm -f "$JRE_CACHE_PATH"
+    exit 1
+  fi
+
+  rm -rf "$JRE_EXTRACT_DIR"
+  mkdir -p "$JRE_EXTRACT_DIR"
+  tar -xf "$JRE_CACHE_PATH" -C "$JRE_EXTRACT_DIR" --strip-components=1
+}
+
+ensure_aarch64_jre
+
+ELECTRON_VERSION=$(node -p "require('./package.json').config.electronVersion")
+
+npx @electron/packager \
+  --overwrite --platform=linux --arch=arm64 --electron-version="$ELECTRON_VERSION" --asar \
+  --out="$PACKAGES_DIR" \
+  ./app/prod madek-exporter
+
+mkdir -p "$OUTPUT_DIR/resources/jre"
+cp -Lrf "${JRE_EXTRACT_DIR}/." "$OUTPUT_DIR/resources/jre"
+cp -Lf app/prod/jvm-main.jar "$OUTPUT_DIR/resources/jvm-main.jar"
+
+echo "  ${OUTPUT_DIR}/"

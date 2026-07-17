@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+# shellcheck disable=SC1091
+source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/packager-tmpdir.bash"
 
-cd $PROJECT_DIR
+PACKAGES_DIR="./target/packages"
+OUTPUT_DIR="$PACKAGES_DIR/madek-exporter-linux-x64"
 
-rm -rf madek-exporter-linux-x64
+mkdir -p "$PACKAGES_DIR"
+rm -rf "$OUTPUT_DIR"
 
-npx electron-packager \
-  --overwrite --platform=linux --arch=x64 --electron-version=1.6.0 \
-  --icon=Madek.icns \
+ELECTRON_VERSION=$(node -p "require('./package.json').config.electronVersion")
+
+npx @electron/packager \
+  --overwrite --platform=linux --arch=x64 --electron-version="$ELECTRON_VERSION" --asar \
+  --out="$PACKAGES_DIR" \
   ./app/prod madek-exporter
 
-cp -Lrf vendor/jre_linux_x64 ./madek-exporter-linux-x64/resources/jre
+cp -Lrf vendor/jre_linux_x64/. "$OUTPUT_DIR/resources/jre"
+cp -Lf app/prod/jvm-main.jar "$OUTPUT_DIR/resources/jvm-main.jar"

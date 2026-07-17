@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+cd "${PROJECT_DIR}"
+
+mkdir -p logs
+status=0
+
+echo "[security] npm audit (json)"
+if npm audit --json > logs/npm-audit.json 2>logs/npm-audit.err; then
+  node <<'NODE'
+const fs = require('fs');
+const p = 'logs/npm-audit.json';
+const r = JSON.parse(fs.readFileSync(p, 'utf8'));
+const v = (r.metadata && r.metadata.vulnerabilities) || {};
+console.log('[security] vulnerabilities', JSON.stringify(v));
+NODE
+else
+  echo "[security] npm audit failed (non-blocking); see logs/npm-audit.err"
+  echo "[security] continuing with osv-scanner lockfile scan"
+fi
+
+echo "[security] osv-scanner (Clojure/JVM)"
+./bin/clj-osv-scan || status=$?
+
+echo "[security] osv-scanner (npm + Ruby lockfiles)"
+if command -v mise >/dev/null 2>&1; then
+  OSV_SCANNER=(mise exec -- osv-scanner)
+elif command -v osv-scanner >/dev/null 2>&1; then
+  OSV_SCANNER=(osv-scanner)
+else
+  echo "[security] osv-scanner not found; skipping lockfile scan"
+  exit "${status}"
+fi
+"${OSV_SCANNER[@]}" scan source \
+  --format markdown \
+  --config "${PROJECT_DIR}/osv-scanner/osv-scanner.toml" \
+  --lockfile package-lock.json \
+  --lockfile Gemfile.lock \
+  || status=$?
+
+echo "[security] done"
+exit "${status}"
+
+# vi: ft=sh

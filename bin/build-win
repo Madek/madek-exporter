@@ -1,16 +1,42 @@
 #!/usr/bin/env bash
+# Package Electron app for Windows (win32/x64).
+# Do not pass Madek.icns here: packager rewrites the extension to .ico and then
+# rcedit (via wine) fails on Linux CI with ENOENT on the .exe. Use Madek.ico
+# only when present and wine is available.
 set -euo pipefail
 
-PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+# shellcheck disable=SC1091
+source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/packager-tmpdir.bash"
 
-cd $PROJECT_DIR
+PACKAGES_DIR="./target/packages"
+OUTPUT_DIR="$PACKAGES_DIR/madek-exporter-win32-x64"
 
-rm -rf madek-exporter-win32-x64
+mkdir -p "$PACKAGES_DIR"
+rm -rf "$OUTPUT_DIR"
 
+ELECTRON_VERSION=$(node -p "require('./package.json').config.electronVersion")
 
-npx electron-packager \
-  --overwrite --platform=win32 --arch=x64 --electron-version=1.6.0 \
-  --icon=Madek.icns \
+PACKAGER_ARGS=(
+  --overwrite
+  --platform=win32
+  --arch=x64
+  --electron-version="$ELECTRON_VERSION"
+  --asar
+  --out="$PACKAGES_DIR"
+)
+
+if [[ -f Madek.ico ]] && { command -v wine >/dev/null 2>&1 || command -v wine64 >/dev/null 2>&1; }; then
+  PACKAGER_ARGS+=(--icon=Madek.ico)
+  echo "Using Madek.ico (wine available)"
+else
+  echo "Skipping Windows app icon (need Madek.ico + wine); packaging with default Electron icon"
+fi
+
+npx @electron/packager \
+  "${PACKAGER_ARGS[@]}" \
   ./app/prod madek-exporter
 
-cp -Lrf vendor/jre_win_x64 ./madek-exporter-win32-x64/resources/jre
+cp -Lrf vendor/jre_win_x64/. "$OUTPUT_DIR/resources/jre"
+cp -Lf app/prod/jvm-main.jar "$OUTPUT_DIR/resources/jvm-main.jar"
+
+echo "  ${OUTPUT_DIR}/"

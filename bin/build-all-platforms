@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+cd "$PROJECT_DIR"
+
+TARGET_DIR="$PROJECT_DIR/target"
+DIST_DIR="$TARGET_DIR/dist"
+
+./bin/build-electron-prod
+./bin/build-jvm-main-prod
+./bin/build-mac-os
+./bin/build-mac-os-arm64
+./bin/build-linux
+./bin/build-linux-arm64
+./bin/build-win
+
+mkdir -p "$DIST_DIR"
+./bin/zip-tree "$DIST_DIR/Madek-Exporter_Mac-OS-x64.zip" target/packages/madek-exporter-darwin-x64
+./bin/zip-tree "$DIST_DIR/Madek-Exporter_Mac-OS-ARM64.zip" target/packages/madek-exporter-darwin-arm64
+./bin/zip-tree "$DIST_DIR/Madek-Exporter_Linux-x64.zip" target/packages/madek-exporter-linux-x64
+./bin/zip-tree "$DIST_DIR/Madek-Exporter_Linux-ARM64.zip" target/packages/madek-exporter-linux-arm64
+./bin/zip-tree "$DIST_DIR/Madek-Exporter_Windows.zip" target/packages/madek-exporter-win32-x64
+
+echo
+echo "Platform packages:"
+echo "  target/packages/madek-exporter-darwin-x64/"
+echo "  target/packages/madek-exporter-darwin-arm64/"
+echo "  target/packages/madek-exporter-linux-x64/"
+echo "  target/packages/madek-exporter-linux-arm64/"
+echo "  target/packages/madek-exporter-win32-x64/"
+echo
+echo "Zips:"
+echo "  target/dist/Madek-Exporter_Mac-OS-x64.zip"
+echo "  target/dist/Madek-Exporter_Mac-OS-ARM64.zip"
+echo "  target/dist/Madek-Exporter_Linux-x64.zip"
+echo "  target/dist/Madek-Exporter_Linux-ARM64.zip"
+echo "  target/dist/Madek-Exporter_Windows.zip"

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+rm -rf \
+  ./madek-exporter-darwin-x64 \
+  ./madek-exporter-darwin-arm64 \
+  ./madek-exporter-linux-x64 \
+  ./madek-exporter-linux-arm64 \
+  ./madek-exporter-win32-x64 \
+  ./target/packages \
+  ./target/dist
+
+rm -f \
+  ./Madek-Exporter_Mac-OS.zip \
+  ./Madek-Exporter_Mac-OS-x64.zip \
+  ./Madek-Exporter_Mac-OS-ARM64.zip \
+  ./Madek-Exporter_Linux-x64.zip \
+  ./Madek-Exporter_Linux-ARM64.zip \
+  ./Madek-Exporter_Windows.zip

@@ -9,7 +9,7 @@
    [logbug.thrown]
    [madek.exporter.utils :as utils :refer [exit presence deep-merge]]
    [taoensso.sente :as sente]
-   [taoensso.sente.server-adapters.immutant :refer [sente-web-server-adapter]]
+   [taoensso.sente.server-adapters.http-kit :refer [get-sch-adapter]]
    [taoensso.timbre :refer [info debug warn]]
    [timothypratley.patchin :as patchin]))
 
@@ -49,7 +49,7 @@
   (let [{:keys [ch-recv send-fn ajax-post-fn
                 ajax-get-or-ws-handshake-fn connected-uids]}
         (sente/make-channel-socket!
-         sente-web-server-adapter
+         (get-sch-adapter)
          {:user-id-fn (fn [req] (:client-id req))})]
     (def ring-ajax-post ajax-post-fn)
     (def ring-ajax-get-or-ws-handshake ajax-get-or-ws-handshake-fn)

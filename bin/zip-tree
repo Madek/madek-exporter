@@ -1,0 +1,233 @@
+#!/usr/bin/env bash
+# Create a zip archive of a directory, preserving Unix symlinks.
+#
+# Electron .app frameworks rely on symlinks (Libraries -> Versions/Current/...,
+# Current -> A, …). Following those links (default zip -r / naive walkers)
+# either duplicates huge binaries or — worse, with Python os.walk — drops
+# directory symlinks entirely, so the extracted app crashes with:
+#   Library not loaded: @rpath/libffmpeg.dylib
+#
+# Prefer system `zip -ry`; else system Python that writes symlink entries;
+# else Node with the same semantics.
+#
+# Usage: ./bin/zip-tree OUT.zip SRC_DIR
+# Archive entries are rooted at basename(SRC_DIR), matching `cd parent && zip -ry OUT basename`.
+set -euo pipefail
+
+if [[ "$#" -ne 2 ]]; then
+  echo "usage: $0 OUT.zip SRC_DIR" >&2
+  exit 2
+fi
+
+OUT="$1"
+SRC="$2"
+
+if [[ ! -d "$SRC" ]]; then
+  echo "ERROR: not a directory: $SRC" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$OUT")"
+rm -f "$OUT"
+
+OUT_ABS="$(cd "$(dirname "$OUT")" && pwd -P)/$(basename "$OUT")"
+SRC_ABS="$(cd "$SRC" && pwd -P)"
+PARENT="$(dirname "$SRC_ABS")"
+BASE="$(basename "$SRC_ABS")"
+
+if command -v zip >/dev/null 2>&1; then
+  # -y: store symlinks as symlinks (required for Electron .app frameworks)
+  if (cd "$PARENT" && zip -ry "$OUT_ABS" "$BASE"); then
+    echo "  $OUT_ABS"
+    exit 0
+  fi
+  echo "WARN: zip failed; falling back to Python/Node zip writer" >&2
+  rm -f "$OUT_ABS"
+fi
+
+# Prefer real system interpreters; asdf/mise shims fail without a pinned version.
+find_python() {
+  local c
+  for c in \
+    /usr/bin/python3 \
+    /usr/bin/python3.12 \
+    /usr/bin/python3.11 \
+    /usr/bin/python3.10 \
+    /usr/bin/python3.9 \
+    /usr/bin/python3.8 \
+    /bin/python3
+  do
+    if [[ -x "$c" ]]; then
+      echo "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if PYTHON_BIN="$(find_python)"; then
+  "$PYTHON_BIN" - "$OUT_ABS" "$PARENT" "$BASE" <<'PY'
+import os
+import stat
+import sys
+import zipfile
+
+out, parent, base = sys.argv[1], sys.argv[2], sys.argv[3]
+root = os.path.join(parent, base)
+
+
+def add_symlink(zf, path, arcname):
+    target = os.readlink(path)
+    info = zipfile.ZipInfo(arcname)
+    info.create_system = 3  # Unix
+    info.external_attr = (stat.S_IFLNK | 0o777) << 16
+    zf.writestr(info, target)
+
+
+with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    # Root directory entry (optional but keeps unzip layout clear)
+    zf.write(root, base)
+
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        # Directory symlinks must be stored as links, not descended into.
+        for name in list(dirnames):
+            path = os.path.join(dirpath, name)
+            if os.path.islink(path):
+                arcname = os.path.relpath(path, parent)
+                add_symlink(zf, path, arcname)
+                dirnames.remove(name)
+
+        for name in filenames:
+            path = os.path.join(dirpath, name)
+            arcname = os.path.relpath(path, parent)
+            if os.path.islink(path):
+                add_symlink(zf, path, arcname)
+            else:
+                zf.write(path, arcname)
+
+print(f"  {out}")
+PY
+  exit 0
+fi
+
+# Last resort: Node (available on packaging steps via with-node22).
+if command -v node >/dev/null 2>&1; then
+  node - "$OUT_ABS" "$PARENT" "$BASE" <<'JS'
+const fs = require("fs");
+const path = require("path");
+const zlib = require("zlib");
+
+const table = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  table[i] = c >>> 0;
+}
+function crc32(buf) {
+  let crc = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) crc = table[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+const [out, parent, base] = process.argv.slice(2);
+const root = path.join(parent, base);
+const entries = []; // { arcname, data, isSymlink, mode }
+
+function walk(dir) {
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, ent.name);
+    const arc = path.relative(parent, p).split(path.sep).join("/");
+    if (ent.isSymbolicLink()) {
+      const target = fs.readlinkSync(p);
+      entries.push({
+        arcname: arc,
+        data: Buffer.from(target, "utf8"),
+        isSymlink: true,
+        mode: 0o120777,
+      });
+      continue;
+    }
+    if (ent.isDirectory()) {
+      walk(p);
+      continue;
+    }
+    if (ent.isFile()) {
+      const st = fs.statSync(p);
+      entries.push({
+        arcname: arc,
+        data: fs.readFileSync(p),
+        isSymlink: false,
+        mode: st.mode & 0o777,
+      });
+    }
+  }
+}
+walk(root);
+
+const parts = [];
+const central = [];
+let offset = 0;
+for (const ent of entries) {
+  const nameBuf = Buffer.from(ent.arcname, "utf8");
+  const data = ent.data;
+  const compressed = ent.isSymlink ? data : zlib.deflateRawSync(data);
+  const method = ent.isSymlink ? 0 : 8;
+  const crc = crc32(data);
+  const unixMode = ent.isSymlink ? 0o120777 : 0o100000 | (ent.mode & 0o777);
+  const externalAttr = (unixMode << 16) >>> 0;
+
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt16LE(0, 6);
+  local.writeUInt16LE(method, 8);
+  local.writeUInt16LE(0, 10);
+  local.writeUInt16LE(0, 12);
+  local.writeUInt32LE(crc, 14);
+  local.writeUInt32LE(compressed.length, 18);
+  local.writeUInt32LE(data.length, 22);
+  local.writeUInt16LE(nameBuf.length, 26);
+  local.writeUInt16LE(0, 28);
+  parts.push(local, nameBuf, compressed);
+
+  const cen = Buffer.alloc(46);
+  cen.writeUInt32LE(0x02014b50, 0);
+  cen.writeUInt16LE(20, 4);
+  cen.writeUInt16LE(20, 6);
+  cen.writeUInt16LE(0, 8);
+  cen.writeUInt16LE(method, 10);
+  cen.writeUInt16LE(0, 12);
+  cen.writeUInt16LE(0, 14);
+  cen.writeUInt32LE(crc, 16);
+  cen.writeUInt32LE(compressed.length, 20);
+  cen.writeUInt32LE(data.length, 24);
+  cen.writeUInt16LE(nameBuf.length, 28);
+  cen.writeUInt16LE(0, 30);
+  cen.writeUInt16LE(0, 32);
+  cen.writeUInt16LE(0, 34);
+  cen.writeUInt16LE(0, 36);
+  cen.writeUInt32LE(externalAttr, 38);
+  cen.writeUInt32LE(offset, 42);
+  // create_system Unix = 3 in version-made-by high byte
+  cen.writeUInt16LE(20 | (3 << 8), 4);
+  central.push(cen, nameBuf);
+  offset += local.length + nameBuf.length + compressed.length;
+}
+const centralSize = central.reduce((n, b) => n + b.length, 0);
+const end = Buffer.alloc(22);
+end.writeUInt32LE(0x06054b50, 0);
+end.writeUInt16LE(0, 4);
+end.writeUInt16LE(0, 6);
+end.writeUInt16LE(entries.length, 8);
+end.writeUInt16LE(entries.length, 10);
+end.writeUInt32LE(centralSize, 12);
+end.writeUInt32LE(offset, 16);
+end.writeUInt16LE(0, 20);
+fs.writeFileSync(out, Buffer.concat([...parts, ...central, end]));
+console.log(`  ${out}`);
+JS
+  exit 0
+fi
+
+echo "ERROR: need zip, /usr/bin/python3, or node to create archives" >&2
+exit 1

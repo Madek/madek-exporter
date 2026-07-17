@@ -14,11 +14,14 @@ APP_ROOT_DIR = \
 
 APP_BINARY = \
   case RUBY_PLATFORM
-  when 'x86_64-darwin16', 'arm64-darwin22'
+  when /arm64-darwin/
     APP_ROOT_DIR.join(
-      'madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter').to_s
+      'target/packages/madek-exporter-darwin-arm64/madek-exporter.app/Contents/MacOS/madek-exporter').to_s
+  when /x86_64-darwin|darwin/
+    APP_ROOT_DIR.join(
+      'target/packages/madek-exporter-darwin-x64/madek-exporter.app/Contents/MacOS/madek-exporter').to_s
   when 'x86_64-linux', 'x86_64-linux-gnu'
-    APP_ROOT_DIR.join( 'madek-exporter-linux-x64/madek-exporter').to_s
+    APP_ROOT_DIR.join( 'target/packages/madek-exporter-linux-x64/madek-exporter').to_s
   else
     raise "#{RUBY_PLATFORM} system not configured / not supported"
   end

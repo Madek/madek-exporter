@@ -1,0 +1,10 @@
+# Ensure libs for Electron packaging/smoke.
+# Uses bin/install-missing-libs: passwordless sudo apt when available, else user-space .deb extract.
+scripts:
+  install-missing-libs:
+    exclusive_executor_resource: apt-get
+    timeout: 30 Minutes
+    body: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      ./bin/install-missing-libs
