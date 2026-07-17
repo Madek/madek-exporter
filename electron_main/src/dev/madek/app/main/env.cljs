@@ -9,6 +9,12 @@
 
 (def env :dev)
 
+(def resources-dir
+  nil)
+
+(def asar-enabled?
+  false)
+
 (def app-dir
   (let [process-dir (.realpathSync fs ".")
         relative-app-dir "./app/dev"]

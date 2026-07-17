@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+./bin/build-mac-os
+./bin/zip-tree target/dist/Madek-Exporter_Mac-OS-x64.zip target/packages/madek-exporter-darwin-x64

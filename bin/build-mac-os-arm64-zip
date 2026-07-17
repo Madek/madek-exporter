@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+./bin/build-mac-os-arm64
+./bin/zip-tree target/dist/Madek-Exporter_Mac-OS-ARM64.zip target/packages/madek-exporter-darwin-arm64

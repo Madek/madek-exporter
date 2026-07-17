@@ -26,11 +26,15 @@
 
 (defn open-new []
   (let [id (-> (uuid/make-random-uuid) uuid/uuid-string)
-        window (BrowserWindow. (clj->js {:width 800 :height 600}))
+        window (BrowserWindow. (clj->js {:width 800 :height 600
+                                         :show false
+                                         :webPreferences {:nodeIntegration true
+                                                          :contextIsolation false}}))
         index-html-path (str env/app-dir "/index.html")]
     (.log js/console "index-html-path" index-html-path)
     (.loadURL window (str "file://" index-html-path))
     (swap! windows assoc id (atom {:window window}))
+    (.once window "ready-to-show" (fn [] (.show window)))
     (.on (.-webContents window) "dom-ready"
          (fn []
            (.send (.-webContents window) "madek:jvm-sync:init"
@@ -80,4 +84,3 @@
   (fn [_ _ _ new-state]
     (doseq [client-id (keys @windows)]
       (send-db client-id new-state))))
-

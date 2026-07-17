@@ -1,0 +1,7 @@
+environment_variables:
+  NODE_VERSION: "22.12.0"
+  JAVA_MAJOR_VERSION: "21"
+  JAVA_RELEASE: "21.0.11+10"
+  RUBY_ENGINE: ruby
+  RUBY_VERSION: "3.3.8"
+  RUBY: '{{RUBY_ENGINE}}-{{RUBY_VERSION}}'

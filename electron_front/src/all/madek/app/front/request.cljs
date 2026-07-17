@@ -5,7 +5,7 @@
     [cljs.core.async.macros :refer [go]]
     )
   (:require
-    [madek.app.front.utils :refer [str keyword deep-merge]]
+    [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.state :as state]
 
     [cljs-http.client :as http]
@@ -45,12 +45,37 @@
                                    (-> @state/electron-main-db :jvm-process :port)
                                    (:path req-opts))}
                         req-opts)
-        id (uuid/uuid-string (uuid/make-random-uuid))]
+        id (uuid/uuid-string (uuid/make-random-uuid))
+        params (:json-params req)
+        params-for-log (cond-> (dissoc params :password)
+                         (contains? params :password)
+                         (assoc :password "***redacted***"
+                                :password-present (boolean (presence (:password params)))))]
+    (state/add-app-log!
+      :info :request/send
+      {:id id
+       :method (:method req)
+       :url (:url req)
+       :path (:path req-opts)
+       :json-params params-for-log})
     (swap! state/client-db assoc-in [:requests id]
            {:request req :meta (deep-merge META-DEFAULTS meta-req)})
     (go (let [resp (<! (http/request req))]
           (when (-> @state/client-db :requests (get id))
             (swap! state/client-db assoc-in [:requests id :response] resp))
+          (state/add-app-log!
+            (if (response-success? resp) :info :error)
+            :request/response
+            {:id id
+             :status (:status resp)
+             :success (:success resp)
+             :error-code (:error-code resp)
+             :path (:path req-opts)
+             :hint (when (= 0 (:status resp))
+                     "Local JVM endpoint not reachable. Check if jvm-main is running and listening on localhost.")
+             :body (when-not (response-success? resp)
+                     (or (:body resp)
+                         (:error-text resp)))})
           (when (and (response-success? resp)
                      (:autoremove-on-success meta-req))
             (autoremove id meta-req))
@@ -96,9 +121,14 @@
            (case bootstrap-status
              :success [:p (-> request :response :body)]
              :pending [:p "Please stand by!"]
-             :danger (if-let [body (-> request :response :body)]
+             :danger (if-let [body (-> request :response :body presence)]
                        body
-                       [:pre (with-out-str (pprint request))]))]
+                       [:div
+                        (when (= 0 (-> request :response :status))
+                          [:div.alert.alert-warning
+                           [:p "Request failed with status 0 (local transport error)."]
+                           [:p "The local JVM endpoint may be unreachable."]])
+                        [:pre (with-out-str (pprint request))]]))]
           [:div.modal-footer
            [:div.clearfix]
            [:button.btn

@@ -3,7 +3,6 @@
 require 'active_support/all'
 require 'json'
 require 'optparse'
-require 'pry'
 require 'yaml'
 require 'filewatcher'
 
@@ -42,7 +41,7 @@ end
 
 if options[:watch]
   puts "Watching releases.yml ..."
-  FileWatcher.new(['releases.yml']).watch do |filename|
+  Filewatcher.new(['releases.yml']).watch do |_changes|
     update
   end
 end

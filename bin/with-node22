@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MIN_NODE="${NODE_VERSION:-22.12.0}"
+TOOLS_DIR="${PWD}/.tools"
+NODE_DIR="${TOOLS_DIR}/node-v${MIN_NODE}-linux-x64"
+NODE_BIN="${NODE_DIR}/bin/node"
+NPM_BIN="${NODE_DIR}/bin/npm"
+
+version_ge() {
+  [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+}
+
+current_node_version() {
+  if command -v node >/dev/null 2>&1; then
+    node -v | sed 's/^v//'
+  else
+    echo "0.0.0"
+  fi
+}
+
+if ! version_ge "$(current_node_version)" "$MIN_NODE"; then
+  mkdir -p "$TOOLS_DIR"
+  if [ ! -x "$NODE_BIN" ]; then
+    curl -fsSL "https://nodejs.org/dist/v${MIN_NODE}/node-v${MIN_NODE}-linux-x64.tar.xz" -o "${TOOLS_DIR}/node-v${MIN_NODE}-linux-x64.tar.xz"
+    tar -xf "${TOOLS_DIR}/node-v${MIN_NODE}-linux-x64.tar.xz" -C "$TOOLS_DIR"
+  fi
+  export PATH="${NODE_DIR}/bin:${PATH}"
+fi
+
+if [ "$#" -eq 0 ]; then
+  node -v
+  npm -v
+  exit 0
+fi
+
+exec "$@"
+
+

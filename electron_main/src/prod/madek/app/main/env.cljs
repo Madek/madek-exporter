@@ -9,10 +9,20 @@
 
 (def env :prod)
 
+(def resources-dir
+  (.resolve path (js* "__dirname") ".." ".."))
+
+(def asar-app-dir
+  (.resolve path resources-dir "app.asar"))
+
+(def unpacked-app-dir
+  (.resolve path resources-dir "app"))
+
+(def asar-enabled?
+  (.existsSync fs asar-app-dir))
+
 (def app-dir
-  (let [dirname (js* "__dirname")
-        relative-app-dir ".."]
-    (.resolve path dirname relative-app-dir)))
+  (if asar-enabled? asar-app-dir unpacked-app-dir))
 
 (def jvm-port (+ 1024 (rand-int (- 65535 1024))))
 

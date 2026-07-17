@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+./bin/build-linux-arm64
+./bin/zip-tree target/dist/Madek-Exporter_Linux-ARM64.zip target/packages/madek-exporter-linux-arm64

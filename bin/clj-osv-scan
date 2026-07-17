@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Checks all project dependencies (direct + transitive) against the OSV
+# vulnerability database.
+#
+# Uses `lein deps :tree` to get the fully resolved dep graph (including
+# Clojars-hosted packages), converts it to osv-scanner's JSON lockfile format,
+# and feeds it directly to osv-scanner — no pom.xml or Maven Central resolution
+# involved.
+#
+# Prerequisite: osv-scanner must be installed.
+#   mise:   mise install   (osv-scanner pinned in mise.toml)
+#   macOS:  brew install osv-scanner
+#   other:  https://google.github.io/osv-scanner/installation/
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
+
+DEPS_JSON=$(mktemp "${TMPDIR:-/tmp}/clj-osv-scan.XXXXXX")
+
+cleanup() {
+  rm -f "${DEPS_JSON}"
+}
+trap cleanup EXIT
+
+cd "${PROJECT_DIR}"
+
+# Resolve runtime deps (exclude :dev so cljs/guava build-only deps are omitted),
+# then convert Leiningen `[group/artifact "version"]` lines to osv-scanner's
+# JSON lockfile format. Artifacts without a group become group:artifact
+# (Leiningen convention). Git-sha based deps are skipped (not in Maven).
+./bin/lein with-profile -dev deps :tree 2>/dev/null | \
+  sed -n 's/.*\[\([^][:space:]]*\) "\([^"]*\)".*/\1 \2/p' | \
+  awk '
+    BEGIN { printf "{\"results\":[{\"packages\":["; first=1 }
+    NF < 2 { next }
+    length($2) == 40 && $2 ~ /^[0-9a-fA-F]+$/ { next }
+    {
+      name = $1
+      if (index(name, "/") > 0) {
+        gsub("/", ":", name)
+      } else if (index(name, ":") == 0) {
+        name = name ":" name
+      }
+      if (!first) printf ","
+      printf "{\"package\":{\"name\":\"%s\",\"version\":\"%s\",\"ecosystem\":\"Maven\"}}", name, $2
+      first = 0
+    }
+    END { printf "]}]}\n" }
+  ' > "${DEPS_JSON}"
+
+# Prefer mise-managed osv-scanner (see mise.toml); fall back to PATH.
+if command -v mise >/dev/null 2>&1; then
+  OSV_SCANNER=(mise exec -- osv-scanner)
+elif command -v osv-scanner >/dev/null 2>&1; then
+  OSV_SCANNER=(osv-scanner)
+else
+  echo "osv-scanner not found. Install via: mise install   (pinned in mise.toml)" >&2
+  echo "  or: brew install osv-scanner" >&2
+  exit 127
+fi
+
+"${OSV_SCANNER[@]}" scan source \
+  --format markdown \
+  --config "${PROJECT_DIR}/osv-scanner/osv-scanner.toml" \
+  --lockfile "osv-scanner:${DEPS_JSON}" \
+  "$@"
+
+# vi: ft=sh

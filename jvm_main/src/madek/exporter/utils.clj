@@ -33,12 +33,24 @@
     :else v))
 
 (defn options-to-http-options [options]
-  (let [{login :login password :password
-         session-token :session-token} options]
-    (if (and (presence login)
-             (presence password))
-      {:basic-auth [login password]}
-      {:basic-auth [password]})))
+  (letfn [(basic-auth-header [login password]
+            (let [raw (clojure.core/str login ":" password)
+                  encoded (.encodeToString (java.util.Base64/getEncoder)
+                                           (.getBytes raw "UTF-8"))]
+              (clojure.core/str "Basic " encoded)))]
+    (let [login (some-> options :login presence)
+          password (some-> options :password presence)
+          session-token (some-> options :session-token presence)]
+      (cond
+        (and login password)
+        {:basic-auth [login password]
+         :headers {"authorization" (basic-auth-header login password)}}
+
+        session-token
+        {:headers {"authorization" (clojure.core/str "Bearer " session-token)}}
+
+        :else
+        {}))))
 
 (defn str
   "Like clojure.core/str but maps keywords to strings without preceding colon."

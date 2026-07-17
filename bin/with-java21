@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Ensure Java 21+ on PATH (CI executors only advertise JDK 8/11).
+# Prefers vendor/temurin-21.* JDK from the vendor submodule; downloads Adoptium as fallback.
+set -euo pipefail
+
+MIN_MAJOR="${JAVA_MAJOR_VERSION:-21}"
+JAVA_RELEASE="${JAVA_RELEASE:-21.0.11+10}"
+TOOLS_DIR="${PWD}/.tools"
+DOWNLOAD_DIR="${TOOLS_DIR}/jdk-${JAVA_RELEASE}"
+
+version_major() {
+  # "21.0.11" -> 21; "1.8.0_392" -> 8
+  local v="$1"
+  if [[ "$v" == 1.* ]]; then
+    echo "$v" | cut -d. -f2
+  else
+    echo "$v" | cut -d. -f1
+  fi
+}
+
+current_java_major() {
+  if ! command -v java >/dev/null 2>&1; then
+    echo "0"
+    return
+  fi
+  local ver
+  ver="$(java -version 2>&1 | awk -F '"' '/version/ { print $2; exit }')"
+  version_major "${ver:-0}"
+}
+
+find_vendored_java_home() {
+  local uname_s candidate
+  uname_s="$(uname -s)"
+  case "$uname_s" in
+    Linux)
+      candidate="${PWD}/vendor/temurin-${JAVA_RELEASE}-linux_x64"
+      ;;
+    Darwin)
+      candidate="${PWD}/vendor/temurin-${JAVA_RELEASE}-macosx_x64"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  if [[ -x "${candidate}/bin/java" ]]; then
+    echo "$candidate"
+    return 0
+  fi
+  return 1
+}
+
+download_temurin_linux() {
+  local url archive top
+  mkdir -p "$TOOLS_DIR"
+  archive="${TOOLS_DIR}/OpenJDK21U-jdk_x64_linux_hotspot_21.0.11_10.tar.gz"
+  url="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11%2B10/OpenJDK21U-jdk_x64_linux_hotspot_21.0.11_10.tar.gz"
+  if [[ ! -x "${DOWNLOAD_DIR}/bin/java" ]]; then
+    curl -fsSL "$url" -o "$archive"
+    rm -rf "$DOWNLOAD_DIR"
+    mkdir -p "$DOWNLOAD_DIR"
+    tar -xf "$archive" -C "$DOWNLOAD_DIR" --strip-components=1
+  fi
+  echo "$DOWNLOAD_DIR"
+}
+
+ensure_java21() {
+  local major home
+  major="$(current_java_major)"
+  if [[ "$major" -ge "$MIN_MAJOR" ]]; then
+    return 0
+  fi
+
+  if home="$(find_vendored_java_home)"; then
+    export JAVA_HOME="$home"
+    export PATH="${JAVA_HOME}/bin:${PATH}"
+    return 0
+  fi
+
+  if command -v mise >/dev/null 2>&1; then
+    home="$(mise --no-config where "java@temurin-21.0.11+10.0.LTS" 2>/dev/null || true)"
+    if [[ -n "${home}" && -x "${home}/bin/java" ]]; then
+      export JAVA_HOME="$home"
+      export PATH="${JAVA_HOME}/bin:${PATH}"
+      return 0
+    fi
+  fi
+
+  case "$(uname -s)" in
+    Linux)
+      home="$(download_temurin_linux)"
+      export JAVA_HOME="$home"
+      export PATH="${JAVA_HOME}/bin:${PATH}"
+      ;;
+    *)
+      echo "Java ${MIN_MAJOR}+ required; found major=${major}. Install Temurin 21 or init vendor submodule." >&2
+      exit 1
+      ;;
+  esac
+}
+
+ensure_java21
+
+major_now="$(current_java_major)"
+if [[ "$major_now" -lt "$MIN_MAJOR" ]]; then
+  echo "Java ${MIN_MAJOR}+ required after setup; still have major=${major_now} (JAVA_HOME=${JAVA_HOME:-unset})" >&2
+  java -version >&2 || true
+  exit 1
+fi
+
+if [ "$#" -eq 0 ]; then
+  echo "JAVA_HOME=${JAVA_HOME:-$(dirname "$(dirname "$(command -v java)")")}"
+  java -version
+  exit 0
+fi
+
+exec "$@"

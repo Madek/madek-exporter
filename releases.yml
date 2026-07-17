@@ -1,5 +1,39 @@
 
-####### 0.9.8 #######################################################################
+####### 0.11.0 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 0
+  version_pre: 0
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Upgrade Electron to 43.1.1 (from 1.6.0); require Node.js 22.
+    * Bundle Temurin Java 21 runtime; modernize Clojure 1.10.3 / ClojureScript 1.10.773.
+    * Provide artefacts for macOS (x64 and ARM64), Linux (x64 and ARM64), and Windows (x64) (outputs under target/).
+    * Fix CSS / stylesheet production build.
+    * Improve app shutdown and add main-process file logging.
+    * Add dependency vulnerability scanning (osv-scanner) and security audit helpers.
+    * Add CI smoke run and build-artifact validation across packaged platforms.
+    * Preserve Electron framework symlinks in release zips (fixes macOS libffmpeg.dylib load failures).
+    * macOS zips include README.txt and remove-quarantine-lock.sh beside madek-exporter.app (Gatekeeper “damaged” workaround for unsigned downloads; run manually after unzip).
+    * Disable Chromium GPU acceleration by default (`disableHardwareAcceleration`, `--disable-gpu`, `--in-process-gpu`) so the app starts on Citrix/VDI instead of fatalling with `GPU process isn't usable`.
+
+    Notes
+    -----
+
+    * Toolchain is managed via mise (Java 21, Node 22, Ruby for release helpers); CI uses bin/with-java21 and bin/with-node22.
+    * Mac OS-only and broken CSS notes from 0.10.0 no longer apply.
+    * macOS Gatekeeper quarantine helper is a workaround until Apple codesign/notarization; see package README.txt and project README.
+    * Prefer a local path over UNC network homes when running Windows builds on Citrix; see README troubleshooting.
+
+
+####### 0.10.0 ######################################################################
 
 - version_major: 0
   version_minor: 10

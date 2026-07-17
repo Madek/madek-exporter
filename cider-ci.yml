@@ -8,7 +8,10 @@ jobs:
     context:
       tasks:
         build:
-          traits: []
+          # No desktop/wine traits. Ruby via asdf (exclusive_executor_resource in bundle-script).
+          traits:
+            asdf: true
+            asdf-ruby: true
           scripts:
             include:
               - cider-ci/bundle-script.yml
@@ -22,35 +25,42 @@ jobs:
                 bundle exec ./bin/update-releases
                 git diff --stat --exit-code -- app/prod/releases.json
 
-  draft-release:
-    name: Draft a release on GH
+  security-audit:
+    name: Security audit (npm + OSV)
     run_when:
-      on the release branch:
+      on any branch:
         type: branch
-        include_match: ^release$
+        include_match: ^.*$
     context:
       tasks:
-        release:
-          include:
-            - cider-ci/build-and-test.yml
-          traits: {}
+        scan:
+          traits:
+            JDK: true
+            Leiningen: true
+            nodejs: true
           scripts:
-            # override the existing test; we don't care about the result
-            test:
-              body: exit 0
-            draft-release:
-              start_when:
-                build-linux has passed:
-                  script_key: build-linux
-#               build-windows has passed:
-#                 script_key: build-windows
-                build-mac-os has passed:
-                  script_key: build-mac-os
-              timeout: 10 Minutes
+            scan:
+              timeout: 20 Minutes
               body: |
                 #!/usr/bin/env bash
                 set -euo pipefail
-                bundle exec ./bin/draft-gh-release
+                OSV_SCANNER_VERSION=2.4.0
+                if ! command -v osv-scanner >/dev/null 2>&1; then
+                  OSV_BIN_DIR="$(mktemp -d)"
+                  curl -fsSL \
+                    "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" \
+                    -o "${OSV_BIN_DIR}/osv-scanner"
+                  chmod +x "${OSV_BIN_DIR}/osv-scanner"
+                  export PATH="${OSV_BIN_DIR}:${PATH}"
+                fi
+                ./bin/security-audit || {
+                  rc=$?
+                  if [[ "$rc" -eq 1 ]]; then
+                    echo "Vulnerabilities found (non-blocking)."
+                    exit 0
+                  fi
+                  exit "$rc"
+                }
 
   build:
     name: Build the App
@@ -63,3 +73,20 @@ jobs:
         build:
           include:
             - cider-ci/build-and-test.yml
+          scripts:
+            snapshot-release-artefacts:
+              start_when:
+                build-linux has passed:
+                  script_key: build-linux
+                build-linux-arm64 has passed:
+                  script_key: build-linux-arm64
+                build-windows has passed:
+                  script_key: build-windows
+                build-mac-os has passed:
+                  script_key: build-mac-os
+                build-mac-os-arm64 has passed:
+                  script_key: build-mac-os-arm64
+              timeout: 10 Minutes
+              body: |
+                set -euo pipefail
+                ./bin/snapshot-release-artefacts

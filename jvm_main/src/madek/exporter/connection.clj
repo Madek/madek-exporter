@@ -20,9 +20,23 @@
 (defn connect-to-madek-server [request]
   (catcher/snatch
    {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
-   (debug 'connect {:request request})
    (try (let [connect-body (:body request)
-              url (-> connect-body :url)
+              url (some-> connect-body :url utils/presence)
+              login (some-> connect-body :login utils/presence)
+              password (some-> connect-body :password utils/presence)
+              _ (debug 'connect-request
+                       {:path (:uri request)
+                        :has-body (map? connect-body)
+                        :has-url (boolean url)
+                        :has-login (boolean login)
+                        :has-password (boolean password)})
+              _ (when-not (map? connect-body)
+                  (throw (ex-info "invalid connect payload" {:status 422 :message "Expected JSON object body"})))
+              _ (when-not url
+                  (throw (ex-info "missing url" {:status 422 :message "Missing required field: url"})))
+              _ (when (not= (boolean login) (boolean password))
+                  (throw (ex-info "invalid credentials" {:status 422
+                                                          :message "Provide both login and password, or neither."})))
               http-options (utils/options-to-http-options connect-body)
               api-root (roa/get-root (str url "/api/")
                                      :default-conn-opts http-options)
@@ -53,6 +67,9 @@
           (cond
             (= (-> e ex-data :status) 401) {:status 401
                                             :body "Authentication failed. Check your credentials!"}
+            (= (-> e ex-data :status) 422) {:status 422
+                                            :body {:message (or (-> e ex-data :message)
+                                                                "Invalid connect request")}}
             :else (throw e))))))
 
 (defn disconnect [_]

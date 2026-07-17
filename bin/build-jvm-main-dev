@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euxo
+
+lein uberjar
+mkdir -p app/dev
+cp -Lf app/prod/jvm-main.jar app/dev/jvm-main.jar
+

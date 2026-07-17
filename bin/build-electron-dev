@@ -2,3 +2,5 @@
 set -eou
 ./bin/build-electron-main-dev
 ./bin/build-electron-front-dev
+./bin/build-stylesheets-dev
+./bin/build-jvm-main-dev

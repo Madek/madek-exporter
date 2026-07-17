@@ -25,11 +25,25 @@
 (defonce client-db
   (reagent/atom
     {:debug false
+     :app-logs []
      :client-id (uuid/uuid-string (uuid/make-random-uuid))
      :connection {:form {:url nil
                          :login nil
                          :password nil
                          }}}))
+
+(def MAX-APP-LOGS 300)
+
+(defn add-app-log! [level event data]
+  (let [entry {:ts (.toISOString (js/Date.))
+               :level level
+               :event event
+               :data data}]
+    (swap! client-db update :app-logs
+           (fn [logs]
+             (->> (conj (vec (or logs [])) entry)
+                  (take-last MAX-APP-LOGS)
+                  vec)))))
 
 ;### init #####################################################################
 

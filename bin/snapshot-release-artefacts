@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Snapshot Madek-Exporter release zips out of the ephemeral CI working tree and
+# print info for creating a GitHub release manually.
+#
+# Copies target/dist/Madek-Exporter_*.zip to a flat dir under world-writable /var/tmp
+# (ci-exec-user cannot mkdir under a root-owned nested parent):
+#   /var/tmp/madek-exporter-artefacts-<job-id>/
+#
+# Then a developer can fetch with:
+#   ./bin/fetch-server-artefacts <user@host> /var/tmp/madek-exporter-artefacts-<job-id>
+#
+# Usage (from repo root, after platform zips exist):
+#   ./bin/snapshot-release-artefacts
+set -euo pipefail
+
+REQUIRED_ZIPS=(
+  Madek-Exporter_Linux-x64.zip
+  Madek-Exporter_Linux-ARM64.zip
+  Madek-Exporter_Mac-OS-x64.zip
+  Madek-Exporter_Mac-OS-ARM64.zip
+  Madek-Exporter_Windows.zip
+)
+
+ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+DIST_DIR="${ROOT}/target/dist"
+JOB_ID="$(basename "$ROOT")"
+BACKUP_DIR="/var/tmp/madek-exporter-artefacts-${JOB_ID}"
+EXECUTOR="$(hostname -f 2>/dev/null || hostname)"
+
+fail() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
+
+[[ -f releases.yml ]] || fail "missing releases.yml"
+[[ -d "$DIST_DIR" ]] || fail "missing ${DIST_DIR}"
+
+missing=0
+for zip in "${REQUIRED_ZIPS[@]}"; do
+  if [[ ! -f "${DIST_DIR}/${zip}" ]]; then
+    echo "ERROR: missing ${DIST_DIR}/${zip}" >&2
+    missing=1
+  fi
+done
+[[ "$missing" -eq 0 ]] || fail "incomplete release zip set in ${DIST_DIR}"
+
+mkdir -p "$BACKUP_DIR"
+cp -a "${DIST_DIR}"/Madek-Exporter_*.zip "$BACKUP_DIR"/
+
+VERSION="$(
+  ruby -ryaml -e '
+    release = YAML.load_file("releases.yml").first
+    version = "#{release["version_major"]}.#{release["version_minor"]}.#{release["version_patch"]}"
+    version += "-#{release["version_pre"]}" if release["version_pre"]
+    version += "+#{release["version_build"]}" if release["version_build"]
+    puts version
+  '
+)"
+
+TOP_ENTRY="$(
+  ruby -ryaml -e '
+    release = YAML.load_file("releases.yml").first
+    puts YAML.dump(release)
+  '
+)"
+
+echo "============================================================"
+echo "Release artefacts snapshotted for manual GitHub release"
+echo "============================================================"
+echo
+echo "--- Top releases.yml entry (version ${VERSION}) ---"
+echo "${TOP_ENTRY}"
+echo "--- Paths ---"
+echo "Executor:            ${EXECUTOR}"
+echo "Source (ephemeral):  ${DIST_DIR}"
+echo "Backup (durable):    ${BACKUP_DIR}"
+echo
+echo "Zips in backup:"
+ls -lah "${BACKUP_DIR}"/Madek-Exporter_*.zip
+echo
+RELEASE_DRAFT_URL="https://github.com/Madek/madek-exporter/releases/new?tag=${VERSION}&title=${VERSION}"
+
+echo "Next steps:"
+echo "  1. Fetch:  ./bin/fetch-server-artefacts <user@${EXECUTOR}> ${BACKUP_DIR}"
+echo "  2. Draft release (creates tag): ${RELEASE_DRAFT_URL}"
+echo "  3. Attach the zips to the draft and publish."
+echo "============================================================"

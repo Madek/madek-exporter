@@ -4,14 +4,13 @@
    [clojure.tools.logging :as logging]
    [clojure.walk]
    [environ.core :refer [env]]
-   [immutant.web :refer [run]]
-   [logbug.catcher :as catcher]
    [logbug.catcher :as catcher]
    [logbug.debug :as debug :refer [I>]]
    [logbug.ring :as logbug-ring :refer [wrap-handler-with-logging]]
    [logbug.thrown]
    [madek.exporter.server.web :as web]
-   [madek.exporter.utils :as utils :refer [presence]]))
+   [madek.exporter.utils :as utils :refer [presence]]
+   [org.httpkit.server :as http-kit]))
 
 (def web-server (atom nil))
 
@@ -47,18 +46,29 @@
 
 ;;; Initialize ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn- http-kit-options
+  "Map Immutant-style {:port :host} to http-kit {:port :ip}."
+  [{:keys [port host]}]
+  (cond-> {:port port}
+    host (assoc :ip host)))
+
 (defn initialize [server-config app-config]
   (let [app (if-let [password (-> app-config :password presence)]
               (wrap-http-basic-auth #'web/app password)
-              #'web/app)]
+              #'web/app)
+        opts (http-kit-options server-config)]
     ; TODO replace #'web/app with app once the chrome in electron supports
     ; Basic Auth via websockets
     ; * this seems to be implemented in chrome now,
     ;  see https://bugs.chromium.org/p/chromium/issues/detail?id=123862
     ; *  Electron 1.6.8 beta still ships with chrome 56
-    (try (reset! web-server (run #'web/app server-config))
-         (logging/info "Initialized web server" server-config @web-server)
+    (try (reset! web-server (http-kit/run-server #'web/app opts))
+         (logging/info "Initialized web server" opts @web-server)
          ;(utils/os-browse uri)
+         (catch java.net.BindException e
+           (logging/warn "The port is already occupied! Opening application and bailing out!")
+           ;(utils/os-browse uri)
+           (utils/exit 0))
          (catch java.lang.RuntimeException e
            (if (instance? java.net.BindException (.getCause e))
              (do (logging/warn "The port is already occupied! Opening application and bailing out!")

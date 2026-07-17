@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euxo
+
+mkdir -p app/dev/css
+BOOTSTRAP_DIR="$(ls -d "$PWD/vendor/bootstrap-sass-"* 2>/dev/null | sort -V | tail -1)"
+if [ -z "$BOOTSTRAP_DIR" ]; then
+  BOOTSTRAP_DIR="$PWD/vendor/bootstrap"
+fi
+echo "Using Bootstrap from: $BOOTSTRAP_DIR"
+
+SASS_ARGS=(
+  -s compressed
+  --no-source-map
+  --load-path="$BOOTSTRAP_DIR/assets/stylesheets"
+)
+
+if [ "${SASS_STRICT_DEPRECATIONS:-0}" = "1" ]; then
+  echo "Sass strict mode enabled (deprecation warnings visible)"
+else
+  SASS_ARGS+=(
+    --quiet-deps
+    --silence-deprecation=import,global-builtin,color-functions,slash-div,if-function
+  )
+fi
+
+npx sass "${SASS_ARGS[@]}" \
+  electron_front/sass/site.sass app/dev/css/site.css
+
+mkdir -p app/dev/fonts/bootstrap
+cp -Lrf "$BOOTSTRAP_DIR/assets/fonts/bootstrap/". app/dev/fonts/bootstrap/
+
