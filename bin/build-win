@@ -7,6 +7,8 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/packager-tmpdir.bash"
+# shellcheck disable=SC1091
+source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/madek-exporter-version.bash"
 
 PACKAGES_DIR="./target/packages"
 OUTPUT_DIR="$PACKAGES_DIR/madek-exporter-win32-x64"
@@ -38,5 +40,7 @@ npx @electron/packager \
 
 cp -Lrf vendor/jre_win_x64/. "$OUTPUT_DIR/resources/jre"
 cp -Lf app/prod/jvm-main.jar "$OUTPUT_DIR/resources/jvm-main.jar"
+cp packaging/README.txt "$OUTPUT_DIR/README.txt"
+substitute_madek_exporter_version_in_readme "$OUTPUT_DIR/README.txt"
 
 echo "  ${OUTPUT_DIR}/"

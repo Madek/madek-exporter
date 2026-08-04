@@ -98,16 +98,22 @@ Individual packaging (after a shared prod build):
 The `:zip:` variants package the platform and create a zip in `target/dist/`.
 Linux ARM64 and macOS ARM64 builds download and verify a pinned Temurin 21 ARM64 JRE in `target/vendor-cache/`; subsequent builds reuse the cached archive.
 
+**Package `README.txt`:** every platform package/zip includes `README.txt` at the
+package root (GitHub links, log paths, Architecture, Java, and Version from
+`releases.yml`). Template: `packaging/README.txt`.
+
 **macOS artefacts:** each Mac package/zip (`madek-exporter-darwin-x64/`,
-`madek-exporter-darwin-arm64/`) includes, **beside** `madek-exporter.app` (not
-inside the bundle):
+`madek-exporter-darwin-arm64/`) also includes, **beside** `madek-exporter.app`
+(not inside the bundle):
 
-- `README.txt` — Gatekeeper “damaged” explanation for unsigned downloads
-- `remove-quarantine-lock.sh` — run **manually** after unzip
-  (`bash ./remove-quarantine-lock.sh`); it is not auto-executed when opening the app
+- Gatekeeper Fix / Longer-term sections appended into `README.txt` from
+  `packaging/mac/README.txt`
+- `remove-quarantine-lock.sh` — run **manually** after unzip (double-click in
+  Finder, or `bash ./remove-quarantine-lock.sh`); it is not auto-executed when
+  opening the app
 
-Templates are in `packaging/mac/`; copied by `bin/build-mac-os` and
-`bin/build-mac-os-arm64`. Full steps: [Debug startup from Terminal (macOS)](#debug-startup-from-terminal-macos).
+Mac packaging is done by `bin/build-mac-os` and `bin/build-mac-os-arm64`. Full
+steps: [Debug startup from Terminal (macOS)](#debug-startup-from-terminal-macos).
 
 Optional check: `npm run check:artifacts`.
 
@@ -269,7 +275,9 @@ needs Rosetta; a native ARM64 Mac with only the x64 zip often fails before any
 log file is created.
 
 Mac release zips include `README.txt` and `remove-quarantine-lock.sh` beside
-`madek-exporter.app`. After unzip, if macOS reports the app as “damaged”:
+`madek-exporter.app`. After unzip, if macOS reports the app as “damaged”,
+double-click `remove-quarantine-lock.sh`, then open the app. Otherwise from
+Terminal:
 
 ```zsh
 cd /path/to/madek-exporter-darwin-arm64   # or darwin-x64
@@ -287,7 +295,7 @@ APP="/path/to/madek-exporter.app"
 BIN="$APP/Contents/MacOS/madek-exporter"
 
 # 3) Clear Gatekeeper quarantine (common after download/AirDrop/zip)
-# Prefer: bash ./remove-quarantine-lock.sh from the unzipped package folder
+# Prefer: double-click remove-quarantine-lock.sh, or bash ./remove-quarantine-lock.sh
 # chmod: bundled JRE has read-only files; xattr needs write access
 chmod -R u+w "$APP"
 xattr -dr com.apple.quarantine "$APP"

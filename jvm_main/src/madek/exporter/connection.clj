@@ -5,7 +5,6 @@
    [json-roa.client.core :as roa]
    [logbug.catcher :as catcher]
    [logbug.debug :as debug]
-   [logbug.thrown :as thrown]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils]
    [taoensso.timbre :as timbre :refer [info debug]]))
@@ -19,30 +18,40 @@
 
 (defn connect-to-madek-server [request]
   (catcher/snatch
-   {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
+   {:return-fn (fn [e]
+                 (timbre/error e "Unexpected error while connecting to Madek")
+                 {:status 500
+                  :body {:message "Connection failed. Please try again."}})}
    (try (let [connect-body (:body request)
               url (some-> connect-body :url utils/presence)
               login (some-> connect-body :login utils/presence)
               password (some-> connect-body :password utils/presence)
+              api-token (some-> connect-body :api-token utils/presence)
               _ (debug 'connect-request
                        {:path (:uri request)
                         :has-body (map? connect-body)
                         :has-url (boolean url)
                         :has-login (boolean login)
-                        :has-password (boolean password)})
+                        :has-password (boolean password)
+                        :has-api-token (boolean api-token)})
               _ (when-not (map? connect-body)
                   (throw (ex-info "invalid connect payload" {:status 422 :message "Expected JSON object body"})))
               _ (when-not url
                   (throw (ex-info "missing url" {:status 422 :message "Missing required field: url"})))
-              _ (when (not= (boolean login) (boolean password))
+              _ (when (and login (not password))
                   (throw (ex-info "invalid credentials" {:status 422
-                                                          :message "Provide both login and password, or neither."})))
+                                                          :message "Password is required when login is provided."})))
               http-options (utils/options-to-http-options connect-body)
               api-root (roa/get-root (str url "/api/")
                                      :default-conn-opts http-options)
-              auth-info (when (:basic-auth http-options)
+              auth-info (when (utils/authenticated-http-options? http-options)
                           (-> api-root (roa/relation :auth-info) (roa/get {})))]
-          (debug 'http-options http-options)
+          (debug 'http-options
+                 (cond-> http-options
+                   (get-in http-options [:headers "authorization"])
+                   (assoc-in [:headers "authorization"] "***redacted***")
+                   (:basic-auth http-options)
+                   (assoc :basic-auth "***redacted***")))
           (debug 'api-root api-root)
           (debug 'auth-info auth-info)
           (if-not auth-info
@@ -64,13 +73,26 @@
                           (select-keys auth-info [:login :email_address])))
                   {:status 202})))))
         (catch Exception e
-          (cond
-            (= (-> e ex-data :status) 401) {:status 401
-                                            :body "Authentication failed. Check your credentials!"}
-            (= (-> e ex-data :status) 422) {:status 422
-                                            :body {:message (or (-> e ex-data :message)
-                                                                "Invalid connect request")}}
-            :else (throw e))))))
+          (let [{:keys [status message]} (ex-data e)]
+            (timbre/error e "Failed to connect to Madek")
+            (cond
+              (= status 401)
+              {:status 401
+               :body {:message "Authentication failed. Check your credentials."}}
+
+              (= status 422)
+              {:status 422
+               :body {:message (or message "Invalid connect request.")}}
+
+              (integer? status)
+              {:status 422
+               :body {:message (str "Could not connect to a Madek API at this URL. "
+                                    "Check the Madek base URL.")}}
+
+              :else
+              {:status 502
+               :body {:message (str "Could not reach the Madek server. "
+                                    "Check the URL and your network connection.")}}))))))
 
 (defn disconnect [_]
   (swap! state/db assoc-in [:connection] {}))

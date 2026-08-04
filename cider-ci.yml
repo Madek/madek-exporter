@@ -74,7 +74,7 @@ jobs:
           include:
             - cider-ci/build-and-test.yml
           scripts:
-            snapshot-release-artefacts:
+            prepare-release-infos:
               start_when:
                 build-linux has passed:
                   script_key: build-linux
@@ -89,4 +89,4 @@ jobs:
               timeout: 10 Minutes
               body: |
                 set -euo pipefail
-                ./bin/snapshot-release-artefacts
+                ./bin/prepare-release-infos

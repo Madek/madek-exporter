@@ -11,7 +11,6 @@
     [cljs-http.client :as http]
     [cljs-uuid-utils.core :as uuid]
     [cljs.core.async :refer [timeout]]
-    [fipp.edn :refer [pprint]]
     [goog.string :as gstring]
     [goog.string.format]
     [reagent.core :as r]
@@ -28,6 +27,15 @@
 
 (defn response-success? [resp]
   (<= 200 (-> resp :status) 299))
+
+(defn response-error-message [response]
+  (let [body (:body response)]
+    (or (when (map? body)
+          (or (:message body)
+              (get body "message")))
+        (when (= 0 (:status response))
+          "The local service is not reachable. Please restart the application.")
+        "The request could not be completed.")))
 
 (defn autoremove [id meta]
   (go (<! (timeout 30000))
@@ -47,10 +55,13 @@
                         req-opts)
         id (uuid/uuid-string (uuid/make-random-uuid))
         params (:json-params req)
-        params-for-log (cond-> (dissoc params :password)
+        params-for-log (cond-> (dissoc params :password :api-token)
                          (contains? params :password)
                          (assoc :password "***redacted***"
-                                :password-present (boolean (presence (:password params)))))]
+                                :password-present (boolean (presence (:password params))))
+                         (contains? params :api-token)
+                         (assoc :api-token "***redacted***"
+                                :api-token-present (boolean (presence (:api-token params)))))]
     (state/add-app-log!
       :info :request/send
       {:id id
@@ -110,25 +121,19 @@
         [:div.modal-dialog
          [:div.modal-content {:class (str "modal-" bootstrap-status)}
           [:div.modal-header
-           [:h4 (str " Request "
-                     (when-let [title (-> request :meta :title)]
-                       (str " \"" title "\" "))
-                     (case bootstrap-status
-                       :danger " ERROR "
-                       nil))
-            (-> request :response :status)]]
+           [:h4 (if (= bootstrap-status :danger)
+                  (or (-> request :meta :error-title)
+                      "Request failed")
+                  (str " Request "
+                       (when-let [title (-> request :meta :title)]
+                         (str " \"" title "\" "))
+                       (-> request :response :status)))]]
           [:div.modal-body
            (case bootstrap-status
              :success [:p (-> request :response :body)]
              :pending [:p "Please stand by!"]
-             :danger (if-let [body (-> request :response :body presence)]
-                       body
-                       [:div
-                        (when (= 0 (-> request :response :status))
-                          [:div.alert.alert-warning
-                           [:p "Request failed with status 0 (local transport error)."]
-                           [:p "The local JVM endpoint may be unreachable."]])
-                        [:pre (with-out-str (pprint request))]]))]
+             :danger [:div.alert.alert-danger
+                      [:p (response-error-message (:response request))]])]
           [:div.modal-footer
            [:div.clearfix]
            [:button.btn

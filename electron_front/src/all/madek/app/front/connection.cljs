@@ -73,12 +73,23 @@
       " " ; utf-8 m-space!
       [:span ct ]])])
 
+(defn connect-params []
+  (let [fd @form-data
+        base (select-keys fd [:url :sign-in-method :show-password])]
+    (case (or (:sign-in-method fd) :token)
+      :login (merge base (select-keys fd [:login :password]))
+      :token (merge base
+                    (when-let [token (presence (:password fd))]
+                      {:api-token token}))
+      base)))
+
 (defn connect []
   (let [req {:method :post
-             :json-params @form-data
+             :json-params (connect-params)
              :path "/connect"}]
     (request/send-off
-      req {:title "Connect!"})))
+      req {:title "Connect!"
+           :error-title "Connection failed"})))
 
 
 ;;; disconnect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -6,6 +6,8 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/packager-tmpdir.bash"
+# shellcheck disable=SC1091
+source "$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env/madek-exporter-version.bash"
 
 PACKAGES_DIR="./target/packages"
 OUTPUT_DIR="$PACKAGES_DIR/madek-exporter-darwin-arm64"
@@ -140,7 +142,8 @@ if [[ ! -e "$OUTPUT_DIR/madek-exporter.app/Contents/Resources/jre/bin/java" ]]; 
   exit 1
 fi
 
-cp packaging/mac/README.txt "$OUTPUT_DIR/README.txt"
+cat packaging/README.txt packaging/mac/README.txt > "$OUTPUT_DIR/README.txt"
+substitute_madek_exporter_version_in_readme "$OUTPUT_DIR/README.txt"
 cp packaging/mac/remove-quarantine-lock.sh "$OUTPUT_DIR/remove-quarantine-lock.sh"
 chmod +x "$OUTPUT_DIR/remove-quarantine-lock.sh"
 

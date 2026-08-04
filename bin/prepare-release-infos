@@ -10,7 +10,7 @@
 #   ./bin/fetch-server-artefacts <user@host> /var/tmp/madek-exporter-artefacts-<job-id>
 #
 # Usage (from repo root, after platform zips exist):
-#   ./bin/snapshot-release-artefacts
+#   ./bin/prepare-release-infos
 set -euo pipefail
 
 REQUIRED_ZIPS=(
@@ -67,7 +67,7 @@ TOP_ENTRY="$(
 )"
 
 echo "============================================================"
-echo "Release artefacts snapshotted for manual GitHub release"
+echo "You have to create gh-release manually, below are all necessary infos that are required"
 echo "============================================================"
 echo
 echo "--- Top releases.yml entry (version ${VERSION}) ---"

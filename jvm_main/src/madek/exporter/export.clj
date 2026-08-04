@@ -12,7 +12,7 @@
    [madek.exporter.export.meta-data :as meta-data :refer [meta-data write-meta-data]]
    [madek.exporter.export.meta-data-schema :as meta-data-schema]
    [madek.exporter.state :as state]
-   [madek.exporter.utils :refer [deep-merge presence]]
+   [madek.exporter.utils :refer [authenticated-http-options? deep-merge presence]]
    [taoensso.timbre :as logging :refer [debug]])
 
   (:import
@@ -104,8 +104,7 @@
 (defn download-media-entries-for-set [id target-dir-path skip-media-files? prefix-meta-key
                                       api-entry-point api-http-opts]
   (let [me-get-opts (merge {:collection_id id}
-                           (if (or (:basic-auth api-http-opts)
-                                   (-> api-http-opts :cookies (get "madek-session")))
+                           (if (authenticated-http-options? api-http-opts)
                              {:me_get_full_size "true"}
                              {:public_get_full_size "true"}))]
     (doseq [me-rel (I> identity-with-logging
@@ -118,8 +117,7 @@
 
 (defn download-collections-for-collection [collection target-dir-path recursive? skip-media-files?
                                            prefix-meta-key api-entry-point api-http-opts]
-  (let [coll-get-opts (if (or (:basic-auth api-http-opts)
-                              (-> api-http-opts :cookies (get "madek-session")))
+  (let [coll-get-opts (if (authenticated-http-options? api-http-opts)
                         {:me_get_metadata_and_previews "true"}
                         {:public_get_metadata_and_previews "true"})]
     (doseq [collection (I>> identity-with-logging

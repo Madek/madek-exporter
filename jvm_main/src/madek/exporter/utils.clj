@@ -40,17 +40,21 @@
               (clojure.core/str "Basic " encoded)))]
     (let [login (some-> options :login presence)
           password (some-> options :password presence)
-          session-token (some-> options :session-token presence)]
+          api-token (some-> options :api-token presence)]
       (cond
         (and login password)
         {:basic-auth [login password]
          :headers {"authorization" (basic-auth-header login password)}}
 
-        session-token
-        {:headers {"authorization" (clojure.core/str "Bearer " session-token)}}
+        api-token
+        {:headers {"authorization" (clojure.core/str "token " api-token)}}
 
         :else
         {}))))
+
+(defn authenticated-http-options? [http-options]
+  (boolean (or (:basic-auth http-options)
+               (some-> http-options :headers (clojure.core/get "authorization") presence))))
 
 (defn str
   "Like clojure.core/str but maps keywords to strings without preceding colon."

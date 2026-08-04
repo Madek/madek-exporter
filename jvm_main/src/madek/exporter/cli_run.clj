@@ -35,7 +35,7 @@
 
 (defn run [options]
   (info 'run options)
-  (connect-to-madek-server {:body {:password (:token options)
+  (connect-to-madek-server {:body {:api-token (:token options)
                                    :url (:madek-url options)}})
   (info 'state/db @state/db)
   (when-let [media-entry-id (:media-entry-id options)]
