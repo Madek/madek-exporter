@@ -7,7 +7,7 @@ GitHub
 ------
 
   Repository:  https://github.com/Madek/madek-exporter
-  Releases:    https://github.com/Madek/madek-exporter/releases
+  Releases:    https://github.com/Madek/madek-exporter/releases/tag/__MADEK_EXPORTER_VERSION__
   Issues:      https://github.com/Madek/madek-exporter/issues
 
 Log files
