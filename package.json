@@ -18,6 +18,8 @@
     "build:mac:arm64:zip:prod": "./bin/build-mac-os-arm64-zip",
     "build:linux:zip:prod": "./bin/build-linux-zip",
     "build:linux:arm64:zip:prod": "./bin/build-linux-arm64-zip",
+    "build:linux:deb:prod": "./bin/build-linux-x64-deb",
+    "build:linux:arm64:deb:prod": "./bin/build-linux-arm64-deb",
     "build:win:zip:prod": "./bin/build-win-zip",
     "build:prod": "./bin/build-electron-prod && ./bin/build-jvm-main-prod && ./bin/build-mac-os && ./bin/build-mac-os-arm64",
     "build:all:prod": "./bin/build-clean && ./bin/build-all-platforms",

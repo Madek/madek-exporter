@@ -120,7 +120,10 @@ scripts:
       set -euo pipefail
       ./bin/with-node22 ./bin/build-linux
       mkdir -p target/dist
-      ./bin/zip-tree target/dist/Madek-Exporter_Linux-x64.zip target/packages/madek-exporter-linux-x64
+      ./bin/build-linux-deb \
+        target/packages/madek-exporter-linux-x64 \
+        amd64 \
+        target/dist/Madek-Exporter_Linux-x64.deb
     start_when:
       missing libs installed:
         script_key: install-missing-libs
@@ -131,7 +134,10 @@ scripts:
       set -euo pipefail
       ./bin/with-node22 ./bin/build-linux-arm64
       mkdir -p target/dist
-      ./bin/zip-tree target/dist/Madek-Exporter_Linux-ARM64.zip target/packages/madek-exporter-linux-arm64
+      ./bin/build-linux-deb \
+        target/packages/madek-exporter-linux-arm64 \
+        arm64 \
+        target/dist/Madek-Exporter_Linux-ARM64.deb
     start_when:
       missing libs installed:
         script_key: install-missing-libs

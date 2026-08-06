@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Madek Exporter
+Comment=Export media from Madek
+Terminal=false
+Categories=Utility;
+# %k may be a path or a file:// URI; strip the prefix, then run the launcher beside this file.
+Exec=/bin/sh -c "desktop=\"%k\"; desktop=\"${desktop#file://}\"; dir=\"$(dirname \"$(readlink -f \"$desktop\")\")\"; export MADEK_EXPORTER_FOREGROUND=1; exec \"$dir/madek-exporter\""

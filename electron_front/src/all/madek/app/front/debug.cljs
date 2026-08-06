@@ -80,6 +80,6 @@
 
 (defn page []
   [:div.debug
-   [:h1 "Debug"]
+   [:h3 "Debug"]
    [content]
    ])

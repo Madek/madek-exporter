@@ -7,36 +7,63 @@
     [madek.app.front.connection :as connection]
     [madek.app.front.release]
     [madek.app.front.request :as request]
-    [madek.app.front.routes :as routes]
     [madek.app.front.state :as state]
     [madek.app.front.utils :refer [str keyword deep-merge]]
 
     [accountant.core :as accountant]
+    [cljs.nodejs :as nodejs]
     [reagent.core :as reagent :refer [atom]]
     [secretary.core :as secretary :include-macros true :refer [defroute]]
     ))
+
+(def Electron (nodejs/require "electron"))
+
+(def shell (.-shell Electron))
+
+(def github-repo-url "https://github.com/Madek/madek-exporter")
+
+(defn- nav-link [path label & [attrs]]
+  [:a (merge {:href path
+              :on-click (fn [e]
+                          (.preventDefault e)
+                          (accountant/navigate! path))}
+             attrs)
+   label])
+
+(defn- nav-item [path label]
+  [:li {:class (when (= @state/current-path path) "active")}
+   [nav-link path label]])
+
+(defn- external-link [url label & [attrs]]
+  [:a (merge {:href url
+              :on-click (fn [e]
+                          (.preventDefault e)
+                          (.openExternal shell url))}
+             attrs)
+   label])
 
 (defn naviagation []
   [:nav.navbar.navbar-inverse
    [:div.container-fluid
     [:div.navbar-header
-     [:a.navbar-brand {:href (routes/about-page)} "Madek-Exporter"]]
+     [external-link github-repo-url "Madek-Exporter" {:class "navbar-brand"}]]
     [:ul.navbar-nav.nav
-     [:li [:a {:href (routes/connection-page)} "Connection"]]
-     [:li [:a {:href (routes/download-page)} "Export"]]
-     [:li [:a {:href (routes/debug-page)} "Debug"]]]
+     [nav-item "/connection" "Connection"]
+     [nav-item "/download" "Export"]
+     [nav-item "/debug" "Debug"]
+     [nav-item "/help" "Help"]]
     [:ul.nav.navbar-nav.navbar-right
      [:li
       [:a [connection/compact-component]]]]]])
 
 (defn root-component []
-  [:div.container-fluid
+  [:div
    [request/modal]
    [naviagation]
-   [madek.app.front.release/update-available-alert-component]
-   (when-let [page @state/current-page]
-     [:div.page [page]])])
-
+   [:div.container-fluid
+    [madek.app.front.release/update-available-alert-component]
+    (when-let [page @state/current-page]
+      [:div.page [page]])]])
 (defn mount-root []
   (reagent/render [root-component]
                   (.getElementById js/document "app")))

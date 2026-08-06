@@ -1,0 +1,287 @@
+#!/usr/bin/env bash
+# Pack an already-built Linux Electron package directory into a .deb.
+# Usage: bin/build-linux-deb <package-dir> <amd64|arm64> <output.deb>
+#
+# Portable: uses tar + Python to write a GNU ar archive (no dpkg-deb required).
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$PROJECT_DIR"
+
+# shellcheck disable=SC1091
+source "$PROJECT_DIR/bin/env/madek-exporter-version.bash"
+
+PKG_DIR="${1:?package directory required}"
+DEB_ARCH="${2:?deb architecture required (amd64|arm64)}"
+OUT_DEB="${3:?output .deb path required}"
+
+case "$DEB_ARCH" in
+  amd64|arm64) ;;
+  *)
+    echo "ERROR: unsupported deb architecture: $DEB_ARCH (use amd64 or arm64)" >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! -d "$PKG_DIR" ]]; then
+  echo "ERROR: package directory not found: $PKG_DIR" >&2
+  exit 1
+fi
+if [[ ! -x "$PKG_DIR/madek-exporter" ]] || [[ ! -x "$PKG_DIR/madek-exporter.bin" ]]; then
+  echo "ERROR: $PKG_DIR is missing madek-exporter launcher or madek-exporter.bin" >&2
+  exit 1
+fi
+
+# Debian version: map semver pre-release dash to ~ (e.g. 0.11.0-3 → 0.11.0~3).
+# Quote the tilde so bash does not expand it to $HOME.
+DEB_VERSION="${MADEK_EXPORTER_VERSION//-/\~}"
+
+STAGE="$(mktemp -d "${TMPDIR:-/tmp}/madek-deb.XXXXXX")"
+cleanup() { rm -rf "$STAGE"; }
+trap cleanup EXIT
+
+DATA="$STAGE/data"
+CTRL="$STAGE/control"
+mkdir -p "$DATA/opt/madek-exporter" \
+  "$DATA/usr/share/applications" \
+  "$DATA/usr/bin" \
+  "$CTRL"
+
+# App tree (disable macOS AppleDouble sidecars during copy)
+export COPYFILE_DISABLE=1
+cp -a "$PKG_DIR"/. "$DATA/opt/madek-exporter/"
+# Drop any AppleDouble / Finder junk that would confuse dpkg.
+find "$DATA" \( -name '._*' -o -name '.DS_Store' \) -delete 2>/dev/null || true
+
+# Menu entry (/opt launcher always execs in-foreground)
+cat > "$DATA/usr/share/applications/madek-exporter.desktop" <<'EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Madek Exporter
+Comment=Export media from Madek
+Terminal=false
+Categories=Utility;
+Exec=/opt/madek-exporter/madek-exporter
+EOF
+
+# PATH wrapper (not a symlink) so `madek-exporter` always foreground-execs
+cat > "$DATA/usr/bin/madek-exporter" <<'EOF'
+#!/bin/sh
+exec /opt/madek-exporter/madek-exporter "$@"
+EOF
+chmod 755 "$DATA/usr/bin/madek-exporter"
+
+# Force traversable dirs + executable launchers/JRE before packing (avoids
+# Permission denied after install when modes were lost on copy/pack).
+find "$DATA" -type d -exec chmod 755 {} \;
+chmod 755 \
+  "$DATA/opt/madek-exporter/madek-exporter" \
+  "$DATA/opt/madek-exporter/madek-exporter.bin" \
+  "$DATA/opt/madek-exporter/chrome_crashpad_handler" \
+  "$DATA/usr/bin/madek-exporter" 2>/dev/null || true
+if [[ -d "$DATA/opt/madek-exporter/resources/jre/bin" ]]; then
+  chmod 755 "$DATA/opt/madek-exporter/resources/jre/bin"/*
+fi
+find "$DATA/opt/madek-exporter" -type f \( -name '*.so' -o -name '*.so.*' \) \
+  -exec chmod 755 {} \; 2>/dev/null || true
+
+INSTALLED_SIZE="$(du -sk "$DATA" | awk '{ print $1 }')"
+
+cat > "$CTRL/control" <<EOF
+Package: madek-exporter
+Version: ${DEB_VERSION}
+Section: utils
+Priority: optional
+Architecture: ${DEB_ARCH}
+Maintainer: Madek <madek-support@zhdk.ch>
+Installed-Size: ${INSTALLED_SIZE}
+Depends: libgtk-3-0 | libgtk-3-0t64, libnotify4, libnss3, libxss1, libxtst6, libatspi2.0-0, libdrm2, libgbm1, libasound2 | libasound2t64, xdg-utils
+Homepage: https://github.com/Madek/madek-exporter
+Description: Desktop exporter for Madek media archives
+ Madek Exporter downloads and exports media and metadata from a Madek
+ instance. This package installs the application under /opt/madek-exporter
+ and a menu entry for Debian/Ubuntu.
+EOF
+
+cat > "$CTRL/postinst" <<'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+  # Ensure users can traverse /opt/madek-exporter and run the launchers/JVM.
+  chmod 755 /opt /opt/madek-exporter 2>/dev/null || true
+  find /opt/madek-exporter -type d -exec chmod 755 {} \; 2>/dev/null || true
+  chmod 755 /opt/madek-exporter/madek-exporter \
+    /opt/madek-exporter/madek-exporter.bin \
+    /opt/madek-exporter/chrome_crashpad_handler 2>/dev/null || true
+  if [ -d /opt/madek-exporter/resources/jre/bin ]; then
+    chmod 755 /opt/madek-exporter/resources/jre/bin/* 2>/dev/null || true
+  fi
+  find /opt/madek-exporter -type f \( -name '*.so' -o -name '*.so.*' -o -name '*.bin' \) \
+    -exec chmod 755 {} \; 2>/dev/null || true
+  if [ -f /opt/madek-exporter/chrome-sandbox ]; then
+    chown root:root /opt/madek-exporter/chrome-sandbox || true
+    chmod 4755 /opt/madek-exporter/chrome-sandbox || true
+  fi
+fi
+exit 0
+EOF
+chmod 755 "$CTRL/postinst"
+
+printf '2.0\n' > "$STAGE/debian-binary"
+
+mkdir -p "$(dirname "$OUT_DEB")"
+rm -f "$OUT_DEB"
+
+# Prefer system interpreters; asdf/mise shims fail without a pinned python in .tool-versions.
+find_python() {
+  local c
+  for c in \
+    /usr/bin/python3 \
+    /usr/bin/python3.12 \
+    /usr/bin/python3.11 \
+    /usr/bin/python3.10 \
+    /usr/bin/python3.9 \
+    /usr/bin/python3.8 \
+    /bin/python3
+  do
+    if [[ -x "$c" ]]; then
+      echo "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+PYTHON_BIN="$(find_python)" || {
+  echo "ERROR: need /usr/bin/python3 (or similar) to build .deb" >&2
+  exit 1
+}
+
+# Build control/data tarballs with Python GNU tar (macOS bsdtar PaxHeaders
+# cause dpkg "corrupted filesystem tarfile"), then pack a classic .deb ar.
+"$PYTHON_BIN" - "$CTRL" "$DATA" "$STAGE/debian-binary" "$OUT_DEB" <<'PY'
+import os
+import sys
+import tarfile
+
+ctrl_dir, data_dir, debian_binary, out_path = sys.argv[1:5]
+stage = os.path.dirname(debian_binary)
+control_tar = os.path.join(stage, "control.tar.gz")
+data_tar = os.path.join(stage, "data.tar.gz")
+
+
+def skip_name(name: str) -> bool:
+    base = os.path.basename(name)
+    return base.startswith("._") or base == ".DS_Store"
+
+
+def force_exec_mode(arcname: str, mode: int) -> int:
+    base = os.path.basename(arcname)
+    if base in (
+        "madek-exporter",
+        "madek-exporter.bin",
+        "chrome_crashpad_handler",
+        "chrome-sandbox",
+        "java",
+        "jspawnhelper",
+    ):
+        return 0o755 if base != "chrome-sandbox" else 0o4755
+    if base.endswith(".so") or ".so." in base:
+        return 0o755
+    # Preserve exec bit when already set; otherwise leave mode as-is.
+    if mode & 0o111:
+        return (mode & ~0o777) | 0o755
+    return mode
+
+
+def add_tree(tf: tarfile.TarFile, root: str) -> None:
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if not skip_name(d)]
+        rel_dir = os.path.relpath(dirpath, root)
+        if rel_dir == ".":
+            arc_dir = "."
+        else:
+            arc_dir = "./" + rel_dir.replace(os.sep, "/")
+        # directory entry
+        if arc_dir != ".":
+            info = tf.gettarinfo(dirpath, arcname=arc_dir)
+            info.uid = 0
+            info.gid = 0
+            info.uname = "root"
+            info.gname = "root"
+            info.mode = 0o755
+            tf.addfile(info)
+        for name in sorted(filenames):
+            if skip_name(name):
+                continue
+            path = os.path.join(dirpath, name)
+            if rel_dir == ".":
+                arc = "./" + name
+            else:
+                arc = "./" + rel_dir.replace(os.sep, "/") + "/" + name
+            if os.path.islink(path):
+                info = tf.gettarinfo(path, arcname=arc)
+                info.uid = 0
+                info.gid = 0
+                info.uname = "root"
+                info.gname = "root"
+                tf.addfile(info)
+            elif os.path.isfile(path):
+                info = tf.gettarinfo(path, arcname=arc)
+                info.uid = 0
+                info.gid = 0
+                info.uname = "root"
+                info.gname = "root"
+                info.mode = force_exec_mode(arc, info.mode)
+                with open(path, "rb") as f:
+                    tf.addfile(info, f)
+
+
+# Explicit control members (modes matter for postinst).
+with tarfile.open(control_tar, "w:gz", format=tarfile.GNU_FORMAT) as tf:
+    for name, mode in (("control", 0o644), ("postinst", 0o755)):
+        path = os.path.join(ctrl_dir, name)
+        info = tarfile.TarInfo(name=name)
+        info.size = os.path.getsize(path)
+        info.mode = mode
+        info.uid = 0
+        info.gid = 0
+        info.uname = "root"
+        info.gname = "root"
+        info.mtime = 0
+        with open(path, "rb") as f:
+            tf.addfile(info, f)
+
+with tarfile.open(data_tar, "w:gz", format=tarfile.GNU_FORMAT) as tf:
+    add_tree(tf, data_dir)
+
+
+def add_member(out, name: str, data: bytes) -> None:
+    header = (
+        f"{name:<16}"
+        f"{0:<12}"
+        f"{0:<6}"
+        f"{0:<6}"
+        f"{0o100644:<8}"
+        f"{len(data):<10}"
+        "`\n"
+    ).encode("ascii")
+    if len(header) != 60:
+        raise SystemExit(f"bad ar header length for {name}: {len(header)}")
+    out.write(header)
+    out.write(data)
+    if len(data) % 2 == 1:
+        out.write(b"\n")
+
+
+with open(out_path, "wb") as out:
+    out.write(b"!<arch>\n")
+    for path in (debian_binary, control_tar, data_tar):
+        name = os.path.basename(path)
+        with open(path, "rb") as f:
+            add_member(out, name, f.read())
+print(out_path)
+PY
+
+echo "  ${OUT_DEB}"

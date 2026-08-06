@@ -48,7 +48,12 @@
                    toggle-deftools-subitem
                    {:type "separator"}
                    new-window-subitem
-                   ]}]
+                   ]}
+        {:label "Help"
+         :submenu [{:label "Login help"
+                    :click (fn [_ win _]
+                             (when win
+                               (.send (.-webContents win) "madek:navigate" "/help")))}]}]
        (filter identity)))
 
 (.log js/console "menu" (clj->js menu-template))

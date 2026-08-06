@@ -3,6 +3,7 @@
     [madek.app.front.state.jvm-sync :as jvm-sync]
     [madek.app.front.state.electron-main-sync :as electron-main-sync]
 
+    [accountant.core :as accountant]
     [cljs-uuid-utils.core :as uuid]
     [cljs.core.async :as async :refer (<! >! put! chan)]
     [cljs.nodejs :as nodejs]
@@ -17,6 +18,8 @@
 ;### dbs ######################################################################
 
 (defonce current-page (reagent/atom nil))
+
+(defonce current-path (reagent/atom "/connection"))
 
 (defonce jvm-main-db (reagent/atom {}))
 
@@ -57,4 +60,8 @@
          (jvm-sync/init jvm-main-db client-db opts)
          )))
 
+(.on (.-ipcRenderer Electron) "madek:navigate"
+     (fn [_ path]
+       (when path
+         (accountant/navigate! path))))
 

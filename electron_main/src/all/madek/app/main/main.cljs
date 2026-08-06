@@ -35,6 +35,11 @@
 (.appendSwitch (.-commandLine app) "disable-gpu")
 (.appendSwitch (.-commandLine app) "in-process-gpu")
 
+;; Zip-distributed Linux builds cannot ship a working setuid chrome-sandbox.
+(when (= (.-platform nodejs/process) "linux")
+  (.appendSwitch (.-commandLine app) "no-sandbox")
+  (.appendSwitch (.-commandLine app) "disable-setuid-sandbox"))
+
 (.log js/console "__dirname" (js* "__dirname"))
 
 (defn -main []
@@ -46,6 +51,12 @@
     (do
       (file-log/log! "INFO" (str "Start Madek application on " (.type Os) "."))
       (file-log/log! "INFO" "GPU disabled (disableHardwareAcceleration, disable-gpu, in-process-gpu)")
+      (when (= (.-platform nodejs/process) "linux")
+        (file-log/log! "INFO" "Linux sandbox disabled (no-sandbox, disable-setuid-sandbox)"))
+      (.on app "second-instance"
+           (fn [_args _working-directory]
+             (file-log/log! "INFO" "second-instance; focusing existing window")
+             (madek.app.main.windows/focus-any)))
       (.start crash-reporter
               (clj->js
                 {:productName "Madek"

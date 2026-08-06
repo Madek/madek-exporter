@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+./bin/build-linux-arm64
+mkdir -p target/dist
+./bin/build-linux-deb \
+  target/packages/madek-exporter-linux-arm64 \
+  arm64 \
+  target/dist/Madek-Exporter_Linux-ARM64.deb

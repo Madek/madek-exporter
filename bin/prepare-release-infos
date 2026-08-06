@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Snapshot Madek-Exporter release zips out of the ephemeral CI working tree and
+# Snapshot Madek-Exporter release artefacts out of the ephemeral CI working tree and
 # print info for creating a GitHub release manually.
 #
-# Copies target/dist/Madek-Exporter_*.zip to a flat dir under world-writable /var/tmp
+# Copies target/dist/Madek-Exporter_* to a flat dir under world-writable /var/tmp
 # (ci-exec-user cannot mkdir under a root-owned nested parent):
 #   /var/tmp/madek-exporter-artefacts-<job-id>/
 #
 # Then a developer can fetch with:
 #   ./bin/fetch-server-artefacts <user@host> /var/tmp/madek-exporter-artefacts-<job-id>
 #
-# Usage (from repo root, after platform zips exist):
+# Usage (from repo root, after platform packages exist):
 #   ./bin/prepare-release-infos
 set -euo pipefail
 
-REQUIRED_ZIPS=(
-  Madek-Exporter_Linux-x64.zip
-  Madek-Exporter_Linux-ARM64.zip
+REQUIRED_ARTEFACTS=(
+  Madek-Exporter_Linux-x64.deb
+  Madek-Exporter_Linux-ARM64.deb
   Madek-Exporter_Mac-OS-x64.zip
   Madek-Exporter_Mac-OS-ARM64.zip
   Madek-Exporter_Windows.zip
@@ -38,16 +38,17 @@ fail() {
 [[ -d "$DIST_DIR" ]] || fail "missing ${DIST_DIR}"
 
 missing=0
-for zip in "${REQUIRED_ZIPS[@]}"; do
-  if [[ ! -f "${DIST_DIR}/${zip}" ]]; then
-    echo "ERROR: missing ${DIST_DIR}/${zip}" >&2
+for artefact in "${REQUIRED_ARTEFACTS[@]}"; do
+  if [[ ! -f "${DIST_DIR}/${artefact}" ]]; then
+    echo "ERROR: missing ${DIST_DIR}/${artefact}" >&2
     missing=1
   fi
 done
-[[ "$missing" -eq 0 ]] || fail "incomplete release zip set in ${DIST_DIR}"
+[[ "$missing" -eq 0 ]] || fail "incomplete release artefact set in ${DIST_DIR}"
 
 mkdir -p "$BACKUP_DIR"
 cp -a "${DIST_DIR}"/Madek-Exporter_*.zip "$BACKUP_DIR"/
+cp -a "${DIST_DIR}"/Madek-Exporter_*.deb "$BACKUP_DIR"/
 
 VERSION="$(
   ruby -ryaml -e '
@@ -59,31 +60,46 @@ VERSION="$(
   '
 )"
 
-TOP_ENTRY="$(
-  ruby -ryaml -e '
-    release = YAML.load_file("releases.yml").first
-    puts YAML.dump(release)
-  '
-)"
+# Print top entry with Notes split out (EXPECTED-LOG style).
+ruby -ryaml -e '
+  release = YAML.load_file("releases.yml").first
+  version = ARGV[0]
+  desc = release["description"].to_s
+  features, notes = desc.split(/\n[ \t]*Notes\n[ \t]*-+\n/, 2)
+  release["description"] = features.to_s.rstrip + "\n"
+  notes = notes.to_s.strip
+  # YAML folded block strips indent; restore the two-space bullet indent used in dumps.
+  notes = notes.split("\n", -1).map { |l| l.strip.empty? ? "" : "  #{l.lstrip}" }.join("\n")
 
-echo "============================================================"
-echo "You have to create gh-release manually, below are all necessary infos that are required"
-echo "============================================================"
-echo
-echo "--- Top releases.yml entry (version ${VERSION}) ---"
-echo "${TOP_ENTRY}"
+  puts "============================================================"
+  puts "You have to create gh-release manually, below are all necessary infos that are required"
+  puts "============================================================"
+  puts
+  puts "--- Top releases.yml entry (version #{version}) ---"
+  print YAML.dump(release)
+  if !notes.empty?
+    puts
+    puts "--- Notes ---"
+    puts
+    puts notes
+    puts
+  end
+' "${VERSION}"
+
 echo "--- Paths ---"
+echo
 echo "Executor:            ${EXECUTOR}"
 echo "Source (ephemeral):  ${DIST_DIR}"
 echo "Backup (durable):    ${BACKUP_DIR}"
 echo
-echo "Zips in backup:"
-ls -lah "${BACKUP_DIR}"/Madek-Exporter_*.zip
+echo "Artefacts in backup:"
+ls -lah "${BACKUP_DIR}"/Madek-Exporter_*
 echo
 RELEASE_DRAFT_URL="https://github.com/Madek/madek-exporter/releases/new?tag=${VERSION}&title=${VERSION}"
 
 echo "Next steps:"
 echo "  1. Fetch:  ./bin/fetch-server-artefacts <user@${EXECUTOR}> ${BACKUP_DIR}"
 echo "  2. Draft release (creates tag): ${RELEASE_DRAFT_URL}"
-echo "  3. Attach the zips to the draft and publish."
+echo "  3. Attach the artefacts to the draft and publish."
+echo
 echo "============================================================"

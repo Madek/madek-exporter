@@ -24,17 +24,36 @@
   (fn [_ _ _ new-state]
     (.log js/console "windows changed" (-> new-state keys clj->js))))
 
+(defn- show-and-focus [window]
+  (when window
+    (when (.isMinimized window)
+      (.restore window))
+    (.show window)
+    (.focus window)))
+
+(defn focus-any []
+  (when-let [win-a (->> @windows vals first)]
+    (show-and-focus (:window @win-a))))
+
 (defn open-new []
   (let [id (-> (uuid/make-random-uuid) uuid/uuid-string)
         window (BrowserWindow. (clj->js {:width 800 :height 600
                                          :show false
                                          :webPreferences {:nodeIntegration true
                                                           :contextIsolation false}}))
-        index-html-path (str env/app-dir "/index.html")]
+        index-html-path (str env/app-dir "/index.html")
+        shown? (atom false)
+        ensure-shown (fn []
+                       (when (compare-and-set! shown? false true)
+                         (show-and-focus window)))]
     (.log js/console "index-html-path" index-html-path)
     (.loadURL window (str "file://" index-html-path))
     (swap! windows assoc id (atom {:window window}))
-    (.once window "ready-to-show" (fn [] (.show window)))
+    ;; ready-to-show can fail to fire on some Linux/Wayland file-manager launches;
+    ;; also show on did-finish-load and a short timeout so the first click works.
+    (.once window "ready-to-show" ensure-shown)
+    (.once (.-webContents window) "did-finish-load" ensure-shown)
+    (js/setTimeout ensure-shown 2000)
     (.on (.-webContents window) "dom-ready"
          (fn []
            (.send (.-webContents window) "madek:jvm-sync:init"

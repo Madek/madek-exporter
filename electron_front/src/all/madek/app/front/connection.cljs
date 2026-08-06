@@ -124,7 +124,7 @@
 (defn login-form-component []
   (when (= @sign-in-method* :login)
     [:div.form-group
-     [:label {:for "login"} "Login | e-mail address | api-client name"]
+     [:label {:for "login"} "Login | api-client name"]
      [:input.login.form-control
       {:type "text"
        :placeholder "Login"
@@ -239,7 +239,7 @@
 
 (defn page []
   [:div.connection
-   [:h1 "Connection"]
+   [:h3 "Connection"]
    [connection-status-component]
    (if-not @connected?*
      [connect-form]

@@ -30,7 +30,9 @@ pkill -f "jvm-main.jar" >/dev/null 2>&1 || true
 pkill -f "madek-exporter.app/Contents/MacOS/madek-exporter" >/dev/null 2>&1 || true
 
 rm -f "$LOG_FILE"
-"$APP_BIN" >"$LOG_FILE" 2>&1 &
+# Linux zip entrypoint backgrounds by default; keep the process in-foreground
+# so this script can track the Electron PID and its JVM child.
+MADEK_EXPORTER_FOREGROUND=1 "$APP_BIN" >"$LOG_FILE" 2>&1 &
 PID=$!
 APP_PID="$PID"
 

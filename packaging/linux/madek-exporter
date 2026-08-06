@@ -1,0 +1,27 @@
+#!/bin/sh
+# Zip installs cannot ship a working setuid chrome-sandbox, and Electron on
+# Ubuntu Wayland often creates an invisible window. Pass flags before Chromium
+# starts (app.commandLine.appendSwitch is too late for the SUID check).
+#
+# Packaged installs under /opt/madek-exporter always exec in-foreground so the
+# desktop session keeps DISPLAY/Wayland. Portable zips outside /opt default to
+# setsid (file-manager "Run as a Program"). Set MADEK_EXPORTER_FOREGROUND=1 to
+# force exec anywhere (CI smoke-run).
+set -eu
+DIR=$(dirname "$(readlink -f "$0")")
+cd "$DIR" || exit 1
+export ELECTRON_OZONE_PLATFORM_HINT=x11
+BIN="$DIR/madek-exporter.bin"
+set -- "$BIN" \
+  --no-sandbox \
+  --disable-setuid-sandbox \
+  --ozone-platform=x11 \
+  "$@"
+
+if [ "${MADEK_EXPORTER_FOREGROUND:-}" = 1 ] || [ "$DIR" = "/opt/madek-exporter" ]; then
+  exec "$@"
+fi
+
+LOG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/Madek/logs"
+mkdir -p "$LOG_DIR"
+setsid "$@" </dev/null >>"$LOG_DIR/launcher.log" 2>&1 &

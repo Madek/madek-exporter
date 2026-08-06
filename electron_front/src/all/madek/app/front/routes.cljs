@@ -4,6 +4,7 @@
     [madek.app.front.connection]
     [madek.app.front.debug]
     [madek.app.front.download]
+    [madek.app.front.help]
     [madek.app.front.state]
 
     [accountant.core :as accountant]
@@ -11,16 +12,24 @@
     ))
 
 (defroute about-page "/about" []
-  (reset! madek.app.front.state/current-page madek.app.front.about/page))
+  (reset! madek.app.front.state/current-page madek.app.front.about/page)
+  (reset! madek.app.front.state/current-path "/about"))
 
 (defroute connection-page "/connection" []
-  (reset! madek.app.front.state/current-page madek.app.front.connection/page))
+  (reset! madek.app.front.state/current-page madek.app.front.connection/page)
+  (reset! madek.app.front.state/current-path "/connection"))
 
 (defroute download-page "/download" []
-  (reset! madek.app.front.state/current-page madek.app.front.download/page))
+  (reset! madek.app.front.state/current-page madek.app.front.download/page)
+  (reset! madek.app.front.state/current-path "/download"))
 
 (defroute debug-page "/debug" []
-  (reset! madek.app.front.state/current-page madek.app.front.debug/page))
+  (reset! madek.app.front.state/current-page madek.app.front.debug/page)
+  (reset! madek.app.front.state/current-path "/debug"))
+
+(defroute help-page "/help" []
+  (reset! madek.app.front.state/current-page madek.app.front.help/page)
+  (reset! madek.app.front.state/current-path "/help"))
 
 
 ; under windows the paths somehow come es e.g. "/C:/about" instead
@@ -31,7 +40,9 @@
 
 (defn init []
   (accountant/configure-navigation!
-    {:nav-handler (fn [path] (-> path fix-path secretary/dispatch!))
+    {:nav-handler (fn [path]
+                    (let [path (fix-path path)]
+                      (when (secretary/locate-route path)
+                        (secretary/dispatch! path))))
      :path-exists? (fn [path] (-> path fix-path secretary/locate-route))})
-  (secretary/dispatch! "/connection")
-  (accountant/dispatch-current!))
+  (accountant/navigate! "/connection"))

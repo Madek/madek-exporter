@@ -27,9 +27,9 @@
     [:li
      [:span "Electron modules"]
      [:ul
-      (for [[k v] (-> nodejs/process .-versions js->clj)]
-        [:li {:key k}(str k ": " v)])]
-     [:span.code (-> nodejs/process .-versions js->clj)]]
+      (doall
+        (for [[k v] (js->clj (.-versions nodejs/process))]
+          [:li {:key (str k)} (str k ": " v)]))]]
     [:li
      [:span "Chrome version: "]
      [:span.code (.-appVersion js/navigator)]]]])

@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Fetch Madek-Exporter zips from a Cider executor into target/server-artefacts/.
+# Fetch Madek-Exporter release artefacts from a Cider executor into
+# target/server-artefacts/.
 #
 # Timing (important):
 #   Run this soon after the platform *build* jobs in the Cider trial have finished
-#   (mac/linux/win package + zip steps). Do *not* wait for the whole trial to
+#   (mac/linux/win package steps). Do *not* wait for the whole trial to
 #   complete — the executor cleans /ramdisk/ci-working-dir shortly after, and the
-#   dist zips disappear.
+#   dist artefacts disappear.
 #
-#   This script therefore copies the zips on the executor into a durable backup
+#   This script therefore copies the artefacts on the executor into a durable backup
 #   under /var/tmp/madek-exporter-artefacts-<job-id>/ first, then rsyncs from that
 #   backup. You can re-fetch later from an existing backup path without touching
 #   the (possibly already cleaned) ramdisk working tree.
@@ -29,7 +30,7 @@
 #                              /var/tmp/madek-exporter-artefacts/<uuid>  (legacy)
 #                            → fetch only (re-fetch without touching ramdisk)
 #                        If omitted, uses the newest /ramdisk/ci-working-dir/* that
-#                        has target/dist/Madek-Exporter_*.zip
+#                        has target/dist/Madek-Exporter_*
 set -euo pipefail
 
 BACKUP_PREFIX="/var/tmp/madek-exporter-artefacts"
@@ -40,8 +41,8 @@ usage() {
 Usage: $0 <user@host|ssh-alias> [remote-repo-root|remote-backup-dir]
 
 Run soon after Cider *build* jobs finish (do not wait for the whole trial):
-ramdisk cleanup removes target/dist zips quickly. This script snapshots
-Madek-Exporter_*.zip on the CI executor to ${BACKUP_PREFIX}-<job-id>/, then
+ramdisk cleanup removes target/dist artefacts quickly. This script snapshots
+Madek-Exporter_*.{zip,deb} on the CI executor to ${BACKUP_PREFIX}-<job-id>/, then
 rsyncs into target/server-artefacts/.
 
 Examples:
@@ -74,7 +75,7 @@ is_backup_path() {
 }
 
 resolve_newest_ci_root() {
-  echo "Resolving newest CI working dir with dist zips on ${SSH_HOST}..." >&2
+  echo "Resolving newest CI working dir with dist artefacts on ${SSH_HOST}..." >&2
   ssh -o BatchMode=yes "$SSH_HOST" bash -s -- "$REMOTE_CI_BASE" <<'EOF'
 set -euo pipefail
 base="$1"
@@ -84,9 +85,9 @@ newest_mtime=0
 for dir in "$base"/*; do
   [[ -d "$dir" ]] || continue
   shopt -s nullglob
-  zips=( "$dir"/target/dist/Madek-Exporter_*.zip )
+  artefacts=( "$dir"/target/dist/Madek-Exporter_*.zip "$dir"/target/dist/Madek-Exporter_*.deb )
   shopt -u nullglob
-  ((${#zips[@]} > 0)) || continue
+  ((${#artefacts[@]} > 0)) || continue
   mtime="$(stat -c %Y "$dir" 2>/dev/null || stat -f %m "$dir")"
   if (( mtime >= newest_mtime )); then
     newest_mtime=$mtime
@@ -94,17 +95,17 @@ for dir in "$base"/*; do
   fi
 done
 [[ -n "$newest" ]] || {
-  echo "no ${base}/*/target/dist/Madek-Exporter_*.zip found" >&2
+  echo "no ${base}/*/target/dist/Madek-Exporter_*.{zip,deb} found" >&2
   exit 1
 }
 printf '%s\n' "$newest"
 EOF
 }
 
-snapshot_zips() {
+snapshot_artefacts() {
   local remote_root="$1"
   local dest="${BACKUP_PREFIX}-$(basename "$remote_root")"
-  echo "Snapshotting dist zips on ${SSH_HOST} → ${dest}/..." >&2
+  echo "Snapshotting dist artefacts on ${SSH_HOST} → ${dest}/..." >&2
   ssh -o BatchMode=yes "$SSH_HOST" bash -s -- "$remote_root" "$dest" <<'EOF'
 set -euo pipefail
 remote_root="$1"
@@ -112,14 +113,14 @@ dest="$2"
 src="${remote_root}/target/dist"
 [[ -d "$src" ]] || { echo "missing ${src}" >&2; exit 1; }
 shopt -s nullglob
-zips=( "$src"/Madek-Exporter_*.zip )
+artefacts=( "$src"/Madek-Exporter_*.zip "$src"/Madek-Exporter_*.deb )
 shopt -u nullglob
-((${#zips[@]} > 0)) || {
-  echo "no Madek-Exporter_*.zip in ${src} (already cleaned?)" >&2
+((${#artefacts[@]} > 0)) || {
+  echo "no Madek-Exporter_*.{zip,deb} in ${src} (already cleaned?)" >&2
   exit 1
 }
 mkdir -p "$dest"
-cp -a "${zips[@]}" "$dest"/
+cp -a "${artefacts[@]}" "$dest"/
 printf '%s\n' "$dest"
 EOF
 }
@@ -127,14 +128,14 @@ EOF
 if [[ -z "$REMOTE_ARG" ]]; then
   REMOTE_ROOT="$(resolve_newest_ci_root)"
   echo "Remote root: ${REMOTE_ROOT}"
-  BACKUP_DIR="$(snapshot_zips "$REMOTE_ROOT")"
+  BACKUP_DIR="$(snapshot_artefacts "$REMOTE_ROOT")"
 elif is_backup_path "$REMOTE_ARG"; then
   BACKUP_DIR="$REMOTE_ARG"
   echo "Using existing backup: ${BACKUP_DIR}"
 else
   REMOTE_ROOT="$REMOTE_ARG"
   echo "Remote root: ${REMOTE_ROOT}"
-  BACKUP_DIR="$(snapshot_zips "$REMOTE_ROOT")"
+  BACKUP_DIR="$(snapshot_artefacts "$REMOTE_ROOT")"
 fi
 
 echo "Remote backup: ${BACKUP_DIR}"
@@ -172,10 +173,13 @@ echo "Cleaning ${LOCAL_DIR}/..."
 clean_local_dir "$LOCAL_DIR"
 mkdir -p "$LOCAL_DIR"
 
-echo "Fetching Madek-Exporter_*.zip → ${LOCAL_DIR}/"
-rsync -avz --include='Madek-Exporter_*.zip' --exclude='*' \
+echo "Fetching Madek-Exporter_*.{zip,deb} → ${LOCAL_DIR}/"
+rsync -avz \
+  --include='Madek-Exporter_*.zip' \
+  --include='Madek-Exporter_*.deb' \
+  --exclude='*' \
   "${SSH_HOST}:${BACKUP_DIR}/" \
   "${LOCAL_DIR}/"
 
 echo "Fetched:"
-ls -lah "$LOCAL_DIR"/Madek-Exporter_*.zip
+ls -lah "$LOCAL_DIR"/Madek-Exporter_*

@@ -44,21 +44,53 @@
   #(fetch-gh-release)
   (* 3 1000))
 
+(defn parse-version
+  "Parse X.Y.Z or X.Y.Z-N (optional leading v). Returns nil if not parseable."
+  [s]
+  (when s
+    (when-let [[_ maj min pat pre]
+               (re-matches #"v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?" (clojure.core/str s))]
+      {:major (js/parseInt maj 10)
+       :minor (js/parseInt min 10)
+       :patch (js/parseInt pat 10)
+       :pre (when pre
+              (if (re-matches #"\d+" pre)
+                (js/parseInt pre 10)
+                pre))})))
+
+(defn version-newer?
+  "True when version string a is strictly newer than b (semver-ish)."
+  [a-str b-str]
+  (let [a (parse-version a-str)
+        b (parse-version b-str)]
+    (boolean
+      (when (and a b)
+        (cond
+          (not= (:major a) (:major b)) (> (:major a) (:major b))
+          (not= (:minor a) (:minor b)) (> (:minor a) (:minor b))
+          (not= (:patch a) (:patch b)) (> (:patch a) (:patch b))
+          (and (nil? (:pre a)) (nil? (:pre b))) false
+          (nil? (:pre a)) true
+          (nil? (:pre b)) false
+          (and (number? (:pre a)) (number? (:pre b))) (> (:pre a) (:pre b))
+          :else (pos? (compare (clojure.core/str (:pre a))
+                               (clojure.core/str (:pre b)))))))))
+
 (def version*
   (reaction
-    (when-let[release (-> @state/electron-main-db :environment :latest-release)]
+    (when-let [release (-> @state/electron-main-db :environment :latest-release)]
       (str (:version_major release)
            "." (:version_minor release)
            "." (:version_patch release)
-           ))))
+           (when-let [pre (:version_pre release)] (str "-" pre))
+           (when-let [build (:version_build release)] (str "+" build))))))
 
 (def update-available?
   (reaction
     (if-let [latest-gh-release (-> @state/client-db :github :latest-release)]
-      (if (and @version*
-               (not= @version* (:tag_name latest-gh-release)))
-        true
-        false)
+      (boolean
+        (and @version*
+             (version-newer? (:tag_name latest-gh-release) @version*)))
       false)))
 
 (defn update-available-alert-component []
@@ -82,13 +114,13 @@
 (defn release-info-component []
   [:div.release-info
    (if-let [latest-gh-release (-> @state/client-db :github :latest-release)]
-     (when (= @version* (:tag_name latest-gh-release))
+     (when (and @version*
+                (not (version-newer? (:tag_name latest-gh-release) @version*)))
        [:div.alert.alert-success
         [:p [:strong "You are up to date."]
          " Version "
          [:code @version*]
-         " is the last version published on the download site."]])
+         " is at least as new as the last version published on the download site."]])
      [:div
       [:div.alert.alert-info
-       [:p "There is currently no release information from the download site available!"]
-       ]])])
+       [:p "There is currently no release information from the download site available!"]]])])
