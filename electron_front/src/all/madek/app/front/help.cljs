@@ -1,5 +1,7 @@
 (ns madek.app.front.help
   (:require
+    [clojure.string :as string]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.release :as release]
     [madek.app.front.state :as state]
     [cljs.nodejs :as nodejs]
@@ -9,12 +11,14 @@
 
 (def shell (.-shell Electron))
 
-(defn- external-link [url]
-  [:a {:href url
-       :on-click (fn [e]
-                   (.preventDefault e)
-                   (.openExternal shell url))}
-   url])
+(defn- external-link
+  ([url] (external-link url (string/replace url #"^https://" "")))
+  ([url label]
+   [:a {:href url
+        :on-click (fn [e]
+                    (.preventDefault e)
+                    (.openExternal shell url))}
+    label]))
 
 (defn full-version []
   (when-let [rel (-> @state/electron-main-db :environment :latest-release)]
@@ -29,15 +33,15 @@
         url (when version
               (str "https://github.com/Madek/madek-exporter/releases#release-" version))]
     [:div.version
-     [:h4 "Version"]
-     [:p "Version " [:code version]]
-     [:p "Date of creation: " [:code "2026-08-07"]]
+     [:h4 (i18n/t :help/version)]
+     [:p (i18n/t :help/version-prefix) [:code version]]
+     [:p (i18n/t :help/date-of-creation) [:code "2026-08-07"]]
      (when url
-       [:p "Release: " [external-link url]])]))
+       [:p (i18n/t :help/release) [external-link url]])]))
 
 (defn supported-os-component []
   [:div.supported-os
-   [:h4 "Supported operating systems"]
+   [:h4 (i18n/t :help/supported-os)]
    [:ul
     [:li "macOS (x64, ARM64)"]
     [:li "Linux (x64, ARM64)"]
@@ -45,34 +49,39 @@
 
 (defn login-variants-component []
   [:div.login-variants
-   [:h4 "Supported login variants"]
-   [:h5 "1. Sign in with token"]
+   [:h4 (i18n/t :help/login-variants)]
+   [:h5 (i18n/t :help/sign-in-token)]
    [:ul
     [:li [:code "api-token"] " only"]]
-   [:h5 "2. Sign in with login and password"]
+   [:h5 (i18n/t :help/sign-in-login)]
    [:ul
     [:li [:code "login/api-token"]]
     [:li [:code "email/api-token"]]
     [:li [:code "api-client/pw"]]
-    [:li [:code "login/pw"] " (external user; login must not contain " [:code "_"] ")"]]
-   [:p
-    "Use the Connection tab “Sign in with login and password”: put the "
-    "identity (login, email, or api-client name) in the login field, and the "
-    "token or password in the password field."]])
+    [:li [:code "login/pw"] (i18n/t :help/login-underscore) [:code "_"] (i18n/t :help/login-underscore-end)]]
+   [:p (i18n/t :help/login-help)]])
 
 (defn references-component []
   [:div.references
-   [:h4 "References"]
+   [:h4 (i18n/t :help/references)]
    [:ul
     [:li [external-link "https://zhdk.medienarchiv.ch/"]]
     [:li [external-link "https://wiki.zhdk.ch/medienarchiv/doku.php?id=madek-exporter"]]
     [:li [external-link "https://zhdk.medienarchiv.ch/api/browser/"]]
     [:li [external-link "https://github.com/Madek/madek-exporter/releases"]]]])
 
+(defn kontakt-component []
+  [:div.kontakt
+   [:h4 [external-link "https://www.zhdk.ch/miz/archive-1387/madek/kontakt-1874"
+                        (i18n/t :help/contact)]]
+   [:p (i18n/t :help/email) [external-link "mailto:support.medienarchiv@zhdk.ch"
+                                           "support.medienarchiv@zhdk.ch"]]])
+
 (defn page []
   [:div.help
-   [:h3 "Help"]
+   [:h3 (i18n/t :help/title)]
    [version-component]
    [supported-os-component]
    [login-variants-component]
-   [references-component]])
+   [references-component]
+   [kontakt-component]])

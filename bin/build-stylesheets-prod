@@ -28,3 +28,6 @@ npx sass "${SASS_ARGS[@]}" \
 
 mkdir -p app/prod/fonts/bootstrap
 cp -Lrf "$BOOTSTRAP_DIR/assets/fonts/bootstrap/". app/prod/fonts/bootstrap/
+
+mkdir -p app/prod/img
+cp -Lf resources/zhdk.svg app/prod/img/zhdk.svg

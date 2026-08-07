@@ -2,6 +2,7 @@
   (:require
     [fipp.edn :refer [pprint]]
     [reagent.core :as reagent]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.state :as state]
     [clojure.walk]
     ))
@@ -17,16 +18,16 @@
     [:div.form-group
      [:input {:type :checkbox :on-click #(swap! state/client-db assoc :debug (-> @state/client-db :debug not))
               :checked (-> @state/client-db :debug)}]
-     " Show per page debug info"]]
+     (i18n/t :debug/show-per-page)]]
 
-   [:p "Electron main "
+   [:p (i18n/t :debug/electron-main)
     (if (empty? @state/electron-main-db)
-      "waiting ..."
-      "connected! ")]
-   [:p "JVM main "
+      (i18n/t :debug/waiting)
+      (i18n/t :debug/connected))]
+   [:p (i18n/t :debug/jvm-main)
     (if (:jvm-main-options  @state/jvm-main-db)
-      "connected! "
-      "waiting ...")]
+      (i18n/t :debug/connected)
+      (i18n/t :debug/waiting))]
    [:div.jvm-main-db
     [:h3 "Electron-main DB"]
     [:pre
@@ -51,13 +52,13 @@
      [:div.form-group
       [:button.btn.btn-default
        {:on-click #(swap! state/client-db assoc :app-logs [])}
-       "Clear logs"]]
+       (i18n/t :debug/clear-logs)]]
      (if (seq logs)
        [:pre
         (with-out-str
           (pprint (reverse logs)))]
        [:div.alert.alert-info
-        [:p "No app logs yet."]])]))
+        [:p (i18n/t :debug/no-logs)]])]))
 
 (defn content []
   [:div
@@ -67,19 +68,19 @@
           :on-click (fn [e]
                       (.preventDefault e)
                       (reset! active-tab* :state))}
-      "State"]]
+      (i18n/t :debug/state)]]
     [:li {:class (when (= @active-tab* :logs) "active")}
      [:a {:href "#"
           :on-click (fn [e]
                       (.preventDefault e)
                       (reset! active-tab* :logs))}
-      "App logs"]]]
+      (i18n/t :debug/app-logs)]]]
    (case @active-tab*
      :logs [logs-content]
      [state-content])])
 
 (defn page []
   [:div.debug
-   [:h3 "Debug"]
+   [:h3 (i18n/t :debug/title)]
    [content]
    ])

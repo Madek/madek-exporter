@@ -20,9 +20,22 @@ pre
 
       > .navbar-brand
         margin-left: 0
+        display: flex
+        align-items: center
+        height: 50px
+        padding-top: 0
+        padding-bottom: 0
 
         &:focus
           outline: none
+
+        > .zhdk-logo
+          display: block
+          height: 20px
+          width: auto
+
+        &.navbar-brand-logo
+          padding-right: 0.25em
 
     > .navbar-nav
       margin-left: 0
@@ -41,11 +54,49 @@ pre
   &:focus
     outline: none
 
+.navbar-inverse .navbar-nav > li.connection-status > a
+  .glyphicon.text-success
+    color: #5cb85c
+  .glyphicon.text-danger
+    color: #d9534f
+
+.navbar-inverse .navbar-nav > li.language-menu,
+.navbar-inverse .navbar-nav > li.burger-menu
+  > .dropdown-toggle
+    &:focus
+      outline: none
+
+.navbar-inverse .navbar-nav > li.language-menu
+  > .dropdown-toggle
+    display: flex
+    align-items: center
+    gap: 0.35em
+
+    .language-code
+      font-size: 12px
+      font-weight: 600
+      letter-spacing: 0.04em
+
+  > .dropdown-menu
+    min-width: 4.5em
+    text-align: center
+
+.navbar-inverse .navbar-nav > li.burger-menu
+  > .dropdown-menu
+    > .dropdown-header
+      white-space: nowrap
+
+    > .burger-session
+      max-width: 28em
+      overflow: hidden
+      text-overflow: ellipsis
+
 .help
   > h3
     margin-bottom: 1.75em
 
   > .version,
+  > .supported-os,
   > .login-variants,
   > .references
     margin-bottom: 2em

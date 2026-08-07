@@ -3,6 +3,7 @@
   (:require
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.utils.form :as form-utils]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
 
     [reagent.core :as reagent]
@@ -70,39 +71,40 @@
              :json-params @data*
              :path "/download/step1"}]
     (request/send-off
-      req {:title "Export/Download Step1!"})))
+      req {:title (i18n/t :download/step1-req)})))
 
 (defn url-input-component []
   [:div.form-group
    {:class (when-not @url-valid?* "has-error")}
-   [:label {:for "url"} "URL of the set or media-entry to be exported:"]
+   [:label {:for "url"} (i18n/t :download/url-label)]
    [:input.form-control {:type "url"
                          :placeholder "https://your-madek-server/sets/UUID"
                          :value (:url @form-data*)
                          :on-change #(set-value
                                        :url (-> % .-target .-value presence))}]
    [:p.help-block
-    "The host and protocol must be equal to those from the connection. "]
+    (i18n/t :download/url-help-host)]
    [:p.help-block
-    "The URL must be given in the UUID form. \"Speaking URLs\" are not permitted. "
-    "Copy the first link of the " [:strong [:em "custom urls"]] " from the Madek web interface."]])
+    (i18n/t :download/url-help-uuid-before)
+    [:strong [:em (i18n/t :download/url-help-uuid-em)]]
+    (i18n/t :download/url-help-uuid-after)]])
 
 (defn target-dir-input-component []
   [:div.form-group
    {:class (when-not @target-dir-valid?* "has-error")}
-   [:label {:for :target-directory} "Target directory:"]
+   [:label {:for :target-directory} (i18n/t :download/target-dir)]
    [:input.form-control {:type :text
                          :value (:target-directory @form-data*)
                          :on-change #(set-value
                                        :target-directory (-> % .-target .-value presence))}]
    [:p.help-block
-    "The exported/downloaded data and files will be stored in this directory. "]])
+    (i18n/t :download/target-dir-help)]])
 
 (defn debug-component []
   [:div.debug
    (when (:debug @state/client-db)
      [:div.debug
-      [:h3 "Debug Step-1"]
+      [:h3 (i18n/t :debug/title)]
       [:section.data
        [:h4 "form-data*"]
        [:pre (with-out-str (pprint @form-data*))]]
@@ -115,7 +117,7 @@
     {:component-will-mount initialize-form-data
      :render (fn []
                [:section.pre-download-check
-                [:h2 "Step 1 - Choose Entity and Target Directory"]
+                [:h2 (i18n/t :download/step1-title)]
                 [:section.form
                  [url-input-component]
                  [target-dir-input-component]
@@ -123,11 +125,10 @@
                   [:div.pull-left
                    [:a.btn.btn-info
                     {:href "/connection"}
-                    "Back to connection"]]
+                    (i18n/t :download/back-connection)]]
                   [:button.btn.btn-primary.pull-right
                    (merge
                      {:on-click submit}
                      (when (not @form-valid?*) {:disabled true}))
-                   "Continue to step 2"]] [:div.clearfix]]
+                   (i18n/t :download/continue-step2)]] [:div.clearfix]]
                 [debug-component]])}))
-

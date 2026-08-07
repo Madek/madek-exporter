@@ -3,6 +3,7 @@
   (:require
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.state :as state]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
     [madek.app.front.connection :as connection]
 
@@ -16,7 +17,7 @@
 (defn errors-component []
   [:div.errors
    (when (->@download* :errors empty? not)
-     [:h3 "Errors"]
+     [:h3 (i18n/t :download/errors)]
      (doall (for [[ek ev] (->@download* :errors)]
               [:div.panel.panel-danger
                [:div.panel-heading
@@ -36,8 +37,8 @@
      :aria-valuemax "100"
      :style {:width "100%"}}
     (if (-> @download* :download-finished not)
-      " Downloading: "
-      " Downloaded: ")
+      (i18n/t :download/downloading)
+      (i18n/t :download/downloaded))
     (pluralize
       (->> @download* :items (map second) (filter #(= "Collection" (:type %))) count)
       "Set") ", "
@@ -47,7 +48,7 @@
 
 (defn downloading-component []
   [:div
-   [:h2 "Downloading / Exporting Now!"]
+   [:h2 (i18n/t :download/downloading-now)]
    [progress-component] ])
 
 (defn clear-export-steps []
@@ -61,7 +62,7 @@
               :errors nil}
              :path "/download"}]
     (request/send-off
-      req {:title "Dismiss Download!"})))
+      req {:title (i18n/t :download/dismiss-req)})))
 
 (defn disconnect []
   (clear-export-steps)
@@ -72,17 +73,15 @@
    [:div.form.pull-left
     [:button.btn.btn-primary
      {:on-click clear-export-steps}
-     "Back to step 1 - start a new export" ]]
+     (i18n/t :download/back-new-export) ]]
    [:div.form.pull-right
     [:button.btn.btn-warning
      {:on-click disconnect}
-     "Disconnect" ]]])
+     (i18n/t :connection/disconnect) ]]])
 
 (defn downloaded-component []
   [:div
-   [:h2 "Download / Export Finished"]
+   [:h2 (i18n/t :download/finished)]
    [progress-component]
    [errors-component]
    [dismiss-component]])
-
-

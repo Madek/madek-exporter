@@ -6,6 +6,7 @@
     )
   (:require
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.state :as state]
 
     [cljs-http.client :as http]
@@ -34,8 +35,8 @@
           (or (:message body)
               (get body "message")))
         (when (= 0 (:status response))
-          "The local service is not reachable. Please restart the application.")
-        "The request could not be completed.")))
+          (i18n/t :request/service-unreachable))
+        (i18n/t :request/could-not-complete))))
 
 (defn autoremove [id meta]
   (go (<! (timeout 30000))
@@ -123,15 +124,15 @@
           [:div.modal-header
            [:h4 (if (= bootstrap-status :danger)
                   (or (-> request :meta :error-title)
-                      "Request failed")
-                  (str " Request "
+                      (i18n/t :request/failed))
+                  (str (i18n/t :request/pending-title)
                        (when-let [title (-> request :meta :title)]
                          (str " \"" title "\" "))
                        (-> request :response :status)))]]
           [:div.modal-body
            (case bootstrap-status
              :success [:p (-> request :response :body)]
-             :pending [:p "Please stand by!"]
+             :pending [:p (i18n/t :request/stand-by)]
              :danger [:div.alert.alert-danger
                       [:p (response-error-message (:response request))]])]
           [:div.modal-footer
@@ -141,7 +142,7 @@
              :on-click #(swap! state/client-db
                                update-in [:requests]
                                (fn [rx] (dissoc rx (:id request))))}
-            "Dismiss"]
+            (i18n/t :request/dismiss)]
            ]]]]
        [:div.modal-backdrop {:style {:opacity "0.2"}}]])))
 

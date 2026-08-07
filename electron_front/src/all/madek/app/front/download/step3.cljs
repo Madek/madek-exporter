@@ -3,6 +3,7 @@
   (:require
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.utils.form :as form-utils]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
 
     [reagent.core :as reagent]
@@ -27,36 +28,37 @@
              :json-params {:step2-completed false}
              :path "/download"}]
     (request/send-off
-      req {:title "Back to :download-entity-checked"})))
+      req {:title (i18n/t :download/back-step2-req)})))
 
 (defn submit []
   (let [req {:method :post
              :json-params nil
              :path "/download"}]
     (request/send-off
-      req {:title "Start Export!"})))
+      req {:title (i18n/t :download/start-export-req)})))
 
 (defn summary-component []
   [:div.summary
-   [:p " Export the " (case (-> @state/jvm-main-db :download :entity :type)
-                                 :collection "set"
-                                 :media-entry "media-entry"
-                                 "???") " "
+   [:p (i18n/t :download/export-the)
+    (case (-> @state/jvm-main-db :download :entity :type)
+      :collection (i18n/t :download/entity-set)
+      :media-entry (i18n/t :download/entity-media-entry)
+      (i18n/t :download/entity-unknown)) " "
     [:a {:href "#"
          :on-click #(.openExternal
                       shell (-> @state/jvm-main-db :download :entity :url))}
      [:em (-> @state/jvm-main-db :download :entity :title)]]]
-   [:p "Export to " [:code (-> @state/jvm-main-db :download :target-directory)] "."]
-   [:p "Recursive: " [:code (-> @state/jvm-main-db :download :recursive not not str)] "."]
-   [:p "Meta-key used for prefixing entities: " (if-let [pmk (-> @state/jvm-main-db :download :prefix_meta_key presence)]
+   [:p (i18n/t :download/export-to) [:code (-> @state/jvm-main-db :download :target-directory)] "."]
+   [:p (i18n/t :download/recursive-label) [:code (-> @state/jvm-main-db :download :recursive not not str)] "."]
+   [:p (i18n/t :download/meta-key-prefixing) (if-let [pmk (-> @state/jvm-main-db :download :prefix_meta_key presence)]
                                                   [:code pmk]
-                                                  [:span "none"]) "."]
-   [:p "Skip media-files " [:code (-> @state/jvm-main-db :download :skip_media_files not not str)]"."]])
+                                                  [:span (i18n/t :download/none)]) "."]
+   [:p (i18n/t :download/skip-media-files) [:code (-> @state/jvm-main-db :download :skip_media_files not not str)]"."]])
 
 (defn debug-component []
   (when (:debug @state/client-db)
     [:div.debug
-     [:h3 "Debug"]
+     [:h3 (i18n/t :debug/title)]
      ]))
 
 (defn form-component []
@@ -64,16 +66,16 @@
    [:div.pull-left
     [:button.btn.btn-info
      {:on-click back}
-     "Back to step 2" ]]
+     (i18n/t :download/back-step2) ]]
    [:div.pull-right
     [:button.btn.btn-primary
      {:on-click submit}
-     "Start Download/Export!" ]]
+     (i18n/t :download/start-export) ]]
    [:div.clearfix]])
 
 (defn main-component []
   [:div.download-form
-   [:h2 "Step 3 - Review and Start Export" ]
+   [:h2 (i18n/t :download/step3-title)]
    [summary-component]
    [form-component]
    [debug-component]
@@ -83,5 +85,3 @@
   (reagent/create-class
     {:component-did-mount (fn [])
      :render main-component }))
-
-

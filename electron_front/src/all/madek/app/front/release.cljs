@@ -6,6 +6,7 @@
     )
   (:require
     [madek.app.front.utils :refer [str keyword deep-merge]]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
     [madek.app.front.state :as state]
 
@@ -27,7 +28,7 @@
   (let [req-opts {:method :get
                   :url "https://api.github.com/repos/madek/madek-exporter/releases/latest"
                   :headers { "accept" "application/vnd.github.v3+json" }}
-        meta-opts {:title "Fetch GH latest release info."
+        meta-opts {:title (i18n/t :release/fetch-gh)
                    :show_request_modal false
                    :show_response_error_modal false}]
     (request/send-off
@@ -96,11 +97,12 @@
 (defn update-available-alert-component []
   (when @update-available?
     [:div.alert.alert-warning
-     [:h3 "An update of the Madek-Exporter is available"]
-     [:p "The latest published release on the download site has version "
+     [:h3 (i18n/t :release/update-available)]
+     [:p (i18n/t :release/update-body-before)
       [:code (-> @state/client-db :github :latest-release :tag_name)]
-      " but the version of this instance is " [:code @version*] "."]
-     [:p "You can download the current release from "
+      (i18n/t :release/update-body-middle) [:code @version*]
+      (i18n/t :release/update-body-after)]
+     [:p (i18n/t :release/download-from)
       [:a {:href "https://github.com/Madek/madek-exporter/releases"
            :on-click (fn [e]
                        (.preventDefault e)
@@ -117,10 +119,8 @@
      (when (and @version*
                 (not (version-newer? (:tag_name latest-gh-release) @version*)))
        [:div.alert.alert-success
-        [:p [:strong "You are up to date."]
-         " Version "
-         [:code @version*]
-         " is at least as new as the last version published on the download site."]])
+        [:p [:strong (i18n/t :release/up-to-date)]
+         (i18n/t :release/up-to-date-body {:version @version*})]])
      [:div
       [:div.alert.alert-info
-       [:p "There is currently no release information from the download site available!"]]])])
+       [:p (i18n/t :release/no-info)]]])])

@@ -3,6 +3,7 @@
   (:require
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.utils.form :as form-utils]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
 
     [reagent.core :as reagent]
@@ -38,7 +39,7 @@
              :json-params {:step1-completed false}
              :path "/download"}]
     (request/send-off
-      req {:title "Delete Pre-Checked Export Entity!"})))
+      req {:title (i18n/t :download/back-step1-req)})))
 
 (defn submit []
   (let [req {:method :patch
@@ -49,34 +50,30 @@
                             :step2-completed true)
              :path "/download"}]
     (request/send-off
-      req {:title "Export/Download Step-2"})))
+      req {:title (i18n/t :download/step2-req)})))
 
 ;;; recursive ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn recursive-component []
   (when (= :collection (-> @download* :entity :type))
     [:div.recursive
-     [:h4 "Recursion on sets"]
+     [:h4 (i18n/t :download/recursion)]
     [:div.form-group
      [:input {:type :checkbox
               :on-click #(set-value :recursive (-> @form-data* :recursive not))
-              :checked (-> @form-data* :recursive)} ] " recurse"
-     [:p.help-block "Sets and media-entries  which are descendants of the selected set "
-      " will be exported  if this option is enabled."
-      "Recurring entities will be replaced by symbolic links the file system and "
-      "therefore infinite recursion is avoided." ]]]))
+              :checked (-> @form-data* :recursive)} ] (i18n/t :download/recurse)
+     [:p.help-block (i18n/t :download/recursion-help)]]]))
 
 ;;; skip files ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn skip-media-files-component []
   [:div.skip-files
-   [:h4 "Skip files"]
+   [:h4 (i18n/t :download/skip-files)]
    [:div.form-group
     [:input {:type :checkbox
              :on-click #(set-value :skip_media_files (-> @form-data* :skip_media_files not))
-             :checked (-> @form-data* :skip_media_files)} ] " skip files"
-    [:p.help-block "The download of any media-files will be skipped if this is checked. "
-     "This means that only the meta-data of media-entries or sets will be downloaded. " ]]])
+             :checked (-> @form-data* :skip_media_files)} ] (i18n/t :download/skip-files-label)
+    [:p.help-block (i18n/t :download/skip-files-help)]]])
 
 
 ;;; prefix meta-key ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -87,7 +84,7 @@
       (request/send-off
         {:method :get
          :path (str "/vocabularies/" vocabulary "/meta-keys/")}
-        {:title (str "Fetch MetaKeys for " vocabulary)}
+        {:title (i18n/t :download/fetch-metakeys {:vocabulary vocabulary})}
         :callback (fn [resp]
                     (when (:success resp)
                       (set-value vocabulary
@@ -97,7 +94,7 @@
                                             (map #(assoc % :key (:id %)))
                                             (sort-by :label)
                                             (into []))
-                                       {:label "NO META-KEY PREFIX"
+                                       {:label ""
                                         :id ""
                                         :key ""
                                         :vocabulary_id vocabulary
@@ -110,10 +107,15 @@
                (when-not (get @form-data* vocabulary nil)
                  (load-vocabulary-meta-keys)))))
 
+(defn- meta-key-option-label [option]
+  (if (or (nil? (:id option)) (= "" (:id option)))
+    (i18n/t :download/no-meta-key-prefix)
+    (:label option)))
+
 (defn prefix-meta-key-component []
   (when-let [meta-keys-options (-> @form-data* (get @vocabulary* nil))]
     [:div.form-group.meta-key
-     [:label "Meta-key:"]
+     [:label (i18n/t :download/meta-key)]
      [:select.form-control
       {:on-change #(set-value :prefix_meta_key (.. % -target -value))
        :value (-> @form-data* :prefix_meta_key)}
@@ -121,15 +123,13 @@
         [:option
          {:key (:id option)
           :value (:id option)}
-         (:label option)])]
+         (meta-key-option-label option)])]
      [:p.help-block
-      "If the " [:code "NO META-KEY PREFIX"]
-      " option is select neither prefix nor underscore will be present. "
-      "This is probably a good choice for automatized post processing. "]
+      (i18n/t :download/meta-key-help-1-before)
+      [:code (i18n/t :download/no-meta-key-prefix)]
+      (i18n/t :download/meta-key-help-1-after)]
      [:p.help-block
-      "If the value of the corresponding meta-key is blank or if there is no "
-      " such meta-key present for the entity "
-      " the id will be still prefixed with an underscore."]]))
+      (i18n/t :download/meta-key-help-2)]]))
 
 
 ;;; prefix vocabulary ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -139,7 +139,7 @@
     (request/send-off
       {:method :get
        :path "/vocabularies/"}
-      {:title "Fetch Vocabularies"}
+      {:title (i18n/t :download/fetch-vocabularies)}
       :callback (fn [req] (set-value :vocabularies
                                      (->> (:body req)
                                           (map #(assoc % :key (:id %)))
@@ -147,7 +147,7 @@
 
 (defn vocabulary-form-group-component []
   [:div.form-group.vocabulary
-   [:label "Vocabulary:"]
+   [:label (i18n/t :download/vocabulary)]
    [:select.form-control
     {:on-change #(let [voc (.. % -target -value)]
                    (when-not (= voc (-> @form-data* :vocabulary))
@@ -172,10 +172,8 @@
 
 (defn prefix-component []
   [:div.prefix
-   [:h4 "Prefix"]
-   [:p "For every set or media-entry a folder will be created. "
-    "The name of the folder consists of a prefix, an underscore and the id of the entity."
-    "The prefix will be determined by the meta-key given in this section."]
+   [:h4 (i18n/t :download/prefix)]
+   [:p (i18n/t :download/prefix-help)]
    [prefix-vocabulary-component]
    [prefix-meta-key-component]
    ])
@@ -191,24 +189,24 @@
    [:div.pull-left
     [:button.btn.btn-info
      {:on-click back}
-     "Back to step 1" ]]
+     (i18n/t :download/back-step1) ]]
    [:div.pull-right
     [:button.btn.btn-primary
      {:on-click submit}
-     "Continue to step 3" ]]
+     (i18n/t :download/continue-step3) ]]
    [:div.clearfix]])
 
 (defn debug-component []
   (when (:debug @state/client-db)
     [:div.debug
-     [:h3 "Debug Step-2"]
+     [:h3 (i18n/t :debug/title)]
      [:section.data
       [:h4 "form-data*"]
       [:pre (with-out-str (pprint @form-data*))]]]))
 
 (defn main-component []
   [:div.download-form
-   [:h2 "Step 2 - Set Advanced Options" ]
+   [:h2 (i18n/t :download/step2-title)]
    [form-component]
    [debug-component]])
 
@@ -223,5 +221,3 @@
     {;:component-will-mount #(swap! state/client-db assoc-in [:download :download-form] {})
      :component-did-mount initialize-form-data
      :render main-component }))
-
-

@@ -5,6 +5,7 @@
     [madek.app.front.download.step2 :as step2]
     [madek.app.front.download.step3 :as step3]
     [madek.app.front.download.download :as download]
+    [madek.app.front.i18n :as i18n]
 
 
     [madek.app.front.request :as request]
@@ -28,16 +29,16 @@
 
 (defn not-found []
   [:div
-   [:h2.text-danger "Bug: The Page for the State "
+   [:h2.text-danger (i18n/t :download/bug-state)
     [:code (with-out-str (pprint (:state @download*))) ]
-    " is not implemented." ]])
+    (i18n/t :download/bug-state-end)]])
 
 (defn debug-component []
   [:div.debug
    (when (:debug @state/client-db)
      [:div
       [:hr]
-      [:h3 "Debug Export Page"]
+      [:h3 (i18n/t :debug/title)]
       [:section.download
        [:h3 "@download*"]
        [:pre (with-out-str (pprint @download*))]]
@@ -45,7 +46,7 @@
 
 (defn page []
   [:div.page
-   [:h3 "Export"]
+   [:h3 (i18n/t :download/title)]
    (cond
      (-> @download* :download-finished) [download/downloaded-component]
      (-> @download* :download-started) [download/downloading-component]

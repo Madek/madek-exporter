@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [str keyword])
   (:require
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
+    [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
 
     [accountant.core :as accountant]
@@ -64,15 +65,6 @@
 
 ;;; connect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn compact-component []
-  [:span
-   (when-let [ce @connected-entity*]
-     [:span ce])
-   (when-let [ct @connected-target*]
-     [:span
-      " " ; utf-8 m-space!
-      [:span ct ]])])
-
 (defn connect-params []
   (let [fd @form-data
         base (select-keys fd [:url :sign-in-method :show-password])]
@@ -88,8 +80,8 @@
              :json-params (connect-params)
              :path "/connect"}]
     (request/send-off
-      req {:title "Connect!"
-           :error-title "Connection failed"})))
+      req {:title (i18n/t :connection/connect-req)
+           :error-title (i18n/t :connection/connect-failed)})))
 
 
 ;;; disconnect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -102,7 +94,7 @@
   (let [req {:method :delete
              :path "/connect"}]
     (request/send-off
-      req {:title "Disconnect!"}
+      req {:title (i18n/t :connection/disconnect-req)}
       :callback (fn [_]
                   (clear-form-sign-in-data)
                   (accountant/navigate! "/connection")))))
@@ -112,7 +104,7 @@
 
 (defn base-url-form-component []
   [:div.form-group {:class (if @url-is-valid "" "has-error")}
-   [:label {:for "url"} "Madek base URL "]
+   [:label {:for "url"} (i18n/t :connection/base-url)]
    [:input.url.form-control
     {:class (if @url-is-valid "" "has-error")
      :type "url"
@@ -124,10 +116,10 @@
 (defn login-form-component []
   (when (= @sign-in-method* :login)
     [:div.form-group
-     [:label {:for "login"} "Login | api-client name"]
+     [:label {:for "login"} (i18n/t :connection/login-label)]
      [:input.login.form-control
       {:type "text"
-       :placeholder "Login"
+       :placeholder (i18n/t :connection/login-placeholder)
        :value (:login @form-data)
        :on-change #(update-form-data-value
                      :login (-> % .-target .-value presence))}]]))
@@ -136,16 +128,16 @@
   [:div.form-group
    [:label {:for "password"}
     (case @sign-in-method*
-      :token "Api-token"
-      :login "Password"
-      "Ooooops")
+      :token (i18n/t :connection/api-token)
+      :login (i18n/t :connection/password)
+      (i18n/t :connection/oops))
     [:span " ("
      [:input {:type :checkbox
-              :on-change #(update-form-data (fn [fd] (assoc fd :show-password (-> fd :show-password not)))) ;#(swap! show-password* (fn [sp] (not sp)))
-              :checked (-> @form-data :show-password)}] " show)"]]
+              :on-change #(update-form-data (fn [fd] (assoc fd :show-password (-> fd :show-password not))))
+              :checked (-> @form-data :show-password)}] (i18n/t :connection/show) ")"]]
    [:input.password.form-control
     {:type (if (-> @form-data :show-password) "text" "password")
-     :placeholder "Password"
+     :placeholder (i18n/t :connection/password-placeholder)
      :value (:password @form-data)
      :on-change #(update-form-data-value
                    :password(-> % .-target .-value presence))}]])
@@ -160,13 +152,13 @@
           :on-click (fn [_]
                       (clear-form-sign-in-data)
                       (update-form-data-value :sign-in-method :token))}
-      "Sign in with token"]]
+      (i18n/t :connection/sign-in-token)]]
     [:li {:class (when (= @sign-in-method* :login) "active")}
      [:a {:href "#"
           :on-click (fn [_]
                       (clear-form-sign-in-data)
                       (update-form-data-value :sign-in-method :login))}
-      "Sign in with login and password"]]]
+      (i18n/t :connection/sign-in-login)]]]
    [login-form-component]
    [token-form-component]
    [:div.form-group.pull-right
@@ -174,18 +166,18 @@
      (merge {:on-click connect}
             (when (not @form-is-valid)
               {:disabled "yes"}))
-     "Connect"]]])
+     (i18n/t :connection/connect)]]])
 
 (defn continue-form []
   [:div.form
    [:div.pull-left
     [:button.btn.btn-warning
      {:on-click disconnect}
-     "Disconnect" ]]
+     (i18n/t :connection/disconnect) ]]
    [:div.pull-right
     [:a.btn.btn-primary
      {:href "/download"}
-     "Continue to export" ]]])
+     (i18n/t :connection/continue-export) ]]])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -200,34 +192,42 @@
   [:div.connected
    [:div.panel.panel-success
     [:div.panel.panel-heading
-     [:h2 "Connected!"]]
+     [:h2 (i18n/t :connection/connected)]]
     [:div.panel.panel-body
      [:p.text-success
-      "Your are connected to " [:code (-> @connection* :url)]
-      " as " [:code [:em (-> @connection* :auth-info :type)]] " "
+      (i18n/t :connection/connected-to-prefix) [:code (-> @connection* :url)]
+      (i18n/t :connection/connected-as) [:code [:em (-> @connection* :auth-info :type)]] " "
       [:em (or (-> @connection* :auth-info :email_address presence)
                (-> @connection* :auth-info :login presence))] "."]]]])
 
-(defn connection-pending-component []
-  [:div.pending
-   [:div.alert.alert-warning
-    [:p "You are not connected yet!"
-     ]]])
+(defn status-icon-component []
+  (let [connected? @connected?*]
+    [:li.connection-status
+     [:a {:href "#"
+          :title (if connected?
+                   (i18n/t :connection/disconnect-hint)
+                   (i18n/t :connection/not-connected))
+          :on-click (fn [e]
+                      (.preventDefault e)
+                      (if connected?
+                        (disconnect)
+                        (accountant/navigate! "/connection")))}
+      [:span.glyphicon.glyphicon-link
+       {:class (if connected? "text-success" "text-danger")
+        :aria-hidden "true"}]]]))
 
 (defn connection-status-component []
   [:div.connection.status
-   (if @connected?*
-     [connection-connected-component]
-     [connection-pending-component])
-   ])
+   (when @connected?*
+     [connection-connected-component])])
 
 (defn debug-component []
   (when (:debug @state/client-db)
     [:div.debug
      [:hr]
-     [:h3 "Debug"]
+     [:h3 (i18n/t :debug/title)]
      [:section.data
-      [:h4 "Connection"]
+      [:h4 (i18n/t :connection/title)]
       [:pre (with-out-str (pprint @connection*))]]
      [:section.data
       [:h4 "form-data"]
@@ -239,7 +239,7 @@
 
 (defn page []
   [:div.connection
-   [:h3 "Connection"]
+   [:h3 (i18n/t :connection/title)]
    [connection-status-component]
    (if-not @connected?*
      [connect-form]
