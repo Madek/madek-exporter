@@ -63,7 +63,7 @@ jobs:
                 }
 
   build:
-    name: Build the App and prepare release-infos
+    name: Build the App
     run_when:
       on any branch:
         type: branch
