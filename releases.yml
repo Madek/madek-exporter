@@ -3,6 +3,57 @@
 - version_major: 0
   version_minor: 11
   version_patch: 0
+  version_pre: NULL
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Upgrade Electron to 43.1.1 (from 1.6.0); require Node.js 22.
+    * Bundle Temurin Java 21 runtime; modernize Clojure 1.10.3 / ClojureScript 1.10.773.
+    * Provide artefacts for macOS (x64 and ARM64), Linux (x64 and ARM64), and Windows (x64) (outputs under target/).
+    * Fix CSS / stylesheet production build.
+    * Improve app shutdown and add main-process file logging.
+    * Add dependency vulnerability scanning (osv-scanner) and security audit helpers.
+    * Add CI smoke run and build-artifact validation across packaged platforms.
+    * Preserve Electron framework symlinks in release zips (fixes macOS libffmpeg.dylib load failures).
+    * macOS zips include README.txt and remove-quarantine-lock.sh beside madek-exporter.app (Gatekeeper “damaged” workaround for unsigned downloads; run manually after unzip).
+    * Disable Chromium GPU acceleration by default (`disableHardwareAcceleration`, `--disable-gpu`, `--in-process-gpu`) so the app starts on Citrix/VDI instead of fatalling with `GPU process isn't usable`.
+    * Fix API-token authentication in the GUI and CLI, including access to authenticated/private data and full-size exports; redact credentials from logs.
+    * Show clear connection errors for failed authentication, invalid Madek URLs, network failures, and an unavailable local service instead of raw exception details.
+    * Include a README.txt in every platform package with its release version, log locations, architecture selection, and bundled-Java guidance.
+    * Allow the macOS Gatekeeper quarantine helper to be run by double-clicking it, with Terminal instructions as an alternative.
+    * Prepare release artefacts in CI and print the version, release notes, download path, and GitHub draft URL needed for manual publishing.
+    * Streamline the project README to concise setup, build, and development instructions.
+    * Link each packaged README.txt directly to its version-specific GitHub release.
+    * Ship a Linux zip launcher (`madek-exporter` → `madek-exporter.bin`) that passes `--no-sandbox`, `--disable-setuid-sandbox`, and `--ozone-platform=x11` before Chromium starts so Debian/Ubuntu zip installs avoid the SUID `chrome-sandbox` FATAL and show a window on Wayland; document in the packaged README.
+    * Ship Debian/Ubuntu `.deb` packages (x64 and ARM64) installing to `/opt/madek-exporter` with a menu entry, `madek-exporter` on PATH, and postinst `chrome-sandbox` permissions.
+    * Publish Linux CI/server artefacts as zips only: each zip wraps the `.deb` with README.txt and delete-app.sh (`sudo apt remove madek-exporter`); the intermediate `.deb` is removed after packing so backup/fetch contain no bare `.deb`; portable Electron trees remain available locally as `Madek-Exporter_Linux-*-portable.zip`.
+    * Add a Help page with version, creation date, release link, References, supported OS (macOS x64/ARM64, Linux x64/ARM64, Windows x64), and supported login variants (`api-token`, `login/api-token`, `email/api-token`, `api-client/pw`, and external `login/pw` without `_`).
+    * Open the Madek-Exporter navbar brand to the GitHub repository; underline the active nav item (no filled background or focus outline) and show Connection on startup.
+    * Fix the false “update available” alert by comparing semver so a newer local build is not treated as outdated versus an older GitHub latest.
+    * Align Connection, Export, and Debug page titles with Help; fix About page render crash.
+    * Add full UI translations for English, German, French, Italian, Spanish, and Simplified Chinese, with automatic locale detection and a persisted language selector.
+    * Improve the navbar menus by centering the language icon, showing account and server on separate lines, and linking the ZHdK logo to the Medienarchiv.
+    * Fix spacing between sections on the Help page.
+
+    Notes
+    -----
+
+    * Toolchain is managed via mise (Java 21, Node 22, Ruby for release helpers); CI uses bin/with-java21 and bin/with-node22.
+    * Mac OS-only and broken CSS notes from 0.10.0 no longer apply.
+    * macOS Gatekeeper quarantine helper is a workaround until Apple codesign/notarization; see package README.txt and project README.
+    * Prefer a local path over UNC network homes when running Windows builds on Citrix; see README troubleshooting.
+    * On Debian/Ubuntu unzip Madek-Exporter_Linux-*.zip, install the `.deb` inside, and use `./delete-app.sh` to uninstall; portable `*-portable.zip` builds still use the shell launcher for sandbox/X11 — see package README.txt Linux section.
+
+####### 0.11.0 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 0
   version_pre: 5
   version_build: NULL
   name: NULL
