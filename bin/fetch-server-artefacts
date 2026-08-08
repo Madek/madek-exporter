@@ -42,7 +42,7 @@ Usage: $0 <user@host|ssh-alias> [remote-repo-root|remote-backup-dir]
 
 Run soon after Cider *build* jobs finish (do not wait for the whole trial):
 ramdisk cleanup removes target/dist artefacts quickly. This script snapshots
-Madek-Exporter_*.{zip,deb} on the CI executor to ${BACKUP_PREFIX}-<job-id>/, then
+Madek-Exporter_*.zip on the CI executor to ${BACKUP_PREFIX}-<job-id>/, then
 rsyncs into target/server-artefacts/.
 
 Examples:
@@ -85,7 +85,7 @@ newest_mtime=0
 for dir in "$base"/*; do
   [[ -d "$dir" ]] || continue
   shopt -s nullglob
-  artefacts=( "$dir"/target/dist/Madek-Exporter_*.zip "$dir"/target/dist/Madek-Exporter_*.deb )
+  artefacts=( "$dir"/target/dist/Madek-Exporter_*.zip )
   shopt -u nullglob
   ((${#artefacts[@]} > 0)) || continue
   mtime="$(stat -c %Y "$dir" 2>/dev/null || stat -f %m "$dir")"
@@ -95,7 +95,7 @@ for dir in "$base"/*; do
   fi
 done
 [[ -n "$newest" ]] || {
-  echo "no ${base}/*/target/dist/Madek-Exporter_*.{zip,deb} found" >&2
+  echo "no ${base}/*/target/dist/Madek-Exporter_*.zip found" >&2
   exit 1
 }
 printf '%s\n' "$newest"
@@ -113,10 +113,10 @@ dest="$2"
 src="${remote_root}/target/dist"
 [[ -d "$src" ]] || { echo "missing ${src}" >&2; exit 1; }
 shopt -s nullglob
-artefacts=( "$src"/Madek-Exporter_*.zip "$src"/Madek-Exporter_*.deb )
+artefacts=( "$src"/Madek-Exporter_*.zip )
 shopt -u nullglob
 ((${#artefacts[@]} > 0)) || {
-  echo "no Madek-Exporter_*.{zip,deb} in ${src} (already cleaned?)" >&2
+  echo "no Madek-Exporter_*.zip in ${src} (already cleaned?)" >&2
   exit 1
 }
 mkdir -p "$dest"
@@ -173,10 +173,9 @@ echo "Cleaning ${LOCAL_DIR}/..."
 clean_local_dir "$LOCAL_DIR"
 mkdir -p "$LOCAL_DIR"
 
-echo "Fetching Madek-Exporter_*.{zip,deb} → ${LOCAL_DIR}/"
+echo "Fetching Madek-Exporter_*.zip → ${LOCAL_DIR}/"
 rsync -avz \
   --include='Madek-Exporter_*.zip' \
-  --include='Madek-Exporter_*.deb' \
   --exclude='*' \
   "${SSH_HOST}:${BACKUP_DIR}/" \
   "${LOCAL_DIR}/"

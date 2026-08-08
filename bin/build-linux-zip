@@ -2,4 +2,4 @@
 set -euo pipefail
 
 ./bin/build-linux
-./bin/zip-tree target/dist/Madek-Exporter_Linux-x64.zip target/packages/madek-exporter-linux-x64
+./bin/zip-tree target/dist/Madek-Exporter_Linux-x64-portable.zip target/packages/madek-exporter-linux-x64

@@ -7,3 +7,4 @@ mkdir -p target/dist
   target/packages/madek-exporter-linux-arm64 \
   arm64 \
   target/dist/Madek-Exporter_Linux-ARM64.deb
+./bin/pack-linux-deb-zip target/dist/Madek-Exporter_Linux-ARM64.deb

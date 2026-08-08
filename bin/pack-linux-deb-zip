@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Wrap a built Linux .deb with README.txt and delete-app.sh into a release zip.
+#
+# Usage: bin/pack-linux-deb-zip <path-to.deb>
+# Writes: target/dist/<basename-without-.deb>.zip
+# Zip root: <basename-without-.deb>/{.deb, README.txt, delete-app.sh}
+# Removes the intermediate .deb from dist after packing (zip is the artefact).
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$PROJECT_DIR"
+
+# shellcheck disable=SC1091
+source "$PROJECT_DIR/bin/env/madek-exporter-version.bash"
+
+DEB="${1:?path to .deb required}"
+
+if [[ ! -f "$DEB" ]]; then
+  echo "ERROR: .deb not found: $DEB" >&2
+  exit 1
+fi
+
+DEB_ABS="$(cd -- "$(dirname "$DEB")" && pwd -P)/$(basename "$DEB")"
+DEB_BASE="$(basename "$DEB" .deb)"
+DIST_DIR="$PROJECT_DIR/target/dist"
+OUT_ZIP="$DIST_DIR/${DEB_BASE}.zip"
+STAGE_PARENT="$DIST_DIR/.stage-$$"
+STAGE_DIR="$STAGE_PARENT/$DEB_BASE"
+
+cleanup() {
+  rm -rf "$STAGE_PARENT"
+}
+trap cleanup EXIT
+
+mkdir -p "$STAGE_DIR"
+cp -a "$DEB_ABS" "$STAGE_DIR/$(basename "$DEB_ABS")"
+cat packaging/README.txt packaging/linux/README-deb.txt > "$STAGE_DIR/README.txt"
+substitute_madek_exporter_version_in_readme "$STAGE_DIR/README.txt"
+cp packaging/linux/delete-app.sh "$STAGE_DIR/delete-app.sh"
+chmod +x "$STAGE_DIR/delete-app.sh"
+
+mkdir -p "$DIST_DIR"
+./bin/zip-tree "$OUT_ZIP" "$STAGE_DIR"
+# Intermediate .deb is only needed inside the zip; drop it from dist artefacts.
+rm -f "$DEB_ABS"
+echo "  $OUT_ZIP"

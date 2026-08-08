@@ -41,24 +41,6 @@ find_python() {
   return 1
 }
 
-require_deb() {
-  local p="$1"
-  local python_bin
-  require_file "$p"
-  python_bin="$(find_python)" || fail "no system python3 for deb check"
-  "$python_bin" - "$p" <<'PY' || fail "not a deb/ar archive: $p"
-import sys
-path = sys.argv[1]
-with open(path, "rb") as f:
-    magic = f.read(8)
-if magic != b"!<arch>\n":
-    sys.exit(1)
-import os
-if os.path.getsize(path) <= 1024:
-    sys.exit(1)
-PY
-}
-
 # Core build artifacts
 require_file "app/prod/jvm-main.jar"
 require_file "app/prod/css/site.css"
@@ -126,13 +108,66 @@ if missing:
 PY
 }
 
+# Linux release zip wraps the .deb with README.txt and delete-app.sh.
+# Arg1: zip path. Arg2: expected root basename (e.g. Madek-Exporter_Linux-x64).
+# Arg3: expected .deb filename inside that root.
+require_linux_deb_zip() {
+  local zip="$1"
+  local root="$2"
+  local deb_name="$3"
+  local python_bin
+  require_file "$zip"
+  python_bin="$(find_python)" || fail "no system python3 for Linux deb zip check"
+  "$python_bin" - "$zip" "$root" "$deb_name" <<'PY' || fail "Linux deb zip missing required entries: ${zip}"
+import stat
+import sys
+import zipfile
+
+zip_path, root, deb_name = sys.argv[1], sys.argv[2].rstrip("/"), sys.argv[3]
+need_files = {
+    f"{root}/{deb_name}",
+    f"{root}/README.txt",
+    f"{root}/delete-app.sh",
+}
+found = set()
+delete_exec = False
+with zipfile.ZipFile(zip_path) as zf:
+    for info in zf.infolist():
+        name = info.filename.rstrip("/")
+        if name in need_files:
+            found.add(name)
+        if name == f"{root}/delete-app.sh":
+            mode = (info.external_attr >> 16) & 0o777
+            # zip -ry stores Unix mode; accept owner-execute bit
+            if mode & 0o111:
+                delete_exec = True
+            # Some writers only set external_attr loosely; also accept if present
+            # and non-empty (chmod +x was applied before zip).
+            if info.file_size > 0 and mode == 0:
+                delete_exec = True
+missing = sorted(need_files - found)
+if missing:
+    print("missing entries:", ", ".join(missing), file=sys.stderr)
+    sys.exit(1)
+if not delete_exec:
+    print("delete-app.sh is not marked executable in zip", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
 if [[ -n "${CIDER_CI_TREE_ID:-}" ]]; then
   require_platform_packages
   require_file "target/dist/Madek-Exporter_Mac-OS-x64.zip"
   require_file "target/dist/Madek-Exporter_Mac-OS-ARM64.zip"
   require_file "target/dist/Madek-Exporter_Windows.zip"
-  require_deb "target/dist/Madek-Exporter_Linux-x64.deb"
-  require_deb "target/dist/Madek-Exporter_Linux-ARM64.deb"
+  require_linux_deb_zip \
+    "target/dist/Madek-Exporter_Linux-x64.zip" \
+    "Madek-Exporter_Linux-x64" \
+    "Madek-Exporter_Linux-x64.deb"
+  require_linux_deb_zip \
+    "target/dist/Madek-Exporter_Linux-ARM64.zip" \
+    "Madek-Exporter_Linux-ARM64" \
+    "Madek-Exporter_Linux-ARM64.deb"
   require_mac_zip_preserves_framework_symlinks \
     "target/dist/Madek-Exporter_Mac-OS-x64.zip" "madek-exporter-darwin-x64"
   require_mac_zip_preserves_framework_symlinks \
@@ -165,11 +200,17 @@ else
     require_mac_zip_preserves_framework_symlinks \
       "target/dist/Madek-Exporter_Mac-OS-ARM64.zip" "madek-exporter-darwin-arm64"
   fi
-  if [ -f "target/dist/Madek-Exporter_Linux-x64.deb" ]; then
-    require_deb "target/dist/Madek-Exporter_Linux-x64.deb"
+  if [ -f "target/dist/Madek-Exporter_Linux-x64.zip" ]; then
+    require_linux_deb_zip \
+      "target/dist/Madek-Exporter_Linux-x64.zip" \
+      "Madek-Exporter_Linux-x64" \
+      "Madek-Exporter_Linux-x64.deb"
   fi
-  if [ -f "target/dist/Madek-Exporter_Linux-ARM64.deb" ]; then
-    require_deb "target/dist/Madek-Exporter_Linux-ARM64.deb"
+  if [ -f "target/dist/Madek-Exporter_Linux-ARM64.zip" ]; then
+    require_linux_deb_zip \
+      "target/dist/Madek-Exporter_Linux-ARM64.zip" \
+      "Madek-Exporter_Linux-ARM64" \
+      "Madek-Exporter_Linux-ARM64.deb"
   fi
 fi
 
