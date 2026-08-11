@@ -5,7 +5,6 @@
    [clojure.java.io :as io]
    [hiccup.core :as hiccup]
    [hiccup.page :refer [html5]]
-   [json-roa.client.core :as roa]
    [logbug.catcher :as catcher]
    [logbug.debug :as debug :refer [I> I>>]]
    [logbug.thrown :as thrown]
@@ -15,19 +14,6 @@
 
   (:import
    [java.io File]))
-
-(defn meta-keys_unmemoized []
-  (->> (-> (roa/get-root (state/connection-entry-point)
-                         :default-conn-opts (state/connection-http-options))
-           (roa/relation :meta-keys)
-           (roa/get {})
-           roa/coll-seq)
-       (map #(roa/get % {}))
-       (map roa/data)
-       (map (fn [k] [(:id k) k]))
-       (into {})))
-
-(def meta-keys (memoize meta-keys_unmemoized))
 
 (defn title [media-resource]
   (str (-> media-resource :type name ->PascalCase)
@@ -133,7 +119,7 @@
 (defn html-meta-datum [meta-datum]
   (let [meta-key-id (:meta_key_id meta-datum)]
     [:div.meta-datum {:class (:meta_key_id meta-datum)}
-     [:h3 (or (:label (get (meta-keys) meta-key-id nil)) meta-key-id)]
+     [:h3 (or (:label meta-datum) meta-key-id)]
      (case (:type meta-datum)
        "MetaDatum::Keywords" (html-keywords-values meta-datum)
        "MetaDatum::People" (html-people-values meta-datum)

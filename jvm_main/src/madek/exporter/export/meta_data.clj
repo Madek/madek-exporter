@@ -6,6 +6,7 @@
    [logbug.catcher :as catcher]
    [logbug.debug :as debug :refer [I> I>>]]
    [logbug.thrown :as thrown]
+   [madek.exporter.export.meta-keys :as meta-keys]
    [madek.exporter.state :as state]
    [madek.exporter.utils :refer [deep-merge]]
    [taoensso.timbre :as timbre :refer [info debug warn error spy]])
@@ -76,6 +77,10 @@
   (-> meta-datum
       roa/data))
 
+(defn enrich-with-meta-key-label [md]
+  (assoc md :label (or (:label (get (meta-keys/meta-keys) (:meta_key_id md)))
+                       (:meta_key_id md))))
+
 (defn meta-data_unmemoized [media-resource]
   (->> (-> media-resource
            (roa/relation :meta-data)
@@ -86,7 +91,8 @@
               (case (-> meta-datum roa/data :type)
                 ("MetaDatum::Text" "MetaDatum::TextDate" "MetaDatum::JSON")
                 (get-scalar-meta-datum-value meta-datum)
-                (get-collection-meta-datum-values meta-datum))))))
+                (get-collection-meta-datum-values meta-datum))))
+       (map enrich-with-meta-key-label)))
 
 (def meta-data (memoize meta-data_unmemoized))
 
