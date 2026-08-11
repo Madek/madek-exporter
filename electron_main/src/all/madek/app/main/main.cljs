@@ -78,6 +78,7 @@
            (fn []
              (.quit app)))
       (.on app "ready" (fn []
+                          (madek.app.main.windows/init-ipc)
                           (madek.app.main.menu/initialize)
                           (madek.app.main.windows/open-new))))))
 

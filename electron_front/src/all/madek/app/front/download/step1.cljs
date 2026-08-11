@@ -19,6 +19,10 @@
     [goog Uri]
     ))
 
+(def Electron (nodejs/require "electron"))
+
+(def ipcRenderer (.-ipcRenderer Electron))
+
 
 (def path-regex #"^/(sets|entries)/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$")
 
@@ -89,14 +93,28 @@
     [:strong [:em (i18n/t :download/url-help-uuid-em)]]
     (i18n/t :download/url-help-uuid-after)]])
 
+(defn choose-target-directory []
+  (let [current (:target-directory @form-data*)]
+    (-> (.invoke ipcRenderer "madek:choose-directory" current)
+        (.then (fn [path]
+                 (when (presence path)
+                   (set-value :target-directory path)))))))
+
 (defn target-dir-input-component []
   [:div.form-group
    {:class (when-not @target-dir-valid?* "has-error")}
    [:label {:for :target-directory} (i18n/t :download/target-dir)]
-   [:input.form-control {:type :text
-                         :value (:target-directory @form-data*)
-                         :on-change #(set-value
-                                       :target-directory (-> % .-target .-value presence))}]
+   [:div.input-group
+    [:input.form-control {:type :text
+                          :id :target-directory
+                          :value (:target-directory @form-data*)
+                          :on-change #(set-value
+                                        :target-directory (-> % .-target .-value presence))}]
+    [:span.input-group-btn
+     [:button.btn.btn-default
+      {:type :button
+       :on-click choose-target-directory}
+      (i18n/t :download/target-dir-browse)]]]
    [:p.help-block
     (i18n/t :download/target-dir-help)]])
 

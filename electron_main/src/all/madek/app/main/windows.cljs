@@ -17,6 +17,10 @@
 
 (def BrowserWindow (.-BrowserWindow Electron))
 
+(def dialog (.-dialog Electron))
+
+(def ipcMain (.-ipcMain Electron))
+
 (def windows (atom {}))
 
 (add-watch
@@ -34,6 +38,23 @@
 (defn focus-any []
   (when-let [win-a (->> @windows vals first)]
     (show-and-focus (:window @win-a))))
+
+(defn- choose-directory [_event default-path]
+  (let [opts (clj->js
+               (cond-> {:properties ["openDirectory" "createDirectory"]}
+                 (and default-path (not= default-path ""))
+                 (assoc :defaultPath default-path)))
+        focused (.getFocusedWindow BrowserWindow)
+        result-p (if focused
+                   (.showOpenDialog dialog focused opts)
+                   (.showOpenDialog dialog opts))]
+    (.then result-p
+           (fn [result]
+             (when-not (.-canceled result)
+               (aget (.-filePaths result) 0))))))
+
+(defn init-ipc []
+  (.handle ipcMain "madek:choose-directory" choose-directory))
 
 (defn open-new []
   (let [id (-> (uuid/make-random-uuid) uuid/uuid-string)

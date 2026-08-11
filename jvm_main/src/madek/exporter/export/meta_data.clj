@@ -84,7 +84,8 @@
        (map #(roa/get % {}))
        (map (fn [meta-datum]
               (case (-> meta-datum roa/data :type)
-                ("MetaDatum::Text" "MetaDatum::TextDate") (get-scalar-meta-datum-value meta-datum)
+                ("MetaDatum::Text" "MetaDatum::TextDate" "MetaDatum::JSON")
+                (get-scalar-meta-datum-value meta-datum)
                 (get-collection-meta-datum-values meta-datum))))))
 
 (def meta-data (memoize meta-data_unmemoized))
