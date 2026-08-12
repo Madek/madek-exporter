@@ -78,7 +78,8 @@ ruby -ryaml -e '
   print YAML.dump(release)
   if !notes.empty?
     puts
-    puts "--- Notes ---"
+    puts "  Notes"
+    puts "  -----"
     puts
     puts notes
     puts

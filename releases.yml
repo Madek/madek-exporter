@@ -1,3 +1,27 @@
+####### 0.11.1 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 1
+  version_pre: 0
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Add a Browse button for the export target directory (native Electron folder dialog).
+    * Improve HTML export: WebApp-style person names with roles, skip empty meta-data, and format JSON meta-data.
+    * Enrich exported meta-data with meta-key labels (shared meta-keys lookup for HTML and JSON).
+    * Fix release-infos helper Notes formatting; ignore vendor/ in git.
+
+    Notes
+    -----
+
+    * Same packaging, toolchain, and platform notes as 0.11.0.
+
 ####### 0.11.0 ######################################################################
 
 - version_major: 0
