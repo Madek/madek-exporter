@@ -19,7 +19,10 @@
   (:import
    [java.io File]
    [java.nio.file Files Paths]
+   [java.util.concurrent Callable Executors Future TimeUnit]
    [org.apache.commons.io FileUtils]))
+
+(def ^:private media-entry-concurrency 4)
 
 ;### Cancel ###################################################################
 
@@ -63,6 +66,25 @@
     (nio-path target)
     (make-array java.nio.file.attribute.FileAttribute 0))))
 
+;### Atomic claim #############################################################
+
+(defn claim-item!
+  "Atomically register an item under (str id). Returns
+   {:action :download} when this caller owns the download, or
+   {:action :symlink :target path} when the item was already claimed."
+  [id claimed-data]
+  (let [id (str id)
+        outcome (atom nil)]
+    (swap! state/db
+           (fn [db]
+             (if-let [existing (get-in db [:download :items id])]
+               (do (reset! outcome {:action :symlink :target (:path existing)})
+                   db)
+               (do (reset! outcome {:action :download})
+                   (assoc-in db [:download :items id]
+                             (assoc claimed-data :id id))))))
+    @outcome))
+
 ;### DL Media-Entry ###########################################################
 
 (defn set-item-to-finished [id]
@@ -101,20 +123,20 @@
            entry-dir-path (str dir-path File/separator entry-prefix-path)
            write-prefixed? (structure/write-prefixed-artifacts? export-structure)
            entity-md (meta-data/meta-data media-entry)
-           item-title (meta-data/title entity-md)]
-       (if (-> @state/db :download :items (get id))
-         (let [target (-> @state/db :download :items (get id) :path)]
-           (symlink id entry-dir-path target))
-             (do (swap! state/db (fn [db uuid media-entry]
-                               (assoc-in db [:download :items id] media-entry))
-                    id (assoc (roa/data media-entry)
-                              :state "downloading"
-                              :errors {}
-                              :type "MediaEntry"
-                              :title item-title
-                              :path entry-dir-path
-                              :download_started-at (str (time/now))))
-             (ensure-not-cancelled!)
+           item-title (meta-data/title entity-md)
+           claim (claim-item!
+                  id
+                  (assoc (roa/data media-entry)
+                         :state "downloading"
+                         :errors {}
+                         :type "MediaEntry"
+                         :title item-title
+                         :path entry-dir-path
+                         :download_started-at (str (time/now))))]
+       (case (:action claim)
+         :symlink (symlink id entry-dir-path (:target claim))
+         :download
+         (do (ensure-not-cancelled!)
              (delete-path-if-exists! entry-dir-path)
              (io/make-parents entry-dir-path)
              (meta-data/write-meta-data entry-dir-path entity-md id
@@ -127,6 +149,39 @@
              (when-not skip-media-files?
                (download-media-files entry-dir-path media-entry))
              (set-item-to-finished id)))))))
+
+;### Parallel helpers #########################################################
+
+(defn- unwrap-execution-exception [e]
+  (if (instance? java.util.concurrent.ExecutionException e)
+    (or (.getCause e) e)
+    e))
+
+(defn run-bounded!
+  "Run (f item) for each item with at most n worker threads. Rethrows the first
+  worker failure and cancels remaining tasks."
+  [n f items]
+  (when (seq items)
+    (let [pool (Executors/newFixedThreadPool (int n))
+          futs (atom [])]
+      (try
+        (doseq [item items]
+          (swap! futs conj
+                 (.submit pool
+                          ^Callable
+                          (reify Callable
+                            (call [_]
+                              (f item))))))
+        (doseq [^Future fut @futs]
+          (try
+            (.get fut)
+            (catch Exception e
+              (doseq [^Future other @futs]
+                (.cancel other true))
+              (throw (unwrap-execution-exception e)))))
+        (finally
+          (.shutdownNow pool)
+          (.awaitTermination pool 60 TimeUnit/SECONDS))))))
 
 ;### check credentials ########################################################
 
@@ -145,16 +200,21 @@
   (let [me-get-opts (merge {:collection_id id}
                            (if (authenticated-http-options? api-http-opts)
                              {:me_get_full_size "true"}
-                             {:public_get_full_size "true"}))]
-    (doseq [me-rel (I> identity-with-logging
-                       (roa/get-root api-entry-point
-                                     :default-conn-opts api-http-opts)
-                       (roa/relation :media-entries)
-                       (roa/get me-get-opts)
-                       roa/coll-seq)]
-      (ensure-not-cancelled!)
-      (download-media-entry skip-media-files? prefix-meta-key export-structure
-                            target-dir-path (roa/get me-rel {})))))
+                             {:public_get_full_size "true"}))
+        me-rels (doall
+                 (I> identity-with-logging
+                     (roa/get-root api-entry-point
+                                   :default-conn-opts api-http-opts)
+                     (roa/relation :media-entries)
+                     (roa/get me-get-opts)
+                     roa/coll-seq))]
+    (run-bounded!
+     media-entry-concurrency
+     (fn [me-rel]
+       (ensure-not-cancelled!)
+       (download-media-entry skip-media-files? prefix-meta-key export-structure
+                             target-dir-path (roa/get me-rel {})))
+     me-rels)))
 
 (defn download-collections-for-collection [collection target-dir-path recursive? skip-media-files?
                                            prefix-meta-key export-structure
@@ -187,20 +247,20 @@
         target-dir-path (str dl-path File/separator path-prefix)
         write-prefixed? (structure/write-prefixed-artifacts? export-structure)
         entity-md (meta-data/meta-data collection)
-        item-title (meta-data/title entity-md)]
-    (if (-> @state/db :download :items (get id))
-      (let [target (-> @state/db :download :items (get id) :path)]
-        (symlink id target-dir-path target))
+        item-title (meta-data/title entity-md)
+        claim (claim-item!
+               id
+               (assoc (roa/data collection)
+                      :state "downloading"
+                      :errors {}
+                      :type "Collection"
+                      :title item-title
+                      :path target-dir-path
+                      :download_started-at (str (time/now))))]
+    (case (:action claim)
+      :symlink (symlink id target-dir-path (:target claim))
+      :download
       (catcher/with-logging {}
-        (swap! state/db (fn [db uuid collection]
-                          (assoc-in db [:download :items id] collection))
-               id (assoc (roa/data collection)
-                         :state "downloading"
-                         :errors {}
-                         :type "Collection"
-                         :title item-title
-                         :path target-dir-path
-                         :download_started-at (str (time/now))))
         (ensure-not-cancelled!)
         (delete-path-if-exists! target-dir-path)
         (io/make-parents target-dir-path)
@@ -219,6 +279,7 @@
            collection target-dir-path recursive? skip-media-files? prefix-meta-key
            export-structure api-entry-point api-http-opts))
         (set-item-to-finished id)))))
+
 ;### download meta-data schema ################################################
 
 (def download-meta-data-schema meta-data-schema/download)

@@ -39,8 +39,9 @@
     (str url "/api")))
 
 (defn connection-http-options []
-  (or (-> @db :connection :http-options)
-      (throw (ex-info "The connection options are not available at this time." {}))))
+  (let [stored (or (-> @db :connection :http-options)
+                   (throw (ex-info "The connection options are not available at this time." {})))]
+    (utils/with-http-pool stored)))
 
 ;### sente setup ##############################################################
 

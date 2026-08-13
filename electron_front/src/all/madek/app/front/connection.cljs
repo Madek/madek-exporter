@@ -55,7 +55,16 @@
       (when-let [url (-> @form-data :url presence)]
         (re-matches #"https?://[^/]+" url)))))
 
-(def form-is-valid url-is-valid)
+(def credentials-are-valid
+  (reaction
+    (case (or (:sign-in-method @form-data) :token)
+      :login (boolean (and (presence (:login @form-data))
+                           (presence (:password @form-data))))
+      :token (boolean (presence (:password @form-data)))
+      false)))
+
+(def form-is-valid
+  (reaction (and @url-is-valid @credentials-are-valid)))
 
 (def show-password* (atom false))
 

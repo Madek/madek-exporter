@@ -47,11 +47,13 @@
       (zero? total) 0
       :else (js/Math.round (* 100 (/ passed total))))))
 
-(defn current-downloading-item []
+(defn current-downloading-items []
   (->> (items-seq)
        (filter #(= "downloading" (:state %)))
-       (sort-by (fn [item] (or (:download_started-at item) "")))
-       last))
+       (sort-by (fn [item] (or (:download_started-at item) "")))))
+
+(defn current-downloading-item []
+  (last (current-downloading-items)))
 
 (defn sorted-items []
   (let [rank (fn [item]
@@ -170,14 +172,23 @@
 
 (defn current-activity-component []
   (when-not (:download-finished @download*)
-    (when-let [item (current-downloading-item)]
-      (let [{:keys [passed total]} (item-counts)]
-        [:p.download-current
-         (i18n/t :download/current
-                 {:type (item-type-label item)
-                  :title (item-label item)
-                  :passed passed
-                  :total total})]))))
+    (let [active (current-downloading-items)
+          n (count active)
+          {:keys [passed total]} (item-counts)]
+      (when (pos? n)
+        (if (= 1 n)
+          (let [item (first active)]
+            [:p.download-current
+             (i18n/t :download/current
+                     {:type (item-type-label item)
+                      :title (item-label item)
+                      :passed passed
+                      :total total})])
+          [:p.download-current
+           (i18n/t :download/current-many
+                   {:count n
+                    :passed passed
+                    :total total})])))))
 
 (defn phase-checklist-component []
   [:div.download-phases
@@ -196,8 +207,10 @@
                  "passed" :done
                  "downloading" :active
                  :pending)
-        files-n (media-files-count item)]
-    [:li {:key (:id item)
+        files-n (media-files-count item)
+        title (or (presence (:title item)) "—")
+        uuid (str (:id item))]
+    [:li {:key uuid
           :class (str "checklist-item status-" (name status))}
      [status-icon status]
      [:span.checklist-label.item-columns
@@ -207,18 +220,19 @@
                   "label-primary"
                   "label-default")}
         (item-type-label item)]]
+      [:span.item-title {:title title} title]
       (if-let [url (item-medienarchiv-url item)]
         [:a.item-id.text-muted
          {:href url
+          :title uuid
           :on-click (fn [e]
                       (.preventDefault e)
                       (.openExternal shell url))}
-         (:id item)]
-        [:span.item-id.text-muted (:id item)])
-      [:span.item-title (or (presence (:title item)) "")]
-      (when (and (= status :active) (pos? files-n))
-        [:span.item-detail.text-muted
-         (i18n/t :download/files-count {:count files-n})])]]))
+         uuid]
+        [:span.item-id.text-muted {:title uuid} uuid])
+      [:span.item-detail.text-muted
+       (when (and (= status :active) (pos? files-n))
+         (i18n/t :download/files-count {:count files-n}))]]))
 
 (defn item-checklist-component []
   (let [items (sorted-items)]

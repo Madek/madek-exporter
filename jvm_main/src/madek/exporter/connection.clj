@@ -42,8 +42,9 @@
                   (throw (ex-info "invalid credentials" {:status 422
                                                           :message "Password is required when login is provided."})))
               http-options (utils/options-to-http-options connect-body)
+              live-http-options (utils/with-http-pool http-options)
               api-root (roa/get-root (str url "/api/")
-                                     :default-conn-opts http-options)
+                                     :default-conn-opts live-http-options)
               auth-info (when (utils/authenticated-http-options? http-options)
                           (-> api-root (roa/relation :auth-info) (roa/get {})))]
           (debug 'http-options
@@ -68,6 +69,7 @@
                            (assoc-in db [:connection] conn-params))
                          (merge
                           (select-keys connect-body [:url])
+                          ;; Store auth-only options (no connection-manager).
                           {:http-options http-options
                            :auth-info auth-info}
                           (select-keys auth-info [:login :email_address])))

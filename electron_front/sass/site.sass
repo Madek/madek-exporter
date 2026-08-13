@@ -207,17 +207,37 @@ pre
 
     .checklist-label.item-columns
       display: grid
-      grid-template-columns: 7.5em minmax(18em, 22em) minmax(0, 1fr) auto
+      // type | name | uuid | detail (always 4 cells)
+      grid-template-columns: 9em minmax(0, 1fr) 22em 6.5em
       column-gap: 0.75em
       align-items: baseline
       width: 100%
 
-    .item-type .label
-      display: inline-block
+    .item-type
+      width: 9em
+      flex-shrink: 0
+
+      .label
+        display: inline-block
+        max-width: 100%
+
+    .item-title
+      font-weight: 500
+      overflow: hidden
+      text-overflow: ellipsis
+      white-space: nowrap
 
     .item-id
       font-family: Menlo, Monaco, Consolas, monospace
+      font-size: 0.85em
+      overflow: hidden
+      text-overflow: ellipsis
+      white-space: nowrap
+
+    .item-detail
       font-size: 0.9em
+      white-space: nowrap
+      text-align: right
 
   .dismiss
     margin-top: 2em

@@ -1,6 +1,7 @@
 (ns madek.exporter.utils
   (:refer-clojure :exclude [str keyword])
   (:require
+   [clj-http.conn-mgr :as conn-mgr]
    [clojure.java.shell :refer [sh]]
    [clojure.string :as string]
    [json-roa.client.core :as roa]
@@ -11,6 +12,14 @@
    [java.awt Desktop]
    [java.net URI]
    [org.apache.commons.lang3 SystemUtils]))
+
+;; Sized for parallel media-entry downloads (concurrency 4).
+(defonce ^:private http-conn-manager
+  (delay
+   (conn-mgr/make-reusable-conn-manager
+    {:timeout 5
+     :threads 8
+     :default-per-route 4})))
 
 (defn deep-merge [& vals]
   (if (every? map? vals)
@@ -33,6 +42,7 @@
     :else v))
 
 (defn options-to-http-options [options]
+  "Build serializable auth options only (no live connection-manager)."
   (letfn [(basic-auth-header [login password]
             (let [raw (clojure.core/str login ":" password)
                   encoded (.encodeToString (java.util.Base64/getEncoder)
@@ -51,6 +61,11 @@
 
         :else
         {}))))
+
+(defn with-http-pool [http-options]
+  "Attach the shared connection pool for live HTTP calls. Do not store the
+  result in state/db — the manager is not serializable over Sente."
+  (assoc (or http-options {}) :connection-manager @http-conn-manager))
 
 (defn authenticated-http-options? [http-options]
   (boolean (or (:basic-auth http-options)
