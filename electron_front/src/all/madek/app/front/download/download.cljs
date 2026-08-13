@@ -157,16 +157,19 @@
   (case status
     :done [:span.glyphicon.glyphicon-ok.text-success {:aria-hidden "true"}]
     :active [:span.glyphicon.glyphicon-refresh.spinning {:aria-hidden "true"}]
+    :cancelled [:span.glyphicon.glyphicon-remove-circle.text-warning {:aria-hidden "true"}]
     [:span.glyphicon.glyphicon-unchecked.text-muted {:aria-hidden "true"}]))
 
 (defn progress-component []
   (let [{:keys [total passed sets media-entries]} (item-counts)
         pct (progress-percent)
-        finished? (:download-finished @download*)]
+        finished? (:download-finished @download*)
+        cancelled? (:download-cancelled @download*)]
     [:div.progress
      [:div.progress-bar
       {:class (cond
                 (not finished?) "progress-bar-info active"
+                cancelled? "progress-bar-warning"
                 (-> @download* :errors empty?) "progress-bar-success"
                 :else "progress-bar-danger")
        :role "progressbar"
@@ -218,10 +221,13 @@
          [:span.checklist-label (i18n/t label-key)]]))]])
 
 (defn item-row [item]
-  (let [status (case (:state item)
-                 "passed" :done
-                 "downloading" :active
-                 :pending)
+  (let [dl-done? (boolean (or (:download-finished @download*)
+                              (:download-cancelled @download*)))
+        status (cond
+                 (= "passed" (:state item)) :done
+                 (and dl-done? (not= "passed" (:state item))) :cancelled
+                 (= "downloading" (:state item)) :active
+                 :else :pending)
         files-n (media-files-count item)
         title (or (presence (:title item)) "—")
         uuid (str (:id item))
@@ -233,6 +239,8 @@
                         (str " · " (i18n/t :download/files-count {:count files-n}))))
                  (= status :done)
                  (i18n/t :download/item-progress {:percent 100})
+                 (= status :cancelled)
+                 (str (i18n/t :download/item-progress {:percent item-pct}))
                  :else nil)]
     [:li {:key uuid
           :class (str "checklist-item status-" (name status))}
