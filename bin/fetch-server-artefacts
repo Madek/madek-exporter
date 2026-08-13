@@ -14,13 +14,15 @@
 #   the (possibly already cleaned) ramdisk working tree.
 #
 # Usage:
-#   ./bin/fetch-server-artefacts <user@host|ssh-alias> [remote-path]
+#   ./bin/fetch-server-artefacts [--clean] [--checksum] <user@host|ssh-alias> [remote-path]
 #
 # Examples:
 #   ./bin/fetch-server-artefacts root@ci-ax101-05
 #   ./bin/fetch-server-artefacts root@ci-ax101-05 /ramdisk/ci-working-dir/<uuid>
 #   ./bin/fetch-server-artefacts root@ci-ax101-05 /var/tmp/madek-exporter-artefacts-<uuid>
 #   ./bin/fetch-server-artefacts root@ci-ax101-05 /var/tmp/madek-exporter-artefacts/<uuid>  # legacy
+#   ./bin/fetch-server-artefacts --clean root@ci-ax101-05 /var/tmp/madek-exporter-artefacts-<uuid>
+#   ./bin/fetch-server-artefacts --checksum root@ci-ax101-05 /var/tmp/madek-exporter-artefacts-<uuid>
 #
 # <user@host|ssh-alias>  SSH target: user@host, or a Host alias from ~/.ssh/config
 # [remote-path]          Optional. Either:
@@ -31,6 +33,9 @@
 #                            → fetch only (re-fetch without touching ramdisk)
 #                        If omitted, uses the newest /ramdisk/ci-working-dir/* that
 #                        has target/dist/Madek-Exporter_*
+# --clean                Wipe target/server-artefacts/ before fetch (e.g. new job,
+#                        or after unzipping .app trees into that dir)
+# --checksum             Skip by content (rsync --checksum) instead of size+mtime
 set -euo pipefail
 
 BACKUP_PREFIX="/var/tmp/madek-exporter-artefacts"
@@ -38,34 +43,61 @@ REMOTE_CI_BASE="/ramdisk/ci-working-dir"
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 <user@host|ssh-alias> [remote-repo-root|remote-backup-dir]
+Usage: $0 [--clean] [--checksum] <user@host|ssh-alias> [remote-repo-root|remote-backup-dir]
 
 Run soon after Cider *build* jobs finish (do not wait for the whole trial):
 ramdisk cleanup removes target/dist artefacts quickly. This script snapshots
 Madek-Exporter_*.zip on the CI executor to ${BACKUP_PREFIX}-<job-id>/, then
 rsyncs into target/server-artefacts/.
 
+By default the local dir is kept and rsync skips unchanged zips (size+mtime).
+Use --clean to wipe first; use --checksum for content-true skip.
+
 Examples:
   $0 root@ci-ax101-05
   $0 root@ci-ax101-05 /ramdisk/ci-working-dir/<uuid>
   $0 root@ci-ax101-05 ${BACKUP_PREFIX}-<uuid>
   $0 root@ci-ax101-05 ${BACKUP_PREFIX}/<uuid>   # legacy nested layout
+  $0 --clean root@ci-ax101-05 ${BACKUP_PREFIX}-<uuid>
+  $0 --checksum root@ci-ax101-05 ${BACKUP_PREFIX}-<uuid>
 
 Arguments:
   user@host|ssh-alias   SSH target (e.g. root@ci-ax101-05, or a ~/.ssh/config Host)
   remote-repo-root      CI working tree; snapshot then fetch (optional)
   remote-backup-dir     Existing ${BACKUP_PREFIX}-... or ${BACKUP_PREFIX}/... path; fetch only
+
+Options:
+  --clean               Wipe target/server-artefacts/ before fetching
+  --checksum            Compare by checksum instead of size+mtime
+  -h, --help            Show this help
 EOF
   exit 1
 }
 
-[[ $# -ge 1 && $# -le 2 ]] || usage
-case "${1:-}" in
-  -h|--help) usage ;;
-esac
+DO_CLEAN=0
+DO_CHECKSUM=0
+POSITIONAL=()
 
-SSH_HOST="$1"
-REMOTE_ARG="${2:-}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage ;;
+    --clean) DO_CLEAN=1; shift ;;
+    --checksum) DO_CHECKSUM=1; shift ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      usage
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+      ;;
+  esac
+done
+
+[[ ${#POSITIONAL[@]} -ge 1 && ${#POSITIONAL[@]} -le 2 ]] || usage
+
+SSH_HOST="${POSITIONAL[0]}"
+REMOTE_ARG="${POSITIONAL[1]:-}"
 LOCAL_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/target/server-artefacts"
 
 is_backup_path() {
@@ -169,12 +201,21 @@ clean_local_dir() {
   exit 1
 }
 
-echo "Cleaning ${LOCAL_DIR}/..."
-clean_local_dir "$LOCAL_DIR"
+if [[ "$DO_CLEAN" -eq 1 ]]; then
+  echo "Cleaning ${LOCAL_DIR}/..."
+  clean_local_dir "$LOCAL_DIR"
+fi
 mkdir -p "$LOCAL_DIR"
 
-echo "Fetching Madek-Exporter_*.zip → ${LOCAL_DIR}/"
-rsync -avz \
+RSYNC_ARGS=(-avz)
+if [[ "$DO_CHECKSUM" -eq 1 ]]; then
+  RSYNC_ARGS+=(--checksum)
+  echo "Fetching Madek-Exporter_*.zip → ${LOCAL_DIR}/ (checksum compare)..."
+else
+  echo "Fetching Madek-Exporter_*.zip → ${LOCAL_DIR}/ (incremental; skip unchanged)..."
+fi
+
+rsync "${RSYNC_ARGS[@]}" \
   --include='Madek-Exporter_*.zip' \
   --exclude='*' \
   "${SSH_HOST}:${BACKUP_DIR}/" \
