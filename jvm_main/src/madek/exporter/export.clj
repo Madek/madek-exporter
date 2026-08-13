@@ -9,7 +9,7 @@
    [logbug.thrown :as thrown]
    [madek.exporter.export.files :as files :refer [download-media-files]]
    [madek.exporter.export.index-html :as index-html]
-   [madek.exporter.export.meta-data :as meta-data :refer [meta-data write-meta-data]]
+   [madek.exporter.export.meta-data :as meta-data]
    [madek.exporter.export.meta-data-schema :as meta-data-schema]
    [madek.exporter.export.structure :as structure]
    [madek.exporter.state :as state]
@@ -20,6 +20,16 @@
    [java.io File]
    [java.nio.file Files Paths]))
 
+;### Cancel ###################################################################
+
+(defn cancel-requested? []
+  (boolean (get-in @state/db [:download :cancel-requested])))
+
+(defn ensure-not-cancelled! []
+  (when (cancel-requested?)
+    (throw (ex-info "Download cancelled by user"
+                    {:type :download-cancelled}))))
+
 ;### Path Helper ##############################################################
 
 (defn nio-path [s] (Paths/get s (into-array [""])))
@@ -28,14 +38,15 @@
   (snatch
    {:level :debug
     :throwable java.nio.file.FileAlreadyExistsException}
-   (swap! state/db
-          (fn [db id source target]
-            (deep-merge db {:download
-                            {:items
-                             {id
-                              {:links
-                               {source target}}}}}))
-          id source target)
+   (let [id (str id)]
+     (swap! state/db
+            (fn [db id source target]
+              (deep-merge db {:download
+                              {:items
+                               {id
+                                {:links
+                                 {source target}}}}}))
+            id source target))
    (Files/createSymbolicLink
     (nio-path source)
     (nio-path target)
@@ -44,15 +55,16 @@
 ;### DL Media-Entry ###########################################################
 
 (defn set-item-to-finished [id]
-  (swap! state/db
-         (fn [db id]
-           (deep-merge db
-                       {:download
-                        {:items
-                         {id
-                          {:state "passed"
-                           :download_finished-at (str (time/now))}}}}))
-         id))
+  (let [id (str id)]
+    (swap! state/db
+           (fn [db id]
+             (deep-merge db
+                         {:download
+                          {:items
+                           {id
+                            {:state "passed"
+                             :download_finished-at (str (time/now))}}}}))
+           id)))
 
 (defn download-media-entry
   ([id target-dir skip-media-files? prefix-meta-key api-entry-point api-http-opts]
@@ -71,27 +83,31 @@
                              target-dir media-entry))))
   ([skip-media-files? prefix-meta-key export-structure dir-path media-entry]
    (catcher/with-logging {}
-     (let [id (-> media-entry roa/data :id)
+     (ensure-not-cancelled!)
+     (let [id (str (-> media-entry roa/data :id))
            entry-prefix-path (structure/dir-name export-structure
                                                  prefix-meta-key media-entry)
            entry-dir-path (str dir-path File/separator entry-prefix-path)
            write-prefixed? (structure/write-prefixed-artifacts? export-structure)
-           meta-data (meta-data media-entry)]
+           entity-md (meta-data/meta-data media-entry)
+           item-title (meta-data/title entity-md)]
        (if (-> @state/db :download :items (get id))
          (let [target (-> @state/db :download :items (get id) :path)]
            (symlink id entry-dir-path target))
          (do (swap! state/db (fn [db uuid media-entry]
-                               (assoc-in db [:download :items (str id)] media-entry))
+                               (assoc-in db [:download :items id] media-entry))
                     id (assoc (roa/data media-entry)
                               :state "downloading"
                               :errors {}
                               :type "MediaEntry"
+                              :title item-title
                               :path entry-dir-path
                               :download_started-at (str (time/now))))
              (io/make-parents entry-dir-path)
-             (write-meta-data entry-dir-path meta-data id entry-prefix-path write-prefixed?)
+             (meta-data/write-meta-data entry-dir-path entity-md id
+                                        entry-prefix-path write-prefixed?)
              (index-html/write entry-dir-path
-                               meta-data
+                               entity-md
                                (-> media-entry roa/data (assoc :type :media-entry))
                                entry-prefix-path
                                write-prefixed?)
@@ -123,6 +139,7 @@
                        (roa/relation :media-entries)
                        (roa/get me-get-opts)
                        roa/coll-seq)]
+      (ensure-not-cancelled!)
       (download-media-entry skip-media-files? prefix-meta-key export-structure
                             target-dir-path (roa/get me-rel {})))))
 
@@ -139,6 +156,7 @@
                                 (roa/get coll-get-opts)
                                 roa/coll-seq)
                             (map #(roa/get % {})))]
+      (ensure-not-cancelled!)
       (download-set
        (-> collection roa/data :id)
        target-dir-path recursive? skip-media-files? prefix-meta-key
@@ -146,31 +164,36 @@
 
 (defn download-set [id dl-path recursive? skip-media-files? prefix-meta-key
                     export-structure api-entry-point api-http-opts]
-  (let [collection (-> (roa/get-root api-entry-point
+  (ensure-not-cancelled!)
+  (let [id (str id)
+        collection (-> (roa/get-root api-entry-point
                                      :default-conn-opts api-http-opts)
                        (roa/relation :collection)
                        (roa/get {:id id}))
         path-prefix (structure/dir-name export-structure prefix-meta-key collection)
         target-dir-path (str dl-path File/separator path-prefix)
         write-prefixed? (structure/write-prefixed-artifacts? export-structure)
-        meta-data (meta-data collection)]
+        entity-md (meta-data/meta-data collection)
+        item-title (meta-data/title entity-md)]
     (if (-> @state/db :download :items (get id))
       (let [target (-> @state/db :download :items (get id) :path)]
         (symlink id target-dir-path target))
       (catcher/with-logging {}
         (swap! state/db (fn [db id] (deep-merge db {:download {:items {id {}}}})) id)
         (swap! state/db (fn [db uuid collection]
-                          (assoc-in db [:download :items (str id)] collection))
+                          (assoc-in db [:download :items id] collection))
                id (assoc (roa/data collection)
                          :state "downloading"
                          :errors {}
                          :type "Collection"
+                         :title item-title
                          :path target-dir-path
                          :download_started-at (str (time/now))))
         (io/make-parents target-dir-path)
-        (write-meta-data target-dir-path meta-data id path-prefix write-prefixed?)
+        (meta-data/write-meta-data target-dir-path entity-md id
+                                   path-prefix write-prefixed?)
         (index-html/write target-dir-path
-                          meta-data
+                          entity-md
                           (-> collection roa/data (assoc :type :collection))
                           path-prefix
                           write-prefixed?)
@@ -182,7 +205,6 @@
            collection target-dir-path recursive? skip-media-files? prefix-meta-key
            export-structure api-entry-point api-http-opts))
         (set-item-to-finished id)))))
-
 ;### download meta-data schema ################################################
 
 (def download-meta-data-schema meta-data-schema/download)

@@ -82,15 +82,32 @@
 
 (defonce download-future (atom nil))
 
+(defn- download-cancelled? []
+  (boolean (get-in @state/db [:download :cancel-requested])))
+
+(defn- mark-download-cancelled! []
+  (swap! state/db
+         (fn [db]
+           (deep-merge db
+                       {:download
+                        {:download-finished true
+                         :download-cancelled true
+                         :cancel-requested true}}))))
+
+(defn- mark-download-failed! [e]
+  (swap! state/db
+         (fn [db e]
+           (deep-merge db
+                       {:download
+                        {:download-finished true
+                         :errors {:dowload-error (str e)}}}))
+         e))
+
 (def snatch-dl-exception-params
   {:return-fn (fn [e]
-                (swap! state/db
-                       (fn [db e]
-                         (deep-merge db
-                                     {:download
-                                      {:state :failed
-                                       :errors {:dowload-error (str e)}}}))
-                       e))
+                (if (download-cancelled?)
+                  (mark-download-cancelled!)
+                  (mark-download-failed! e)))
    :throwable Throwable})
 
 (defn start-download-future [id target-dir recursive? skip-media-files? prefix-meta-key
@@ -99,13 +116,10 @@
           (future
             (catcher/snatch
              {:return-fn (fn [e]
-                           (swap! state/db
-                                  (fn [db e]
-                                    (deep-merge db
-                                                {:download
-                                                 {:download-finished true
-                                                  :errors {:dowload-error (str e)}}}))
-                                  e))
+                           (if (or (download-cancelled?)
+                                   (= :download-cancelled (:type (ex-data e))))
+                             (mark-download-cancelled!)
+                             (mark-download-failed! e)))
               :throwable Throwable}
              (case (-> @state/db :download :entity :type)
                :collection (export/download-set
@@ -114,22 +128,27 @@
                :media-entry (export/download-media-entry
                              id target-dir skip-media-files? prefix-meta-key
                              export-structure entry-point http-options))
-             (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true)))))))
+             (if (download-cancelled?)
+               (mark-download-cancelled!)
+               (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true))))))))
 
 (defn download [request]
   (if (and @download-future (not (realized? @download-future)))
     {:status 422 :body "There seems to be an ongoing download in progress!"}
     (catcher/snatch
      {:return-fn (fn [e]
-                   (swap! state/db
-                          (fn [db e]
-                            (deep-merge db
-                                        {:download
-                                         {:download-finished true
-                                          :errors {:dowload-error (str e)}}}))
-                          e))
+                   (mark-download-failed! e)
+                   {:status 500 :body (thrown/stringify e)})
       :throwable Throwable}
-     (swap! state/db (fn [db] (assoc-in db [:download :download-started] true)))
+     (swap! state/db
+            (fn [db]
+              (deep-merge db
+                          {:download
+                           {:download-started true
+                            :download-finished false
+                            :download-cancelled false
+                            :cancel-requested false
+                            :errors nil}})))
      (let [id (-> @state/db :download :entity :uuid)
            target-dir (-> @state/db :download :target-directory)
            recursive? (-> @state/db :download :recursive not not)
@@ -145,6 +164,14 @@
        (start-download-future id target-dir recursive? skip-media-files? prefix-meta-key
                               export-structure entry-point http-options))
      {:status 202})))
+
+(defn cancel-download [_]
+  (swap! state/db assoc-in [:download :cancel-requested] true)
+  (when-let [f @download-future]
+    (when-not (realized? f)
+      (future-cancel f)))
+  (mark-download-cancelled!)
+  {:status 204})
 
 (defn patch-download-item [request]
   (logging/debug 'patch-download-item {:request request})
@@ -236,6 +263,8 @@
   (PATCH "/download-parameters" _ #'patch-download-parameters)
 
   (POST "/download" _ #'download)
+
+  (POST "/download/cancel" _ #'cancel-download)
 
   (POST "/download/step1" _ #'download-step1)
 

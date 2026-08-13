@@ -94,7 +94,7 @@
                 (get-collection-meta-datum-values meta-datum))))
        (map enrich-with-meta-key-label)))
 
-(def meta-data (memoize meta-data_unmemoized))
+(def meta-data meta-data_unmemoized)
 
 (defn title [meta-data]
   (:value (some (fn [meta-datum]
@@ -106,7 +106,8 @@
   ([target-dir meta-data item-id prefix-path]
    (write-meta-data target-dir meta-data item-id prefix-path true))
   ([target-dir meta-data item-id prefix-path write-prefixed?]
-   (let [content (cheshire/generate-string meta-data {:pretty true})
+   (let [item-id (str item-id)
+         content (cheshire/generate-string meta-data {:pretty true})
          paths (cond-> [(str target-dir File/separator "meta-data.json")]
                  write-prefixed?
                  (conj (str target-dir File/separator prefix-path "_meta-data.json")))]

@@ -101,12 +101,16 @@ pre
   > .references
     margin-bottom: 2em
 
-.page.download
+.page
   padding-top: 1em
 
-  > h3
-    margin-bottom: 1.5em
+  > .page-breadcrumb
+    margin: 0 0 1.5em
+    color: #777
+    font-size: 1em
+    font-weight: normal
 
+.page.download
   h2
     margin-top: 0
     margin-bottom: 1.25em
@@ -175,6 +179,17 @@ pre
       .item-id
         word-break: break-all
 
+        &.text-muted
+          color: #777
+
+      a.item-id
+        text-decoration: none
+
+        &:hover,
+        &:focus
+          text-decoration: underline
+          color: #555
+
       .item-title
         word-break: break-word
 
@@ -191,6 +206,20 @@ pre
     padding-right: 0.5em
     border-top: 1px solid #eee
     border-bottom: 1px solid #eee
+
+    .checklist-label.item-columns
+      display: grid
+      grid-template-columns: 7.5em minmax(18em, 22em) minmax(0, 1fr) auto
+      column-gap: 0.75em
+      align-items: baseline
+      width: 100%
+
+    .item-type .label
+      display: inline-block
+
+    .item-id
+      font-family: Menlo, Monaco, Consolas, monospace
+      font-size: 0.9em
 
   .dismiss
     margin-top: 2em

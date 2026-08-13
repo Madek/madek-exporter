@@ -40,7 +40,8 @@
 ;### DL Previews ##############################################################
 
 (defn download-previews [target-dir media-file item-id media-file-id]
-  (let [previews-dir (str target-dir File/separator "previews")]
+  (let [item-id (str item-id)
+        previews-dir (str target-dir File/separator "previews")]
     (doseq [preview-rel (-> media-file roa/coll-seq)]
       (let [preview (roa/get preview-rel {})
             preview-id (-> preview roa/data :id)
@@ -67,7 +68,8 @@
 ;### DL Media-Files ###########################################################
 
 (defn download-media-file [target-dir media-file item-id]
-  (let [media-file-id (-> media-file roa/data :id)
+  (let [item-id (str item-id)
+        media-file-id (-> media-file roa/data :id)
         response (-> media-file
                      (roa/relation :data-stream)
                      (roa/get {} :mod-conn-opts #(assoc % :as :stream)))
@@ -90,7 +92,7 @@
 
 (defn download-media-files [target-dir media-entry]
   (catcher/with-logging {}
-    (let [item-id (-> media-entry roa/data :id)
+    (let [item-id (str (-> media-entry roa/data :id))
           media-files-dir (str target-dir File/separator "media-files")]
       (doseq [media-file [(-> media-entry (roa/relation :media-file) (roa/get {}))]]
         (let [media-file-data (roa/data media-file)

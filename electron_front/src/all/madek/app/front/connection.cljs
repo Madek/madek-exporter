@@ -1,6 +1,7 @@
 (ns madek.app.front.connection
   (:refer-clojure :exclude [str keyword])
   (:require
+    [madek.app.front.breadcrumb :as breadcrumb]
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
@@ -252,8 +253,8 @@
      ]))
 
 (defn page []
-  [:div.connection
-   [:h3 (i18n/t :connection/title)]
+  [:div.page.connection
+   [breadcrumb/page-breadcrumb (i18n/t :connection/title)]
    [connection-status-component]
    (if-not @connected?*
      [connect-form]

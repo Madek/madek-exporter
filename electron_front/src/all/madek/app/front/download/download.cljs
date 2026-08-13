@@ -9,10 +9,22 @@
 
     [inflections.core :refer [pluralize]]
 
+    [cljs.nodejs :as nodejs]
     [reagent.ratom :as ratom :refer [reaction]]
     ))
 
+(def Electron (nodejs/require "electron"))
+(def shell (.-shell Electron))
+
 (def download* (reaction (-> @state/jvm-main-db :download)))
+
+(defn item-medienarchiv-url [item]
+  (when-let [base (-> @state/jvm-main-db :connection :url presence)]
+    (when-let [path (case (:type item)
+                      "Collection" "/sets/"
+                      "MediaEntry" "/entries/"
+                      nil)]
+      (str base path (:id item)))))
 
 ;;; progress helpers
 
@@ -188,19 +200,24 @@
     [:li {:key (:id item)
           :class (str "checklist-item status-" (name status))}
      [status-icon status]
-     [:span.checklist-label
-      [:span.label
-       {:class (if (= "Collection" (:type item))
-                 "label-primary"
-                 "label-default")}
-       (item-type-label item)]
-      " "
-      [:span.item-id.text-muted (:id item)]
-      (when (presence (:title item))
-        [:span.item-title " — " (:title item)])
+     [:span.checklist-label.item-columns
+      [:span.item-type
+       [:span.label
+        {:class (if (= "Collection" (:type item))
+                  "label-primary"
+                  "label-default")}
+        (item-type-label item)]]
+      (if-let [url (item-medienarchiv-url item)]
+        [:a.item-id.text-muted
+         {:href url
+          :on-click (fn [e]
+                      (.preventDefault e)
+                      (.openExternal shell url))}
+         (:id item)]
+        [:span.item-id.text-muted (:id item)])
+      [:span.item-title (or (presence (:title item)) "")]
       (when (and (= status :active) (pos? files-n))
         [:span.item-detail.text-muted
-         " — "
          (i18n/t :download/files-count {:count files-n})])]]))
 
 (defn item-checklist-component []
@@ -220,11 +237,6 @@
    [phase-checklist-component]
    [item-checklist-component]])
 
-(defn downloading-component []
-  [:div
-   [:h2 (i18n/t :download/downloading-now)]
-   [progress-detail-component]])
-
 (defn clear-export-steps []
   (let [req {:method :patch
              :json-params
@@ -232,11 +244,29 @@
               :step2-completed false
               :download-started false
               :download-finished false
+              :download-cancelled false
+              :cancel-requested false
               :items nil
               :errors nil}
              :path "/download"}]
     (request/send-off
       req {:title (i18n/t :download/dismiss-req)})))
+
+(defn cancel-download []
+  (let [req {:method :post
+             :path "/download/cancel"}]
+    (request/send-off
+      req {:title (i18n/t :download/cancel-req)
+           :show_request_modal false})))
+
+(defn downloading-component []
+  [:div
+   [:h2 (i18n/t :download/downloading-now)]
+   [progress-detail-component]
+   [:div.dismiss.download-cancel
+    [:button.btn.btn-warning
+     {:on-click cancel-download}
+     (i18n/t :download/cancel)]]])
 
 (defn disconnect []
   (clear-export-steps)
@@ -255,7 +285,9 @@
 
 (defn downloaded-component []
   [:div
-   [:h2 (i18n/t :download/finished)]
+   [:h2 (if (:download-cancelled @download*)
+          (i18n/t :download/cancelled)
+          (i18n/t :download/finished))]
    [progress-detail-component]
    [errors-component]
    [dismiss-component]])
