@@ -39,13 +39,26 @@
      :sets (->> items (filter #(= "Collection" (:type %))) count)
      :media-entries (->> items (filter #(= "MediaEntry" (:type %))) count)}))
 
+(defn item-progress-value [item]
+  "0.0–1.0 for an item; back-compat when :progress is missing."
+  (cond
+    (number? (:progress item)) (max 0.0 (min 1.0 (double (:progress item))))
+    (= "passed" (:state item)) 1.0
+    :else 0.0))
+
+(defn item-progress-percent [item]
+  (js/Math.round (* 100 (item-progress-value item))))
+
 (defn progress-percent []
-  (let [{:keys [total passed]} (item-counts)
+  (let [items (items-seq)
+        total (count items)
         finished? (:download-finished @download*)]
     (cond
       (and finished? (zero? total)) 100
       (zero? total) 0
-      :else (js/Math.round (* 100 (/ passed total))))))
+      :else (js/Math.round
+             (* 100 (/ (reduce + 0 (map item-progress-value items))
+                       total))))))
 
 (defn current-downloading-items []
   (->> (items-seq)
@@ -166,7 +179,9 @@
         (i18n/t :download/downloaded)
         (i18n/t :download/downloading))
       (i18n/t :download/progress-of {:passed passed :total total})
-      " — "
+      " ("
+      (i18n/t :download/item-progress {:percent pct})
+      ") — "
       (pluralize sets "Set") ", "
       (pluralize media-entries "MediaEntry")]]))
 
@@ -209,7 +224,16 @@
                  :pending)
         files-n (media-files-count item)
         title (or (presence (:title item)) "—")
-        uuid (str (:id item))]
+        uuid (str (:id item))
+        item-pct (item-progress-percent item)
+        detail (cond
+                 (= status :active)
+                 (str (i18n/t :download/item-progress {:percent item-pct})
+                      (when (pos? files-n)
+                        (str " · " (i18n/t :download/files-count {:count files-n}))))
+                 (= status :done)
+                 (i18n/t :download/item-progress {:percent 100})
+                 :else nil)]
     [:li {:key uuid
           :class (str "checklist-item status-" (name status))}
      [status-icon status]
@@ -230,9 +254,7 @@
                       (.openExternal shell url))}
          uuid]
         [:span.item-id.text-muted {:title uuid} uuid])
-      [:span.item-detail.text-muted
-       (when (and (= status :active) (pos? files-n))
-         (i18n/t :download/files-count {:count files-n}))]]))
+      [:span.item-detail.text-muted detail]]]))
 
 (defn item-checklist-component []
   (let [items (sorted-items)]

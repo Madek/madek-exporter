@@ -166,6 +166,7 @@
     :throwable Throwable}
    (when @download-future
      (swap! state/db assoc-in [:download :cancel-requested] true)
+     (export/abort-parallel-downloads!)
      (stop-download-future!))
    (reset-download-progress!)
    (let [id (-> @state/db :download :entity :uuid)
@@ -186,6 +187,7 @@
 
 (defn cancel-download [_]
   (swap! state/db assoc-in [:download :cancel-requested] true)
+  (export/abort-parallel-downloads!)
   (stop-download-future!)
   (mark-download-cancelled!)
   {:status 204})

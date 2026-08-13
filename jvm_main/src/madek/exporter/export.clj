@@ -11,6 +11,7 @@
    [madek.exporter.export.index-html :as index-html]
    [madek.exporter.export.meta-data :as meta-data]
    [madek.exporter.export.meta-data-schema :as meta-data-schema]
+   [madek.exporter.export.progress :as progress]
    [madek.exporter.export.structure :as structure]
    [madek.exporter.state :as state]
    [madek.exporter.utils :refer [authenticated-http-options? deep-merge presence]]
@@ -24,6 +25,8 @@
 
 (def ^:private media-entry-concurrency 4)
 
+(defonce active-download-pool (atom nil))
+
 ;### Cancel ###################################################################
 
 (defn cancel-requested? []
@@ -33,6 +36,16 @@
   (when (cancel-requested?)
     (throw (ex-info "Download cancelled by user"
                     {:type :download-cancelled}))))
+
+(defn abort-parallel-downloads!
+  "Shut down the active media-entry worker pool immediately (cancel path)."
+  []
+  (loop []
+    (when-let [^java.util.concurrent.ExecutorService pool
+               @active-download-pool]
+      (if (compare-and-set! active-download-pool pool nil)
+        (.shutdownNow pool)
+        (recur)))))
 
 ;### Path Helper ##############################################################
 
@@ -89,6 +102,8 @@
 
 (defn set-item-to-finished [id]
   (let [id (str id)]
+    (progress/set-item-progress! id 1.0 {:progress-label "done"
+                                         :file-progress 1.0})
     (swap! state/db
            (fn [db id]
              (deep-merge db
@@ -132,6 +147,9 @@
                          :type "MediaEntry"
                          :title item-title
                          :path entry-dir-path
+                         :progress 0.05
+                         :progress-label "meta"
+                         :file-progress 0.0
                          :download_started-at (str (time/now))))]
        (case (:action claim)
          :symlink (symlink id entry-dir-path (:target claim))
@@ -146,6 +164,7 @@
                                (-> media-entry roa/data (assoc :type :media-entry))
                                entry-prefix-path
                                write-prefixed?)
+             (progress/set-item-progress! id 0.15 {:progress-label "meta"})
              (when-not skip-media-files?
                (download-media-files entry-dir-path media-entry))
              (set-item-to-finished id)))))))
@@ -164,8 +183,10 @@
   (when (seq items)
     (let [pool (Executors/newFixedThreadPool (int n))
           futs (atom [])]
+      (reset! active-download-pool pool)
       (try
         (doseq [item items]
+          (ensure-not-cancelled!)
           (swap! futs conj
                  (.submit pool
                           ^Callable
@@ -180,6 +201,7 @@
                 (.cancel other true))
               (throw (unwrap-execution-exception e)))))
         (finally
+          (compare-and-set! active-download-pool pool nil)
           (.shutdownNow pool)
           (.awaitTermination pool 60 TimeUnit/SECONDS))))))
 
@@ -256,6 +278,9 @@
                       :type "Collection"
                       :title item-title
                       :path target-dir-path
+                      :progress 0.1
+                      :progress-label "meta"
+                      :file-progress 0.0
                       :download_started-at (str (time/now))))]
     (case (:action claim)
       :symlink (symlink id target-dir-path (:target claim))
@@ -271,6 +296,7 @@
                           (-> collection roa/data (assoc :type :collection))
                           path-prefix
                           write-prefixed?)
+        (progress/set-item-progress! id 0.3 {:progress-label "meta"})
         (download-media-entries-for-set
          id target-dir-path skip-media-files? prefix-meta-key
          export-structure api-entry-point api-http-opts)
