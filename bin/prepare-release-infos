@@ -98,7 +98,7 @@ echo
 RELEASE_DRAFT_URL="https://github.com/Madek/madek-exporter/releases/new?tag=${VERSION}&title=${VERSION}"
 
 echo "Next steps:"
-echo "  1. Fetch:  ./bin/fetch-server-artefacts <user@${EXECUTOR}> ${BACKUP_DIR}"
+echo "  1. Fetch:  ./bin/fetch-server-artefacts foobar@${EXECUTOR} ${BACKUP_DIR}"
 echo "  2. Draft release (creates tag): ${RELEASE_DRAFT_URL}"
 echo "  3. Attach the artefacts to the draft and publish."
 echo
