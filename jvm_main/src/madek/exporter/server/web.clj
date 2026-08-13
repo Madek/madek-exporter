@@ -24,6 +24,7 @@
    [madek.exporter.connection :as connection]
 
    [madek.exporter.export :as export]
+   [madek.exporter.export.control :as control]
    [madek.exporter.export.structure :as structure]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils :refer [str keyword deep-merge presence]]
@@ -82,6 +83,8 @@
 
 (defonce download-future (atom nil))
 
+(def ^:private download-stop-await-ms 5000)
+
 (defn- download-cancelled? []
   (boolean (get-in @state/db [:download :cancel-requested])))
 
@@ -103,20 +106,30 @@
                          :errors {:dowload-error (str e)}}}))
          e))
 
-(defn- stop-download-future!
-  "Signal cancel and drop the future handle so a new run can start cleanly."
+(defn- stop-download-work!
+  "Cancel in-flight download work, await a brief shutdown, and recreate the
+  HTTP pool so a restart is not starved by leaked connections."
   []
+  (control/bump-generation!)
+  (swap! state/db assoc-in [:download :cancel-requested] true)
+  (export/abort-parallel-downloads!)
   (when-let [f @download-future]
     (when-not (realized? f)
       (future-cancel f))
-    (reset! download-future nil)))
+    (try
+      (deref f download-stop-await-ms ::timeout)
+      (catch Exception _))
+    (reset! download-future nil))
+  (utils/reset-http-conn-manager!))
 
 (defn- reset-download-progress!
-  "Hard-clear progress so a restart never reuses stale items/errors."
+  "Hard-clear progress so a restart never reuses stale items/errors.
+  Bumps download-generation so the new run has a fresh token."
   []
   (swap! state/db
          (fn [db]
            (-> db
+               (update-in [:download :download-generation] (fnil inc 0))
                (assoc-in [:download :download-started] true)
                (assoc-in [:download :download-finished] false)
                (assoc-in [:download :download-cancelled] false)
@@ -135,26 +148,28 @@
                              export-structure entry-point http-options]
   (let [owned (atom nil)
         still-current? (fn [] (identical? @owned @download-future))
+        gen (control/current-generation)
         f (future
-            (catcher/snatch
-             {:return-fn (fn [e]
-                           (when (still-current?)
-                             (if (or (download-cancelled?)
-                                     (= :download-cancelled (:type (ex-data e))))
-                               (mark-download-cancelled!)
-                               (mark-download-failed! e))))
-              :throwable Throwable}
-             (case (-> @state/db :download :entity :type)
-               :collection (export/download-set
-                            id target-dir recursive? skip-media-files?
-                            prefix-meta-key export-structure entry-point http-options)
-               :media-entry (export/download-media-entry
-                             id target-dir skip-media-files? prefix-meta-key
-                             export-structure entry-point http-options))
-             (when (still-current?)
-               (if (download-cancelled?)
-                 (mark-download-cancelled!)
-                 (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true)))))))]
+            (binding [control/*download-generation* gen]
+              (catcher/snatch
+               {:return-fn (fn [e]
+                             (when (still-current?)
+                               (if (or (download-cancelled?)
+                                       (= :download-cancelled (:type (ex-data e))))
+                                 (mark-download-cancelled!)
+                                 (mark-download-failed! e))))
+                :throwable Throwable}
+               (case (-> @state/db :download :entity :type)
+                 :collection (export/download-set
+                              id target-dir recursive? skip-media-files?
+                              prefix-meta-key export-structure entry-point http-options)
+                 :media-entry (export/download-media-entry
+                               id target-dir skip-media-files? prefix-meta-key
+                               export-structure entry-point http-options))
+               (when (still-current?)
+                 (if (download-cancelled?)
+                   (mark-download-cancelled!)
+                   (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true))))))))]
     (reset! owned f)
     (reset! download-future f)))
 
@@ -164,10 +179,7 @@
                  (mark-download-failed! e)
                  {:status 500 :body (thrown/stringify e)})
     :throwable Throwable}
-   (when @download-future
-     (swap! state/db assoc-in [:download :cancel-requested] true)
-     (export/abort-parallel-downloads!)
-     (stop-download-future!))
+   (stop-download-work!)
    (reset-download-progress!)
    (let [id (-> @state/db :download :entity :uuid)
          target-dir (-> @state/db :download :target-directory)
@@ -178,6 +190,7 @@
          export-structure (structure/normalize
                            (-> @state/db :download :export_structure))
          entry-point (state/connection-entry-point)
+         ;; Capture pool after stop/reset so we use the fresh manager.
          http-options (state/connection-http-options)]
      (when download-meta-data-schema?
        (export/download-meta-data-schema target-dir))
@@ -186,9 +199,7 @@
    {:status 202}))
 
 (defn cancel-download [_]
-  (swap! state/db assoc-in [:download :cancel-requested] true)
-  (export/abort-parallel-downloads!)
-  (stop-download-future!)
+  (stop-download-work!)
   (mark-download-cancelled!)
   {:status 204})
 

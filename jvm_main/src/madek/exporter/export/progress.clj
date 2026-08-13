@@ -1,15 +1,19 @@
 (ns madek.exporter.export.progress
   (:require
+   [madek.exporter.export.control :as control]
    [madek.exporter.state :as state]
    [madek.exporter.utils :refer [deep-merge]]))
 
 (defn set-item-progress!
   "Set :progress (0.0–1.0) and optional extra fields on a download item.
-  No-op when cancel has been requested so late workers do not keep the UI alive."
+  No-op when cancel has been requested or this worker was superseded so late
+  workers do not keep the UI alive."
   ([id progress]
    (set-item-progress! id progress nil))
   ([id progress extra]
-   (when-not (get-in @state/db [:download :cancel-requested])
+   (when (and (not (control/cancel-requested?))
+              (or (nil? control/*download-generation*)
+                  (= control/*download-generation* (control/current-generation))))
      (let [id (str id)
            progress (double (max 0.0 (min 1.0 progress)))
            patch (cond-> {:progress progress}

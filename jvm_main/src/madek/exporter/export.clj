@@ -7,6 +7,7 @@
    [logbug.catcher :as catcher :refer [snatch]]
    [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
    [logbug.thrown :as thrown]
+   [madek.exporter.export.control :as control]
    [madek.exporter.export.files :as files :refer [download-media-files]]
    [madek.exporter.export.index-html :as index-html]
    [madek.exporter.export.meta-data :as meta-data]
@@ -25,28 +26,26 @@
 
 (def ^:private media-entry-concurrency 4)
 
+(def ^:private pool-await-seconds 5)
+
 (defonce active-download-pool (atom nil))
 
 ;### Cancel ###################################################################
 
-(defn cancel-requested? []
-  (boolean (get-in @state/db [:download :cancel-requested])))
-
-(defn ensure-not-cancelled! []
-  (when (cancel-requested?)
-    (throw (ex-info "Download cancelled by user"
-                    {:type :download-cancelled}))))
+(def cancel-requested? control/cancel-requested?)
+(def ensure-not-cancelled! control/ensure-not-cancelled!)
 
 (defn abort-parallel-downloads!
-  "Shut down the active media-entry worker pool immediately (cancel path)."
+  "Shut down the active media-entry worker pool immediately (cancel path)
+  and wait briefly for workers to exit."
   []
   (loop []
     (when-let [^java.util.concurrent.ExecutorService pool
                @active-download-pool]
       (if (compare-and-set! active-download-pool pool nil)
-        (.shutdownNow pool)
+        (do (.shutdownNow pool)
+            (.awaitTermination pool pool-await-seconds TimeUnit/SECONDS))
         (recur)))))
-
 ;### Path Helper ##############################################################
 
 (defn nio-path [s] (Paths/get s (into-array [""])))
@@ -86,6 +85,7 @@
    {:action :download} when this caller owns the download, or
    {:action :symlink :target path} when the item was already claimed."
   [id claimed-data]
+  (ensure-not-cancelled!)
   (let [id (str id)
         outcome (atom nil)]
     (swap! state/db
@@ -101,6 +101,7 @@
 ;### DL Media-Entry ###########################################################
 
 (defn set-item-to-finished [id]
+  (ensure-not-cancelled!)
   (let [id (str id)]
     (progress/set-item-progress! id 1.0 {:progress-label "done"
                                          :file-progress 1.0})
@@ -178,11 +179,13 @@
 
 (defn run-bounded!
   "Run (f item) for each item with at most n worker threads. Rethrows the first
-  worker failure and cancels remaining tasks."
+  worker failure and cancels remaining tasks. Re-binds download generation on
+  each worker so cancel/supersede checks work off the pool threads."
   [n f items]
   (when (seq items)
     (let [pool (Executors/newFixedThreadPool (int n))
-          futs (atom [])]
+          futs (atom [])
+          gen control/*download-generation*]
       (reset! active-download-pool pool)
       (try
         (doseq [item items]
@@ -192,7 +195,8 @@
                           ^Callable
                           (reify Callable
                             (call [_]
-                              (f item))))))
+                              (binding [control/*download-generation* gen]
+                                (f item)))))))
         (doseq [^Future fut @futs]
           (try
             (.get fut)
@@ -203,8 +207,7 @@
         (finally
           (compare-and-set! active-download-pool pool nil)
           (.shutdownNow pool)
-          (.awaitTermination pool 60 TimeUnit/SECONDS))))))
-
+          (.awaitTermination pool pool-await-seconds TimeUnit/SECONDS))))))
 ;### check credentials ########################################################
 
 (defn check-credentials [api-entry-point api-http-opts]

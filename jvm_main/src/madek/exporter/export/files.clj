@@ -7,13 +7,13 @@
    [logbug.catcher :as catcher]
    [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
    [logbug.thrown :as thrown]
+   [madek.exporter.export.control :as control]
    [madek.exporter.export.progress :as progress]
    [madek.exporter.state :as state]
    [madek.exporter.utils :refer [deep-merge presence]])
 
   (:import
    [java.io File InputStream OutputStream]))
-
 ;### title and prefix #########################################################
 
 (defn get-prefix [prefix-meta-key media-resource]
@@ -40,11 +40,7 @@
 
 ;### Progress-aware copy ######################################################
 
-(defn- ensure-not-cancelled!
-  []
-  (when (get-in @state/db [:download :cancel-requested])
-    (throw (ex-info "Download cancelled by user"
-                    {:type :download-cancelled}))))
+(def ^:private ensure-not-cancelled! control/ensure-not-cancelled!)
 
 (defn- header-content-length [response]
   (let [h (or (:headers response) {})
@@ -125,11 +121,12 @@
                         {:path preview-path}}}}}}}})
           (io/make-parents preview-path)
           (with-open [out (io/output-stream (io/file preview-path))]
-            (io/copy (-> preview-response :body) out))
+            (copy-counting! (:body preview-response) out
+                            (header-content-length preview-response)
+                            nil))
           (progress/set-item-progress! item-id overall
                                        {:progress-label "preview"
                                         :file-progress 1.0}))))))
-
 ;### DL Media-Files ###########################################################
 
 (defn download-media-file [target-dir media-file item-id]
