@@ -3,6 +3,34 @@
 - version_major: 0
   version_minor: 11
   version_patch: 1
+  version_pre: 1
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Add a Browse button for the export target directory (native Electron folder dialog).
+    * Improve HTML export: WebApp-style person names with roles, skip empty meta-data, and format JSON meta-data.
+    * Enrich exported meta-data with meta-key labels (shared meta-keys lookup for HTML and JSON).
+    * Replace the connection password/token “show” checkbox with an eye-icon toggle.
+    * Fix release-infos helper Notes formatting; ignore vendor/ in git.
+    * Default to the new export structure (`{uuid}_{slug}` folders; only `index.html` / `meta-data.json`; no duplicate prefixed artefacts); Step 3 chooser keeps the legacy structure for compatibility.
+    * Async export/download with progress reporting, status bar, and spinner; improve re-download / export control.
+    * Export UI polish: breadcrumbs, Step 1–3 styling, and related i18n strings.
+
+    Notes
+    -----
+
+    * Same packaging, toolchain, and platform notes as 0.11.0.
+
+####### 0.11.1 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 1
   version_pre: 0
   version_build: NULL
   name: NULL
