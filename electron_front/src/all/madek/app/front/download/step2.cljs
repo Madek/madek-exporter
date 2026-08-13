@@ -58,21 +58,25 @@
   (when (= :collection (-> @download* :entity :type))
     [:div.recursive
      [:h4 (i18n/t :download/recursion)]
-    [:div.form-group
-     [:input {:type :checkbox
-              :on-click #(set-value :recursive (-> @form-data* :recursive not))
-              :checked (-> @form-data* :recursive)} ] (i18n/t :download/recurse)
-     [:p.help-block (i18n/t :download/recursion-help)]]]))
+     [:div.checkbox
+      [:label
+       [:input {:type :checkbox
+                :on-click #(set-value :recursive (-> @form-data* :recursive not))
+                :checked (-> @form-data* :recursive)}]
+       (i18n/t :download/recurse)]
+      [:p.help-block (i18n/t :download/recursion-help)]]]))
 
 ;;; skip files ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn skip-media-files-component []
   [:div.skip-files
    [:h4 (i18n/t :download/skip-files)]
-   [:div.form-group
-    [:input {:type :checkbox
-             :on-click #(set-value :skip_media_files (-> @form-data* :skip_media_files not))
-             :checked (-> @form-data* :skip_media_files)} ] (i18n/t :download/skip-files-label)
+   [:div.checkbox
+    [:label
+     [:input {:type :checkbox
+              :on-click #(set-value :skip_media_files (-> @form-data* :skip_media_files not))
+              :checked (-> @form-data* :skip_media_files)}]
+     (i18n/t :download/skip-files-label)]
     [:p.help-block (i18n/t :download/skip-files-help)]]])
 
 
@@ -186,15 +190,16 @@
    [recursive-component]
    [prefix-component]
    [skip-media-files-component]
-   [:div.pull-left
-    [:button.btn.btn-info
-     {:on-click back}
-     (i18n/t :download/back-step1) ]]
-   [:div.pull-right
-    [:button.btn.btn-primary
-     {:on-click submit}
-     (i18n/t :download/continue-step3) ]]
-   [:div.clearfix]])
+   [:div.form-actions
+    [:div.pull-left
+     [:button.btn.btn-info
+      {:on-click back}
+      (i18n/t :download/back-step1) ]]
+    [:div.pull-right
+     [:button.btn.btn-primary
+      {:on-click submit}
+      (i18n/t :download/continue-step3) ]]
+    [:div.clearfix]]])
 
 (defn debug-component []
   (when (:debug @state/client-db)

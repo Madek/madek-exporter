@@ -139,7 +139,7 @@
                 [:section.form
                  [url-input-component]
                  [target-dir-input-component]
-                 [:div.clearfix
+                 [:div.form-actions.clearfix
                   [:div.pull-left
                    [:a.btn.btn-info
                     {:href "/connection"}
@@ -148,5 +148,5 @@
                    (merge
                      {:on-click submit}
                      (when (not @form-valid?*) {:disabled true}))
-                   (i18n/t :download/continue-step2)]] [:div.clearfix]]
+                   (i18n/t :download/continue-step2)]]]
                 [debug-component]])}))

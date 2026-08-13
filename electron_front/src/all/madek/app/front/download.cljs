@@ -45,7 +45,7 @@
       [:hr]])])
 
 (defn page []
-  [:div.page
+  [:div.page.download
    [:h3 (i18n/t :download/title)]
    (cond
      (-> @download* :download-finished) [download/downloaded-component]

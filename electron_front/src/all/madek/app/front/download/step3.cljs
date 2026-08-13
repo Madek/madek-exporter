@@ -80,23 +80,23 @@
   (let [current (export-structure-value)]
     [:div.export-structure
      [:h4 (i18n/t :download/export-structure)]
-     [:div.form-group
+     [:div.radio
       [:label
        [:input {:type :radio
                 :name "export_structure"
                 :value new-export-structure
                 :checked (= current new-export-structure)
                 :on-change #(set-export-structure new-export-structure)}]
-       " " (i18n/t :download/export-structure-new)]
+       (i18n/t :download/export-structure-new)]
       [:p.help-block (i18n/t :download/export-structure-new-help)]]
-     [:div.form-group
+     [:div.radio
       [:label
        [:input {:type :radio
                 :name "export_structure"
                 :value legacy-export-structure
                 :checked (= current legacy-export-structure)
                 :on-change #(set-export-structure legacy-export-structure)}]
-       " " (i18n/t :download/export-structure-legacy)]
+       (i18n/t :download/export-structure-legacy)]
       [:p.help-block (i18n/t :download/export-structure-legacy-help)]]]))
 
 (defn debug-component []
@@ -106,7 +106,7 @@
      ]))
 
 (defn form-component []
-  [:div.form
+  [:div.form-actions
    [:div.pull-left
     [:button.btn.btn-info
      {:on-click back}
