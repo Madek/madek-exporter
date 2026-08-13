@@ -102,22 +102,27 @@
                        meta-datum))
                 meta-data)))
 
-(defn write-meta-data [target-dir meta-data item-id prefix-path]
-  (let [content (cheshire/generate-string meta-data {:pretty true})]
-    (doseq [path [(str target-dir File/separator "meta-data.json")
-                  (str target-dir File/separator prefix-path "_meta-data.json")]]
-      (io/make-parents path)
-      (spit path content)
-      (swap! state/db
-             (fn [db params]
-               (deep-merge db params))
-             {:download
-              {:items
-               {item-id
-                {:title (title meta-data)
-                 :meta-data
-                 {:path path
-                  :data meta-data}}}}}))))
+(defn write-meta-data
+  ([target-dir meta-data item-id prefix-path]
+   (write-meta-data target-dir meta-data item-id prefix-path true))
+  ([target-dir meta-data item-id prefix-path write-prefixed?]
+   (let [content (cheshire/generate-string meta-data {:pretty true})
+         paths (cond-> [(str target-dir File/separator "meta-data.json")]
+                 write-prefixed?
+                 (conj (str target-dir File/separator prefix-path "_meta-data.json")))]
+     (doseq [path paths]
+       (io/make-parents path)
+       (spit path content)
+       (swap! state/db
+              (fn [db params]
+                (deep-merge db params))
+              {:download
+               {:items
+                {item-id
+                 {:title (title meta-data)
+                  :meta-data
+                  {:path path
+                   :data meta-data}}}}})))))
 
 ;### Debug ####################################################################
 ;(logging-config/set-logger! :level :debug)

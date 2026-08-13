@@ -20,7 +20,8 @@
                        [(System/getProperty "user.home")
                         "Downloads" "Madek-Export"]))
 
-(defonce db (atom {:download {:target-directory default-download-directory}}))
+(defonce db (atom {:download {:target-directory default-download-directory
+                              :export_structure "new-export-structure"}}))
 ;(reset! db {:download {:target-directory default-download-directory}})
 
 (swap! db assoc-in [:download :state] :step1)

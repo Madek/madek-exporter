@@ -24,6 +24,7 @@
    [madek.exporter.connection :as connection]
 
    [madek.exporter.export :as export]
+   [madek.exporter.export.structure :as structure]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils :refer [str keyword deep-merge presence]]
    [ring.middleware.defaults :refer [site-defaults wrap-defaults]]
@@ -92,7 +93,8 @@
                        e))
    :throwable Throwable})
 
-(defn start-download-future [id target-dir recursive? skip-media-files? prefix-meta-key entry-point http-options]
+(defn start-download-future [id target-dir recursive? skip-media-files? prefix-meta-key
+                             export-structure entry-point http-options]
   (reset! download-future
           (future
             (catcher/snatch
@@ -108,10 +110,10 @@
              (case (-> @state/db :download :entity :type)
                :collection (export/download-set
                             id target-dir recursive? skip-media-files?
-                            prefix-meta-key entry-point http-options)
+                            prefix-meta-key export-structure entry-point http-options)
                :media-entry (export/download-media-entry
                              id target-dir skip-media-files? prefix-meta-key
-                             entry-point http-options))
+                             export-structure entry-point http-options))
              (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true)))))))
 
 (defn download [request]
@@ -134,11 +136,14 @@
            skip-media-files? (-> @state/db :download :skip_media_files not not)
            download-meta-data-schema? true
            prefix-meta-key (-> @state/db :download :prefix_meta_key presence)
+           export-structure (structure/normalize
+                             (-> @state/db :download :export_structure))
            entry-point (state/connection-entry-point)
            http-options (state/connection-http-options)]
        (when download-meta-data-schema?
          (export/download-meta-data-schema target-dir))
-       (start-download-future id target-dir recursive? skip-media-files? prefix-meta-key entry-point http-options))
+       (start-download-future id target-dir recursive? skip-media-files? prefix-meta-key
+                              export-structure entry-point http-options))
      {:status 202})))
 
 (defn patch-download-item [request]

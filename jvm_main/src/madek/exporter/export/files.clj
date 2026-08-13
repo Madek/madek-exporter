@@ -26,9 +26,11 @@
       :value str))
 
 (defn useableFileName [s]
-  (.replaceAll s "[^a-zA-Z0-9 ]" ""))
+  "Legacy filename sanitizer; prefer madek.exporter.export.structure/legacy-usable-filename."
+  (.replaceAll (str s) "[^a-zA-Z0-9 ]" ""))
 
 (defn path-prefix [prefix-meta-key media-resource]
+  "Legacy dir naming ({title}_{uuid}); prefer structure/dir-name with a strategy."
   (let [prefix-part-one (if-not (presence prefix-meta-key) ""
                                 (if-let [mk-value (get-prefix
                                                    prefix-meta-key media-resource)]

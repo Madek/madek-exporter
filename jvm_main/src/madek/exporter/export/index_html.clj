@@ -8,7 +8,6 @@
    [logbug.catcher :as catcher]
    [logbug.debug :as debug :refer [I> I>>]]
    [logbug.thrown :as thrown]
-   [madek.exporter.export.files :as files :refer [path-prefix]]
    [madek.exporter.state :as state]
    [madek.exporter.utils :refer [deep-merge]])
 
@@ -145,13 +144,17 @@
      [:p "URL: " (url media-resource)]
      (html-meta-data meta-data)]]))
 
-(defn write [target-dir meta-data media-resource prefix-path]
-  (io/make-parents target-dir)
-  (let [html (html media-resource meta-data)]
-    (doseq [path [(str target-dir File/separator "index.html")
-                  (str target-dir File/separator prefix-path "_index.html")]]
-      (spit path html))))
-
+(defn write
+  ([target-dir meta-data media-resource prefix-path]
+   (write target-dir meta-data media-resource prefix-path true))
+  ([target-dir meta-data media-resource prefix-path write-prefixed?]
+   (io/make-parents target-dir)
+   (let [html (html media-resource meta-data)
+         paths (cond-> [(str target-dir File/separator "index.html")]
+                 write-prefixed?
+                 (conj (str target-dir File/separator prefix-path "_index.html")))]
+     (doseq [path paths]
+       (spit path html)))))
 ;### Debug ####################################################################
 ;(debug/re-apply-last-argument #'write)
 ;(debug/debug-ns *ns*)
