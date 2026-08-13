@@ -18,7 +18,8 @@
 
   (:import
    [java.io File]
-   [java.nio.file Files Paths]))
+   [java.nio.file Files Paths]
+   [org.apache.commons.io FileUtils]))
 
 ;### Cancel ###################################################################
 
@@ -33,6 +34,16 @@
 ;### Path Helper ##############################################################
 
 (defn nio-path [s] (Paths/get s (into-array [""])))
+
+(defn delete-path-if-exists!
+  "Remove an existing export path so a re-download starts clean."
+  [path]
+  (when (presence (some-> path str))
+    (let [f (io/file path)]
+      (when (.exists f)
+        (if (.isDirectory f)
+          (FileUtils/deleteDirectory f)
+          (io/delete-file f true))))))
 
 (defn symlink [id source target]
   (snatch
@@ -94,7 +105,7 @@
        (if (-> @state/db :download :items (get id))
          (let [target (-> @state/db :download :items (get id) :path)]
            (symlink id entry-dir-path target))
-         (do (swap! state/db (fn [db uuid media-entry]
+             (do (swap! state/db (fn [db uuid media-entry]
                                (assoc-in db [:download :items id] media-entry))
                     id (assoc (roa/data media-entry)
                               :state "downloading"
@@ -103,6 +114,8 @@
                               :title item-title
                               :path entry-dir-path
                               :download_started-at (str (time/now))))
+             (ensure-not-cancelled!)
+             (delete-path-if-exists! entry-dir-path)
              (io/make-parents entry-dir-path)
              (meta-data/write-meta-data entry-dir-path entity-md id
                                         entry-prefix-path write-prefixed?)
@@ -179,7 +192,6 @@
       (let [target (-> @state/db :download :items (get id) :path)]
         (symlink id target-dir-path target))
       (catcher/with-logging {}
-        (swap! state/db (fn [db id] (deep-merge db {:download {:items {id {}}}})) id)
         (swap! state/db (fn [db uuid collection]
                           (assoc-in db [:download :items id] collection))
                id (assoc (roa/data collection)
@@ -189,6 +201,8 @@
                          :title item-title
                          :path target-dir-path
                          :download_started-at (str (time/now))))
+        (ensure-not-cancelled!)
+        (delete-path-if-exists! target-dir-path)
         (io/make-parents target-dir-path)
         (meta-data/write-meta-data target-dir-path entity-md id
                                    path-prefix write-prefixed?)

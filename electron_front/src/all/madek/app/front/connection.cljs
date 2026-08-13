@@ -257,7 +257,9 @@
    [breadcrumb/page-breadcrumb (i18n/t :connection/title)]
    [connection-status-component]
    (if-not @connected?*
-     [connect-form]
+     [:div
+      [:h2 (i18n/t :connection/login-title)]
+      [connect-form]]
      [continue-form])
    [:div.clearfix]
    [debug-component]])

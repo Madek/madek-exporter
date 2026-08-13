@@ -1,8 +1,5 @@
 (ns madek.app.front.main
   (:refer-clojure :exclude [str keyword send-off])
-  (:require-macros
-    [reagent.ratom :as ratom :refer [reaction]]
-    )
   (:require
     [madek.app.front.connection :as connection]
     [madek.app.front.i18n :as i18n]

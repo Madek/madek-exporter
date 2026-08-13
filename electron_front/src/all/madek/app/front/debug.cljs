@@ -2,6 +2,7 @@
   (:require
     [fipp.edn :refer [pprint]]
     [reagent.core :as reagent]
+    [madek.app.front.breadcrumb :as breadcrumb]
     [madek.app.front.i18n :as i18n]
     [madek.app.front.state :as state]
     [clojure.walk]
@@ -80,7 +81,7 @@
      [state-content])])
 
 (defn page []
-  [:div.debug
-   [:h3 (i18n/t :debug/title)]
+  [:div.page.debug
+   [breadcrumb/page-breadcrumb (i18n/t :debug/title)]
    [content]
    ])

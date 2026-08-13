@@ -92,9 +92,6 @@ pre
       text-overflow: ellipsis
 
 .help
-  > h3
-    margin-bottom: 1.75em
-
   > .version,
   > .supported-os,
   > .login-variants,
@@ -105,16 +102,17 @@ pre
   padding-top: 1em
 
   > .page-breadcrumb
-    margin: 0 0 1.5em
+    margin: 0
+    padding-bottom: 1.5em
     color: #777
     font-size: 1em
     font-weight: normal
 
-.page.download
   h2
     margin-top: 0
     margin-bottom: 1.25em
 
+.page.download
   // First block under the Schritt title — no extra top margin
   .pre-download-check > .form > .form-group:first-child,
   .download-form > .form > :first-child,
@@ -225,10 +223,10 @@ pre
     margin-top: 2em
     clear: both
 
-  .glyphicon.spinning
-    animation: download-spin 1s linear infinite
+.glyphicon.spinning
+  animation: spin 1s linear infinite
 
-@keyframes download-spin
+@keyframes spin
   from
     transform: rotate(0deg)
   to

@@ -103,6 +103,27 @@
                          :errors {:dowload-error (str e)}}}))
          e))
 
+(defn- stop-download-future!
+  "Signal cancel and drop the future handle so a new run can start cleanly."
+  []
+  (when-let [f @download-future]
+    (when-not (realized? f)
+      (future-cancel f))
+    (reset! download-future nil)))
+
+(defn- reset-download-progress!
+  "Hard-clear progress so a restart never reuses stale items/errors."
+  []
+  (swap! state/db
+         (fn [db]
+           (-> db
+               (assoc-in [:download :download-started] true)
+               (assoc-in [:download :download-finished] false)
+               (assoc-in [:download :download-cancelled] false)
+               (assoc-in [:download :cancel-requested] false)
+               (assoc-in [:download :errors] nil)
+               (assoc-in [:download :items] {})))))
+
 (def snatch-dl-exception-params
   {:return-fn (fn [e]
                 (if (download-cancelled?)
@@ -112,14 +133,16 @@
 
 (defn start-download-future [id target-dir recursive? skip-media-files? prefix-meta-key
                              export-structure entry-point http-options]
-  (reset! download-future
-          (future
+  (let [owned (atom nil)
+        still-current? (fn [] (identical? @owned @download-future))
+        f (future
             (catcher/snatch
              {:return-fn (fn [e]
-                           (if (or (download-cancelled?)
-                                   (= :download-cancelled (:type (ex-data e))))
-                             (mark-download-cancelled!)
-                             (mark-download-failed! e)))
+                           (when (still-current?)
+                             (if (or (download-cancelled?)
+                                     (= :download-cancelled (:type (ex-data e))))
+                               (mark-download-cancelled!)
+                               (mark-download-failed! e))))
               :throwable Throwable}
              (case (-> @state/db :download :entity :type)
                :collection (export/download-set
@@ -128,48 +151,42 @@
                :media-entry (export/download-media-entry
                              id target-dir skip-media-files? prefix-meta-key
                              export-structure entry-point http-options))
-             (if (download-cancelled?)
-               (mark-download-cancelled!)
-               (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true))))))))
+             (when (still-current?)
+               (if (download-cancelled?)
+                 (mark-download-cancelled!)
+                 (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true)))))))]
+    (reset! owned f)
+    (reset! download-future f)))
 
 (defn download [request]
-  (if (and @download-future (not (realized? @download-future)))
-    {:status 422 :body "There seems to be an ongoing download in progress!"}
-    (catcher/snatch
-     {:return-fn (fn [e]
-                   (mark-download-failed! e)
-                   {:status 500 :body (thrown/stringify e)})
-      :throwable Throwable}
-     (swap! state/db
-            (fn [db]
-              (deep-merge db
-                          {:download
-                           {:download-started true
-                            :download-finished false
-                            :download-cancelled false
-                            :cancel-requested false
-                            :errors nil}})))
-     (let [id (-> @state/db :download :entity :uuid)
-           target-dir (-> @state/db :download :target-directory)
-           recursive? (-> @state/db :download :recursive not not)
-           skip-media-files? (-> @state/db :download :skip_media_files not not)
-           download-meta-data-schema? true
-           prefix-meta-key (-> @state/db :download :prefix_meta_key presence)
-           export-structure (structure/normalize
-                             (-> @state/db :download :export_structure))
-           entry-point (state/connection-entry-point)
-           http-options (state/connection-http-options)]
-       (when download-meta-data-schema?
-         (export/download-meta-data-schema target-dir))
-       (start-download-future id target-dir recursive? skip-media-files? prefix-meta-key
-                              export-structure entry-point http-options))
-     {:status 202})))
+  (catcher/snatch
+   {:return-fn (fn [e]
+                 (mark-download-failed! e)
+                 {:status 500 :body (thrown/stringify e)})
+    :throwable Throwable}
+   (when @download-future
+     (swap! state/db assoc-in [:download :cancel-requested] true)
+     (stop-download-future!))
+   (reset-download-progress!)
+   (let [id (-> @state/db :download :entity :uuid)
+         target-dir (-> @state/db :download :target-directory)
+         recursive? (-> @state/db :download :recursive not not)
+         skip-media-files? (-> @state/db :download :skip_media_files not not)
+         download-meta-data-schema? true
+         prefix-meta-key (-> @state/db :download :prefix_meta_key presence)
+         export-structure (structure/normalize
+                           (-> @state/db :download :export_structure))
+         entry-point (state/connection-entry-point)
+         http-options (state/connection-http-options)]
+     (when download-meta-data-schema?
+       (export/download-meta-data-schema target-dir))
+     (start-download-future id target-dir recursive? skip-media-files? prefix-meta-key
+                            export-structure entry-point http-options))
+   {:status 202}))
 
 (defn cancel-download [_]
   (swap! state/db assoc-in [:download :cancel-requested] true)
-  (when-let [f @download-future]
-    (when-not (realized? f)
-      (future-cancel f)))
+  (stop-download-future!)
   (mark-download-cancelled!)
   {:status 204})
 

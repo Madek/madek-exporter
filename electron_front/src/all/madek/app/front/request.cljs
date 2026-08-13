@@ -18,7 +18,7 @@
     ))
 
 (def META-DEFAULTS
-  {:show_request_modal true
+  {:show_request_modal false
    :show_response_success_modal false
    :show_response_error_modal true
    :autoremove-delay 1000
@@ -99,7 +99,7 @@
 
 (defn show-modal? [request]
   (if (response-pending? request)
-    (-> request :meta :show_request_modal)
+    false
     (if (response-success? (-> request :response))
       (-> request :meta :show_response_success_modal)
       (-> request :meta :show_response_error_modal))))

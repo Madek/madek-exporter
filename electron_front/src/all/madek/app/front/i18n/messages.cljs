@@ -14,6 +14,7 @@
 
    ;; connection
    :connection/title "Connection"
+   :connection/login-title "Login"
    :connection/base-url "Madek base URL "
    :connection/login-label "Login | api-client name"
    :connection/login-placeholder "Login"
@@ -193,6 +194,7 @@
    :lang/title "Sprache"
 
    :connection/title "Verbindung"
+   :connection/login-title "Login"
    :connection/base-url "Madek-Basis-URL "
    :connection/login-label "Login | api-client-Name"
    :connection/login-placeholder "Login"
@@ -366,6 +368,7 @@
    :lang/title "Langue"
 
    :connection/title "Connexion"
+   :connection/login-title "Login"
    :connection/base-url "URL de base Madek "
    :connection/login-label "Login | nom api-client"
    :connection/login-placeholder "Login"
@@ -539,6 +542,7 @@
    :lang/title "Lingua"
 
    :connection/title "Connessione"
+   :connection/login-title "Login"
    :connection/base-url "URL di base Madek "
    :connection/login-label "Login | nome api-client"
    :connection/login-placeholder "Login"
@@ -712,6 +716,7 @@
    :lang/title "Idioma"
 
    :connection/title "Conexión"
+   :connection/login-title "Login"
    :connection/base-url "URL base de Madek "
    :connection/login-label "Login | nombre api-client"
    :connection/login-placeholder "Login"
@@ -885,6 +890,7 @@
    :lang/title "语言"
 
    :connection/title "连接"
+   :connection/login-title "Login"
    :connection/base-url "Madek 基础 URL "
    :connection/login-label "登录名 | api-client 名称"
    :connection/login-placeholder "登录名"

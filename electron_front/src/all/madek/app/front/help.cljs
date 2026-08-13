@@ -1,6 +1,7 @@
 (ns madek.app.front.help
   (:require
     [clojure.string :as string]
+    [madek.app.front.breadcrumb :as breadcrumb]
     [madek.app.front.i18n :as i18n]
     [madek.app.front.release :as release]
     [madek.app.front.state :as state]
@@ -78,8 +79,8 @@
                                            "support.medienarchiv@zhdk.ch"]]])
 
 (defn page []
-  [:div.help
-   [:h3 (i18n/t :help/title)]
+  [:div.page.help
+   [breadcrumb/page-breadcrumb (i18n/t :help/title)]
    [version-component]
    [supported-os-component]
    [login-variants-component]
