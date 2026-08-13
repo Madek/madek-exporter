@@ -136,3 +136,71 @@ pre
     .help-block
       margin-left: 20px
       margin-top: 0.35em
+
+  .download-progress-detail
+    .progress
+      margin-bottom: 0.75em
+
+    .download-current
+      margin: 0 0 1.25em
+      color: #555
+
+  .download-phases,
+  .download-items
+    margin-top: 1.5em
+
+    > h4
+      margin-top: 0
+      margin-bottom: 0.75em
+      font-size: 1em
+      font-weight: 600
+
+  .download-checklist
+    margin-bottom: 0
+
+    .checklist-item
+      display: flex
+      align-items: flex-start
+      padding: 0.35em 0
+      line-height: 1.4
+
+      > .glyphicon
+        margin-top: 0.15em
+        margin-right: 0.5em
+        flex-shrink: 0
+
+      .checklist-label
+        min-width: 0
+
+      .item-id
+        word-break: break-all
+
+      .item-title
+        word-break: break-word
+
+      .item-detail
+        font-size: 0.9em
+
+      .label
+        font-weight: normal
+        vertical-align: 0.1em
+
+  .download-items-list
+    max-height: 36em
+    overflow-y: auto
+    padding-right: 0.5em
+    border-top: 1px solid #eee
+    border-bottom: 1px solid #eee
+
+  .dismiss
+    margin-top: 2em
+    clear: both
+
+  .glyphicon.spinning
+    animation: download-spin 1s linear infinite
+
+@keyframes download-spin
+  from
+    transform: rotate(0deg)
+  to
+    transform: rotate(360deg)
