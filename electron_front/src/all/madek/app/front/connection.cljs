@@ -125,22 +125,36 @@
                      :login (-> % .-target .-value presence))}]]))
 
 (defn token-form-component []
-  [:div.form-group
-   [:label {:for "password"}
-    (case @sign-in-method*
-      :token (i18n/t :connection/api-token)
-      :login (i18n/t :connection/password)
-      (i18n/t :connection/oops))
-    [:span " ("
-     [:input {:type :checkbox
-              :on-change #(update-form-data (fn [fd] (assoc fd :show-password (-> fd :show-password not))))
-              :checked (-> @form-data :show-password)}] (i18n/t :connection/show) ")"]]
-   [:input.password.form-control
-    {:type (if (-> @form-data :show-password) "text" "password")
-     :placeholder (i18n/t :connection/password-placeholder)
-     :value (:password @form-data)
-     :on-change #(update-form-data-value
-                   :password(-> % .-target .-value presence))}]])
+  (let [show-password? (-> @form-data :show-password)
+        toggle-label (if show-password?
+                       (i18n/t :connection/hide-password)
+                       (i18n/t :connection/show-password))]
+    [:div.form-group
+     [:label {:for "password"}
+      (case @sign-in-method*
+        :token (i18n/t :connection/api-token)
+        :login (i18n/t :connection/password)
+        (i18n/t :connection/oops))]
+     [:div.input-group
+      [:input.password.form-control
+       {:type (if show-password? "text" "password")
+        :id "password"
+        :placeholder (i18n/t :connection/password-placeholder)
+        :value (:password @form-data)
+        :on-change #(update-form-data-value
+                      :password (-> % .-target .-value presence))}]
+      [:span.input-group-btn
+       [:button.btn.btn-default
+        {:type "button"
+         :title toggle-label
+         :aria-label toggle-label
+         :on-click #(update-form-data
+                      (fn [fd] (assoc fd :show-password (not (:show-password fd)))))}
+        [:span.glyphicon
+         {:class (if show-password?
+                   "glyphicon-eye-close"
+                   "glyphicon-eye-open")
+          :aria-hidden "true"}]]]]]))
 
 
 (defn connect-form []
