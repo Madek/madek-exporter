@@ -21,6 +21,11 @@ npm run build:prod
 npm run run:prod
 ```
 
+Oneliner
+```
+npm run build:clean && npm run build:prod && npm run run:prod
+```
+
 Build packages and zip files for all supported platforms:
 
 ```zsh
