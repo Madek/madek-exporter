@@ -58,7 +58,7 @@ function tool-version-from-mise-toml() {
 }
 
 
-function mise-install-target() {
+function resolved-tool-version() {
   local plugin_name="$1"
   local tool_name="$2"
   local version
@@ -67,6 +67,17 @@ function mise-install-target() {
   if [[ -z "$version" ]]; then
     version="$(tool-version-from-tool-versions "$plugin_name")"
   fi
+
+  printf '%s' "$version"
+}
+
+
+function mise-install-target() {
+  local plugin_name="$1"
+  local tool_name="$2"
+  local version
+
+  version="$(resolved-tool-version "$plugin_name" "$tool_name")"
 
   if [[ -n "$version" ]]; then
     echo "${tool_name}@${version}"
@@ -94,11 +105,25 @@ function asdf-update-plugin () {
         asdf plugin add "$PLUGIN" "${PLUGIN_URL}"
       fi
       cd "$PROJECT_DIR"
-      asdf install "$PLUGIN"
+      local mise_tool version
+      mise_tool="$(tool-name-for-mise "$PLUGIN")"
+      version="$(resolved-tool-version "$PLUGIN" "$mise_tool")"
+      if [[ -n "$version" ]]; then
+        asdf install "$PLUGIN" "$version"
+      else
+        asdf install "$PLUGIN"
+      fi
       touch "$CACHE_FILE"
       echo "# ${CACHE_ID} env is up to date"
     else
       echo "# ${CACHE_ID} env skipped update; touch .tool-versions/mise.toml or remove ${CACHE_FILE} to force update"
+    fi
+    local mise_tool version env_var
+    mise_tool="$(tool-name-for-mise "$PLUGIN")"
+    version="$(resolved-tool-version "$PLUGIN" "$mise_tool")"
+    if [[ -n "$version" ]]; then
+      env_var="ASDF_$(printf '%s' "$PLUGIN" | tr '[:lower:]-' '[:upper:]_')_VERSION"
+      export "${env_var}=${version}"
     fi
     return 0
   fi

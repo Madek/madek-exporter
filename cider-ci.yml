@@ -22,6 +22,7 @@ jobs:
               body: |
                 #!/usr/bin/env bash
                 set -euo pipefail
+                ./bin/env/ruby-setup
                 bundle exec ./bin/update-releases
                 git diff --stat --exit-code -- app/prod/releases.json
 
