@@ -85,16 +85,36 @@
         (keep format-person-value)
         (clojure.string/join ", "))])
 
+(defn json-payload
+  "JSON body lives in :value; older exports stored a list under :values."
+  [meta-datum]
+  (if (contains? meta-datum :value)
+    (:value meta-datum)
+    (:values meta-datum)))
+
+(defn json-item-text [item]
+  (if (string? item)
+    item
+    (cheshire/generate-string item)))
+
 (defn html-json-value [meta-datum]
-  [:pre
-   (cheshire/generate-string (:value meta-datum) {:pretty true})])
+  (let [payload (json-payload meta-datum)]
+    [:pre
+     (cond
+       (nil? payload) ""
+       (sequential? payload) (->> payload
+                                  (map json-item-text)
+                                  (clojure.string/join ", "))
+       (string? payload) payload
+       :else (cheshire/generate-string payload {:pretty true}))]))
 
 (defn html-generic [meta-datum]
   [:pre
    (cheshire/generate-string meta-datum {:pretty true})])
 
 (defn meta-datum-present?
-  "True when the meta-datum has something meaningful to show in HTML."
+  "True when the meta-datum has something meaningful to show in HTML.
+   MetaDatum::JSON is always listed, including a nil or empty payload."
   [meta-datum]
   (case (:type meta-datum)
     ("MetaDatum::Text" "MetaDatum::TextDate")
@@ -109,7 +129,7 @@
               (keep format-person-value)))
 
     "MetaDatum::JSON"
-    (some? (:value meta-datum))
+    true
 
     ;; unknown types: keep only if there is a non-empty values collection or value
     (or (present-str (:value meta-datum))
