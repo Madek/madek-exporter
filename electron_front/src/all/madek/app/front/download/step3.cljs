@@ -23,20 +23,6 @@
 
 (def shell (.-shell Electron))
 
-(def new-export-structure "new-export-structure")
-(def legacy-export-structure "legacy-export-structure")
-
-(defn export-structure-value []
-  (or (-> @state/jvm-main-db :download :export_structure presence)
-      new-export-structure))
-
-(defn set-export-structure [value]
-  (let [req {:method :patch
-             :json-params {:export_structure value}
-             :path "/download"}]
-    (request/send-off
-      req {:title (i18n/t :download/export-structure-req)})))
-
 (defn back []
   (let [req {:method :patch
              :json-params {:step2-completed false}
@@ -50,11 +36,6 @@
              :path "/download"}]
     (request/send-off
       req {:title (i18n/t :download/start-export-req)})))
-
-(defn export-structure-label [value]
-  (case value
-    "legacy-export-structure" (i18n/t :download/export-structure-legacy)
-    (i18n/t :download/export-structure-new)))
 
 (defn summary-component []
   [:div.summary
@@ -72,32 +53,12 @@
    [:p (i18n/t :download/meta-key-prefixing) (if-let [pmk (-> @state/jvm-main-db :download :prefix_meta_key presence)]
                                                   [:code pmk]
                                                   [:span (i18n/t :download/none)]) "."]
-   [:p (i18n/t :download/skip-media-files) [:code (-> @state/jvm-main-db :download :skip_media_files not not str)]"."]
-   [:p (i18n/t :download/export-structure-label)
-    [:code (export-structure-label (export-structure-value))] "."]])
+   [:p (i18n/t :download/skip-media-files) [:code (-> @state/jvm-main-db :download :skip_media_files not not str)]"."]])
 
 (defn export-structure-component []
-  (let [current (export-structure-value)]
-    [:div.export-structure
-     [:h4 (i18n/t :download/export-structure)]
-     [:div.radio
-      [:label
-       [:input {:type :radio
-                :name "export_structure"
-                :value new-export-structure
-                :checked (= current new-export-structure)
-                :on-change #(set-export-structure new-export-structure)}]
-       (i18n/t :download/export-structure-new)]
-      [:p.help-block (i18n/t :download/export-structure-new-help)]]
-     [:div.radio
-      [:label
-       [:input {:type :radio
-                :name "export_structure"
-                :value legacy-export-structure
-                :checked (= current legacy-export-structure)
-                :on-change #(set-export-structure legacy-export-structure)}]
-       (i18n/t :download/export-structure-legacy)]
-      [:p.help-block (i18n/t :download/export-structure-legacy-help)]]]))
+  [:div.export-structure
+   [:h4 (i18n/t :download/export-structure)]
+   [:p.help-block (i18n/t :download/export-structure-help)]])
 
 (defn debug-component []
   (when (:debug @state/client-db)
@@ -126,11 +87,7 @@
    [debug-component]
    ])
 
-(defn ensure-default-export-structure []
-  (when-not (-> @state/jvm-main-db :download :export_structure presence)
-    (set-export-structure new-export-structure)))
-
 (defn component []
   (reagent/create-class
-    {:component-did-mount (fn [] (ensure-default-export-structure))
+    {:component-did-mount (fn [])
      :render main-component }))
