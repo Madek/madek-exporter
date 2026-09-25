@@ -13,6 +13,7 @@
     ------------------
 
     * Add a Browse button for the export target directory (native Electron folder dialog).
+    * Add an Open Finder / Explorer / file manager button on the download view that opens the export target directory.
     * Improve HTML export: WebApp-style person names with roles; skip empty text, keyword, and people fields; always list JSON meta-data (including empty annotations) and join JSON lists with commas.
     * Enrich exported meta-data with meta-key labels (shared meta-keys lookup for HTML and JSON).
     * Replace the connection password/token “show” checkbox with an eye-icon toggle.

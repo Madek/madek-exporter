@@ -303,10 +303,31 @@
       req {:title (i18n/t :download/cancel-req)
            :show_request_modal false})))
 
+(defn file-manager-label-key []
+  (case (.-platform nodejs/process)
+    "darwin" :download/open-finder
+    "win32" :download/open-explorer
+    :download/open-file-manager))
+
+(defn open-target-directory [e]
+  (.preventDefault e)
+  (when-let [dir (presence (:target-directory @download*))]
+    (.openPath shell dir)))
+
+(defn open-folder-component []
+  (when (presence (:target-directory @download*))
+    [:div.open-download-dir
+     [:button.btn.btn-default
+      {:type "button"
+       :on-click open-target-directory}
+      [:span.glyphicon.glyphicon-folder-open {:aria-hidden "true"}]
+      (i18n/t (file-manager-label-key))]]))
+
 (defn downloading-component []
   [:div
    [:h2 (i18n/t :download/downloading-now)]
    [progress-detail-component]
+   [open-folder-component]
    [:div.dismiss.download-cancel
     [:button.btn.btn-warning
      {:on-click cancel-download}
@@ -333,5 +354,6 @@
           (i18n/t :download/cancelled)
           (i18n/t :download/finished))]
    [progress-detail-component]
+   [open-folder-component]
    [errors-component]
    [dismiss-component]])

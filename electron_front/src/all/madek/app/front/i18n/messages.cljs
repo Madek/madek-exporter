@@ -161,6 +161,9 @@
    :download/errors "Errors"
    :download/back-new-export "Back to step 1 - start a new export"
    :download/dismiss-req "Dismiss Download!"
+   :download/open-finder "Open Finder"
+   :download/open-explorer "Open Explorer"
+   :download/open-file-manager "Open file manager"
 
    ;; about
    :about/title "About the Madek-Exporter"
@@ -339,6 +342,9 @@
    :download/errors "Fehler"
    :download/back-new-export "Zurück zu Schritt 1 – neuen Export starten"
    :download/dismiss-req "Download verwerfen!"
+   :download/open-finder "Finder öffnen"
+   :download/open-explorer "Explorer öffnen"
+   :download/open-file-manager "Dateimanager öffnen"
 
    :about/title "Über den Madek-Exporter"
    :about/version-release "Version und Release"
@@ -515,6 +521,9 @@
    :download/errors "Erreurs"
    :download/back-new-export "Retour à l'étape 1 – démarrer un nouvel export"
    :download/dismiss-req "Ignorer le téléchargement !"
+   :download/open-finder "Ouvrir le Finder"
+   :download/open-explorer "Ouvrir l’Explorateur"
+   :download/open-file-manager "Ouvrir le gestionnaire de fichiers"
 
    :about/title "À propos du Madek-Exporter"
    :about/version-release "Version et release"
@@ -691,6 +700,9 @@
    :download/errors "Errori"
    :download/back-new-export "Torna al passo 1 – avvia una nuova esportazione"
    :download/dismiss-req "Annulla download!"
+   :download/open-finder "Apri Finder"
+   :download/open-explorer "Apri Esplora file"
+   :download/open-file-manager "Apri il gestore file"
 
    :about/title "Informazioni su Madek-Exporter"
    :about/version-release "Versione e release"
@@ -867,6 +879,9 @@
    :download/errors "Errores"
    :download/back-new-export "Volver al paso 1 – iniciar una nueva exportación"
    :download/dismiss-req "¡Descartar descarga!"
+   :download/open-finder "Abrir Finder"
+   :download/open-explorer "Abrir el Explorador"
+   :download/open-file-manager "Abrir el administrador de archivos"
 
    :about/title "Acerca de Madek-Exporter"
    :about/version-release "Versión y release"
@@ -1043,6 +1058,9 @@
    :download/errors "错误"
    :download/back-new-export "返回步骤 1 - 开始新的导出"
    :download/dismiss-req "关闭下载！"
+   :download/open-finder "打开 Finder"
+   :download/open-explorer "打开资源管理器"
+   :download/open-file-manager "打开文件管理器"
 
    :about/title "关于 Madek-Exporter"
    :about/version-release "版本与发布"
