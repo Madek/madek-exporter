@@ -5,6 +5,7 @@
     [madek.app.front.i18n :as i18n]
     [madek.app.front.release :as release]
     [madek.app.front.request :as request]
+    [madek.app.front.routes :as routes]
     [madek.app.front.state :as state]
     [madek.app.front.utils :refer [str keyword deep-merge]]
 
@@ -170,6 +171,6 @@
 
 (defn init! []
   (i18n/init!)
-  (madek.app.front.routes/init)
+  (routes/init)
   (mount-root)
   (state/init))
