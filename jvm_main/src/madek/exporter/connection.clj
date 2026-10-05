@@ -47,10 +47,31 @@
             (:id auth-info)
             (:type auth-info)))))
 
+(defn- failure-reason [status error]
+  (cond
+    (and (string? error)
+         (re-find #"(?i)basic|api-client|token or session" error))
+    :unsupported-auth
+
+    (nil? status)
+    :unreachable
+
+    (#{401 403} status)
+    :auth-failed
+
+    (#{404 405} status)
+    :not-found
+
+    (>= status 500)
+    :unreachable
+
+    :else
+    :auth-failed))
+
 (defn- probe-failure
-  ([] (probe-failure nil nil))
   ([status error]
-   (cond-> {:available false}
+   (cond-> {:available false
+            :reason (failure-reason status error)}
      status (assoc :status status)
      error (assoc :error error))))
 
@@ -58,6 +79,34 @@
   {:available true
    :status status
    :auth-info auth-info})
+
+(defn availability-summary
+  "Derive :both | :api | :api-v2 | :neither from per-API probe maps."
+  [api-status]
+  (let [api? (boolean (get-in api-status [:api :available]))
+        v2? (boolean (get-in api-status [:api-v2 :available]))]
+    (cond
+      (and api? v2?) :both
+      api? :api
+      v2? :api-v2
+      :else :neither)))
+
+(defn api-mode-allowed?
+  "True when the selected api-mode is covered by the probe results.
+  Modes: :api | :api-v2 | :both (also accepts string names)."
+  [api-status api-mode]
+  (let [mode (keyword (or api-mode :api))
+        api? (boolean (get-in api-status [:api :available]))
+        v2? (boolean (get-in api-status [:api-v2 :available]))]
+    (case mode
+      :api api?
+      :api-v2 v2?
+      :both (and api? v2?)
+      false)))
+
+(defn- normalize-api-mode [api-mode]
+  (let [mode (keyword (or api-mode :api))]
+    (if (#{:api :api-v2 :both} mode) mode :api)))
 
 (defn probe-api
   "GET {base}/api/auth-info via JSON-ROA. Never throws; one failure does not
@@ -125,10 +174,11 @@
                              "Could not reach /api-v2")))))))
 
 (defn probe-apis
-  "Probe /api and /api-v2 auth-info independently."
+  "Probe /api and /api-v2 auth-info independently. Adds :availability summary."
   [base-url live-http-options http-options]
-  {:api (probe-api base-url live-http-options)
-   :api-v2 (probe-api-v2 base-url live-http-options http-options)})
+  (let [status {:api (probe-api base-url live-http-options)
+                :api-v2 (probe-api-v2 base-url live-http-options http-options)}]
+    (assoc status :availability (availability-summary status))))
 
 ;;; legacy helper (export credential check) ###################################
 
@@ -177,14 +227,24 @@
               api-status (if (utils/authenticated-http-options? http-options)
                            (probe-apis url live-http-options http-options)
                            nil)
-              _ (debug 'api-status api-status)]
+              api-mode (normalize-api-mode (:api-mode connect-body))
+              _ (debug 'api-status api-status)
+              _ (debug 'api-mode api-mode)]
           (cond
             (not api-status)
             {:status 422
              :body {:message (str "no auth-info response, "
                                   "check your connection parameters.")}}
 
-            ;; Export still uses /api (JSON-ROA); require v1 auth until api-v2 mode ships.
+            (not (api-mode-allowed? api-status api-mode))
+            {:status 422
+             :body {:message (str "Selected API mode '" (name api-mode)
+                                  "' is not available with the current credentials or host.")
+                    :api-status api-status
+                    :api-mode api-mode
+                    :availability (:availability api-status)}}
+
+            ;; Export still uses /api (JSON-ROA); require v1 auth until api-v2 export ships.
             (not (get-in api-status [:api :available]))
             (let [api-probe (:api api-status)
                   probe-status (:status api-probe)
@@ -194,7 +254,8 @@
                            :else probe-status)]
               {:status status
                :body {:message (or (:error api-probe) "Authentication failed")
-                      :api-status api-status}})
+                      :api-status api-status
+                      :availability (:availability api-status)}})
 
             :else
             (let [auth-info (get-in api-status [:api :auth-info])]
@@ -205,10 +266,14 @@
                       (select-keys connect-body [:url])
                       {:http-options http-options
                        :auth-info auth-info
-                       :api-status api-status}
+                       :api-status api-status
+                       :api-mode api-mode
+                       :availability (:availability api-status)}
                       (select-keys auth-info [:login :email_address])))
               {:status 202
-               :body {:api-status api-status}})))
+               :body {:api-status api-status
+                      :api-mode api-mode
+                      :availability (:availability api-status)}})))
         (catch Exception e
           (let [{:keys [status message]} (ex-data e)]
             (timbre/error e "Failed to connect to Madek")
