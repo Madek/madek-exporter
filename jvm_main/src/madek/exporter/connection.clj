@@ -1,5 +1,6 @@
 (ns madek.exporter.connection
   (:require
+   [cheshire.core :as cheshire]
    [clj-http.client :as http-client]
    [clj-time.core :as time]
    [clj-time.format :as time-format]
@@ -47,11 +48,69 @@
             (:id auth-info)
             (:type auth-info)))))
 
+(defn- http-status-from-exception [e]
+  (or (:status (ex-data e))
+      (some-> e ex-data :object :status)
+      (when-let [[_ code] (re-find #"(?i)status\s+(\d{3})"
+                                   (or (ex-message e) ""))]
+        (try (Integer/parseInt code)
+             (catch Exception _ nil)))))
+
+(defn- headers-from-exception [e]
+  (or (:headers (ex-data e))
+      (some-> e ex-data :object :headers)))
+
+(defn- header-value [headers header-name]
+  (when (map? headers)
+    (or (get headers header-name)
+        (get headers (string/lower-case header-name))
+        (get headers (keyword header-name))
+        (get headers (keyword (string/lower-case header-name)))
+        (some (fn [[k v]]
+                (when (and (string? k)
+                           (= (string/lower-case k)
+                              (string/lower-case header-name)))
+                  v))
+              headers))))
+
+(defn- cloudflare-server? [headers]
+  (boolean
+   (when-let [server (header-value headers "Server")]
+     (re-find #"(?i)cloudflare" (str server)))))
+
+(def ^:private cloudflare-blocked-message
+  "Requests are blocked, try using a VPN")
+
+(defn- cloudflare-blocked? [status headers]
+  (and (= 403 status) (cloudflare-server? headers)))
+
+(defn- truncate-message [msg]
+  (let [trimmed (string/replace (str msg) #"\s+" " ")]
+    (if (> (count trimmed) 180)
+      (str (subs trimmed 0 177) "...")
+      trimmed)))
+
+(defn- probe-error-message [status raw-message fallback]
+  (cond
+    (= 401 status) "Authentication failed (HTTP 401)"
+    (= 403 status) "Forbidden (HTTP 403)"
+    (#{404 405} status) "API endpoint not found on this host"
+    (and (integer? status) (>= status 500))
+    (str "Server error (HTTP " status ")")
+    (and (integer? status) (not (ok-status? status)))
+    (str "HTTP " status)
+    (string? raw-message) (truncate-message raw-message)
+    :else fallback))
+
 (defn- failure-reason [status error]
   (cond
     (and (string? error)
          (re-find #"(?i)basic|api-client|token or session" error))
     :unsupported-auth
+
+    (and (string? error)
+         (re-find #"(?i)blocked.*VPN|cloudflare" error))
+    :blocked
 
     (nil? status)
     :unreachable
@@ -62,7 +121,7 @@
     (#{404 405} status)
     :not-found
 
-    (>= status 500)
+    (and (integer? status) (>= status 500))
     :unreachable
 
     :else
@@ -70,15 +129,105 @@
 
 (defn- probe-failure
   ([status error]
-   (cond-> {:available false
-            :reason (failure-reason status error)}
-     status (assoc :status status)
-     error (assoc :error error))))
+   (probe-failure status error nil))
+  ([status error headers]
+   (let [cf? (cloudflare-blocked? status headers)
+         error* (if cf?
+                  cloudflare-blocked-message
+                  error)
+         reason (if cf? :blocked (failure-reason status error*))]
+     (cond-> {:available false
+              :reason reason}
+       status (assoc :status status)
+       error* (assoc :error error*)
+       cf? (assoc :server "cloudflare")))))
 
 (defn- probe-success [status auth-info]
   {:available true
    :status status
    :auth-info auth-info})
+
+(defn- parse-json-body [body]
+  (when (and (string? body)
+             (re-find #"^\s*[\{\[]" body))
+    (try
+      (cheshire/parse-string body true)
+      (catch Exception _ nil))))
+
+(defn probe-api
+  "GET {base}/api/auth-info via JSON-ROA. Never throws; one failure does not
+  affect the api-v2 probe."
+  [base-url live-http-options]
+  (try
+    (let [api-root (roa/get-root (str base-url "/api/")
+                                 :default-conn-opts live-http-options)
+          response (-> api-root (roa/relation :auth-info) (roa/get {}))
+          status (:status response)
+          headers (:headers response)]
+      (if-not (ok-status? status)
+        (probe-failure status
+                       (probe-error-message status nil "Authentication failed")
+                       headers)
+        (let [data (try (identity-fields (roa/data response))
+                        (catch Exception _ nil))]
+          (if (has-identity? data)
+            (probe-success status data)
+            (probe-failure status "Authentication failed" headers)))))
+    (catch Exception e
+      (let [status (http-status-from-exception e)
+            headers (headers-from-exception e)]
+        (timbre/warn e "api auth-info probe failed")
+        (probe-failure status
+                       (probe-error-message status nil "Could not reach /api")
+                       headers)))))
+
+(defn probe-api-v2
+  "GET {base}/api-v2/auth-info/ (plain HTTP). Requires token or session;
+  Basic/ApiClient is not supported. Never throws.
+
+  Uses :throw-exceptions false and decides availability from HTTP status
+  before parsing the body as JSON."
+  [base-url live-http-options http-options]
+  (cond
+    (not (utils/authenticated-http-options? http-options))
+    (probe-failure nil "No credentials provided")
+
+    (basic-auth-only? http-options)
+    (probe-failure nil
+                   (str "api-v2 requires token or session; "
+                        "Basic/ApiClient auth is not supported"))
+
+    :else
+    (try
+      (let [url (str base-url "/api-v2/auth-info/")
+            response (http-client/get
+                      url
+                      (merge live-http-options
+                             {:as :text
+                              :throw-exceptions false
+                              :coerce :false}))
+            status (:status response)
+            headers (:headers response)]
+        (if-not (ok-status? status)
+          (probe-failure status
+                         (probe-error-message status nil "Could not reach /api-v2")
+                         headers)
+          (let [raw-body (cond
+                           (string? (:body response)) (:body response)
+                           (nil? (:body response)) nil
+                           :else (str (:body response)))
+                data (identity-fields (parse-json-body raw-body))]
+            (if (has-identity? data)
+              (probe-success status data)
+              (probe-failure status "Authentication failed" headers)))))
+      (catch Exception e
+        (let [status (http-status-from-exception e)
+              headers (headers-from-exception e)]
+          (timbre/warn e "api-v2 auth-info probe failed")
+          (probe-failure status
+                         (probe-error-message status nil
+                                              "Could not reach /api-v2")
+                         headers))))))
 
 (defn availability-summary
   "Derive :both | :api | :api-v2 | :neither from per-API probe maps."
@@ -96,8 +245,12 @@
   Modes: :api | :api-v2 | :both (also accepts string names)."
   [api-status api-mode]
   (let [mode (keyword (or api-mode :api))
-        api? (boolean (get-in api-status [:api :available]))
-        v2? (boolean (get-in api-status [:api-v2 :available]))]
+        available? (fn [k]
+                     (boolean (or (get-in api-status [k :available])
+                                  (get-in api-status [(name k) :available])
+                                  (get-in api-status [k "available"]))))
+        api? (available? :api)
+        v2? (available? :api-v2)]
     (case mode
       :api api?
       :api-v2 v2?
@@ -107,71 +260,6 @@
 (defn- normalize-api-mode [api-mode]
   (let [mode (keyword (or api-mode :api))]
     (if (#{:api :api-v2 :both} mode) mode :api)))
-
-(defn probe-api
-  "GET {base}/api/auth-info via JSON-ROA. Never throws; one failure does not
-  affect the api-v2 probe."
-  [base-url live-http-options]
-  (try
-    (let [api-root (roa/get-root (str base-url "/api/")
-                                 :default-conn-opts live-http-options)
-          response (-> api-root (roa/relation :auth-info) (roa/get {}))
-          status (:status response)
-          data (try (identity-fields (roa/data response))
-                    (catch Exception _ nil))]
-      (if (and (ok-status? status) (has-identity? data))
-        (probe-success status data)
-        (probe-failure status
-                       (or (some-> response :body :message)
-                           (some-> data :message)
-                           "Authentication failed"))))
-    (catch Exception e
-      (let [status (:status (ex-data e))]
-        (timbre/warn e "api auth-info probe failed")
-        (probe-failure status
-                       (or (ex-message e)
-                           "Could not reach /api"))))))
-
-(defn probe-api-v2
-  "GET {base}/api-v2/auth-info/ (plain HTTP). Requires token or session;
-  Basic/ApiClient is not supported. Never throws."
-  [base-url live-http-options http-options]
-  (cond
-    (not (utils/authenticated-http-options? http-options))
-    (probe-failure nil "No credentials provided")
-
-    (basic-auth-only? http-options)
-    (probe-failure nil
-                   (str "api-v2 requires token or session; "
-                        "Basic/ApiClient auth is not supported"))
-
-    :else
-    (try
-      (let [url (str base-url "/api-v2/auth-info/")
-            response (http-client/get
-                      url
-                      (merge live-http-options
-                             {:as :json
-                              :coerce :always
-                              :throw-exceptions false}))
-            status (:status response)
-            body (:body response)
-            data (identity-fields body)]
-        (if (and (ok-status? status) (has-identity? data))
-          (probe-success status data)
-          (probe-failure status
-                         (or (when (map? body)
-                               (or (get body :message)
-                                   (get body "message")
-                                   (get body :msg)
-                                   (get body "msg")))
-                             "Authentication failed"))))
-      (catch Exception e
-        (let [status (:status (ex-data e))]
-          (timbre/warn e "api-v2 auth-info probe failed")
-          (probe-failure status
-                         (or (ex-message e)
-                             "Could not reach /api-v2")))))))
 
 (defn probe-apis
   "Probe /api and /api-v2 auth-info independently. Adds :availability summary."
@@ -190,6 +278,15 @@
     response))
 
 ;;; connect / disconnect ######################################################
+
+(defn- cloudflare-blocked-status? [api-status]
+  (boolean
+   (some (fn [k]
+           (let [p (get api-status k)]
+             (or (= :blocked (:reason p))
+                 (= "blocked" (:reason p))
+                 (= "cloudflare" (:server p)))))
+         [:api :api-v2])))
 
 (defn connect-to-madek-server [request]
   (catcher/snatch
@@ -227,7 +324,8 @@
               api-status (if (utils/authenticated-http-options? http-options)
                            (probe-apis url live-http-options http-options)
                            nil)
-              api-mode (normalize-api-mode (:api-mode connect-body))
+              ;; Provisional mode until the user picks one after login (UI).
+              api-mode (normalize-api-mode (or (:api-mode connect-body) :api))
               _ (debug 'api-status api-status)
               _ (debug 'api-mode api-mode)]
           (cond
@@ -236,14 +334,6 @@
              :body {:message (str "no auth-info response, "
                                   "check your connection parameters.")}}
 
-            (not (api-mode-allowed? api-status api-mode))
-            {:status 422
-             :body {:message (str "Selected API mode '" (name api-mode)
-                                  "' is not available with the current credentials or host.")
-                    :api-status api-status
-                    :api-mode api-mode
-                    :availability (:availability api-status)}}
-
             ;; Export still uses /api (JSON-ROA); require v1 auth until api-v2 export ships.
             (not (get-in api-status [:api :available]))
             (let [api-probe (:api api-status)
@@ -251,9 +341,20 @@
                   status (cond
                            (nil? probe-status) 502
                            (ok-status? probe-status) 401
-                           :else probe-status)]
+                           :else probe-status)
+                  message (cond
+                            (cloudflare-blocked-status? api-status)
+                            cloudflare-blocked-message
+
+                            (#{401 403} status)
+                            "Authentication failed. Check your credentials."
+
+                            (utils/presence (:error api-probe))
+                            (:error api-probe)
+
+                            :else "Authentication failed")]
               {:status status
-               :body {:message (or (:error api-probe) "Authentication failed")
+               :body {:message message
                       :api-status api-status
                       :availability (:availability api-status)}})
 
@@ -298,6 +399,40 @@
 
 (defn disconnect [_]
   (swap! state/db assoc-in [:connection] {}))
+
+(defn patch-api-mode
+  "Set :api-mode on an existing connection after login, gated by probe results."
+  [request]
+  (catcher/snatch
+   {:return-fn (fn [e]
+                 (timbre/error e "Failed to update API mode")
+                 {:status 500
+                  :body {:message "Could not update API mode."}})}
+   (let [conn (get @state/db :connection)
+         api-status (:api-status conn)
+         api-mode (normalize-api-mode (get-in request [:body :api-mode]))]
+     (cond
+       (or (nil? conn) (empty? conn) (nil? (:url conn)))
+       {:status 422 :body {:message "Not connected. Sign in first."}}
+
+       (nil? api-status)
+       {:status 422 :body {:message "No API availability status. Disconnect and sign in again."}}
+
+       (not (api-mode-allowed? api-status api-mode))
+       {:status 422
+        :body {:message (str "Selected API mode '" (name api-mode)
+                             "' is not available with the current credentials or host.")
+               :api-status api-status
+               :api-mode api-mode
+               :availability (:availability api-status)}}
+
+       :else
+       (do
+         (swap! state/db assoc-in [:connection :api-mode] api-mode)
+         {:status 200
+          :body {:api-mode api-mode
+                 :availability (:availability api-status)
+                 :api-status api-status}})))))
 
 ;### Debug ####################################################################
 ;(logging-config/set-logger! :level :debug)

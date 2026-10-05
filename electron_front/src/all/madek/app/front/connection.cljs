@@ -77,15 +77,20 @@
 
 (defn connect-params []
   (let [fd @form-data
-        base (select-keys fd [:url :sign-in-method :show-password])
-        api-mode (or (:api-mode fd) :api)]
+        ;; API mode is chosen after login; connect with provisional :api.
+        base (merge (select-keys fd [:url :sign-in-method :show-password])
+                    {:api-mode :api})]
     (case (or (:sign-in-method fd) :token)
-      :login (merge base {:api-mode api-mode} (select-keys fd [:login :password]))
+      :login (merge base (select-keys fd [:login :password]))
       :token (merge base
-                    {:api-mode api-mode}
                     (when-let [token (presence (:password fd))]
                       {:api-token token}))
-      (merge base {:api-mode api-mode}))))
+      base)))
+
+(defn- stash-api-status-from-response! [resp]
+  (when-let [api-status (or (get-in resp [:body :api-status])
+                            (get-in resp [:body "api-status"]))]
+    (swap! state/client-db assoc-in [:connection :last-api-status] api-status)))
 
 (defn connect []
   (let [req {:method :post
@@ -93,7 +98,27 @@
              :path "/connect"}]
     (request/send-off
       req {:title (i18n/t :connection/connect-req)
-           :error-title (i18n/t :connection/connect-failed)})))
+           :error-title (i18n/t :connection/connect-failed)}
+      :callback (fn [resp]
+                  (if (request/response-success? resp)
+                    (swap! state/client-db update :connection
+                           #(dissoc % :last-api-status :last-availability))
+                    (stash-api-status-from-response! resp))))))
+
+(defn set-api-mode! [mode]
+  (let [previous (or (:api-mode @form-data)
+                     (-> @state/jvm-main-db :connection :api-mode)
+                     :api)
+        req {:method :post
+             :json-params {:api-mode mode}
+             :path "/connect/api-mode"}]
+    (update-form-data-value :api-mode mode)
+    (request/send-off
+      req {:title (i18n/t :connection/api-mode-update-req)
+           :error-title (i18n/t :connection/api-mode-update-failed)}
+      :callback (fn [resp]
+                  (when-not (request/response-success? resp)
+                    (update-form-data-value :api-mode previous))))))
 
 
 ;;; disconnect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -109,6 +134,8 @@
       req {:title (i18n/t :connection/disconnect-req)}
       :callback (fn [_]
                   (clear-form-sign-in-data)
+                  (swap! state/client-db update :connection
+                         #(dissoc % :last-api-status :last-availability))
                   (accountant/navigate! "/connection")))))
 
 
@@ -121,7 +148,6 @@
     (update-form-data-value :url default-madek-url)))
 
 (defn- select-sign-in-method! [method]
-  (clear-form-sign-in-data)
   (update-form-data-value :sign-in-method method)
   (ensure-default-url!))
 
@@ -162,7 +188,9 @@
       [:input.password.form-control
        {:type (if show-password? "text" "password")
         :id "password"
-        :placeholder (i18n/t :connection/password-placeholder)
+        :placeholder (case @sign-in-method*
+                       :token (i18n/t :connection/token-placeholder)
+                       (i18n/t :connection/password-placeholder))
         :value (:password @form-data)
         :on-change #(update-form-data-value
                       :password (-> % .-target .-value presence))}]
@@ -230,49 +258,47 @@
       (:api-mode @connection*)
       :api))
 
-(defn api-mode-form-component []
-  (let [api-mode (selected-api-mode)
-        connected? @connected?*
-        api-status (:api-status @connection*)
-        mode-available?
-        (fn [mode]
-          (if-not api-status
-            true
-            (case mode
-              :api (boolean (get-in api-status [:api :available]))
-              :api-v2 (boolean (get-in api-status [:api-v2 :available]))
-              :both (and (get-in api-status [:api :available])
-                         (get-in api-status [:api-v2 :available]))
-              false)))]
-    [:div.panel.panel-default.api-mode-selection
-     [:div.panel-heading
-      [:h3.panel-title {:style {:margin 0}}
-       (i18n/t :connection/api-mode-label)]]
-     [:div.panel-body
-      [:p.help-block {:style {:margin-top 0}}
-       (i18n/t :connection/api-mode-help)]
-      [:div.form-group {:style {:margin-bottom (if connected? "0.5em" 0)}}
-       [:label {:for "api-mode"} (i18n/t :connection/api-mode-label)]
-       [:select#api-mode.form-control
-        {:value (name api-mode)
-         :disabled (when connected? true)
-         :on-change #(update-form-data-value
-                       :api-mode (keyword (-> % .-target .-value)))}
-        (doall
-         (for [mode [:api :api-v2 :both]]
-           ^{:key (name mode)}
-           [:option
-            {:value (name mode)
-             :disabled (when-not (mode-available? mode) true)}
-            (str (i18n/t (keyword (str "connection/api-mode-" (name mode))))
-                 (when (and api-status (not (mode-available? mode)))
-                   (str " — " (i18n/t :connection/api-unavailable))))]))]]
-      (when connected?
-        [:p.text-muted {:style {:margin-bottom 0}}
-         (i18n/t :connection/api-mode-change-hint)])]]))
+(defn- probe-available? [probe]
+  (boolean (or (:available probe)
+               (get probe "available"))))
+
+(defn- availability-from-probes [api-status]
+  (let [api? (probe-available? (or (:api api-status) (get api-status "api")))
+        v2? (probe-available? (or (:api-v2 api-status) (get api-status "api-v2")))]
+    (cond
+      (and api? v2?) :both
+      api? :api
+      v2? :api-v2
+      :else :neither)))
+
+(defn- current-api-status []
+  (or (:api-status @connection*)
+      (-> @state/client-db :connection :last-api-status)))
+
+(defn- current-availability [api-status]
+  (availability-from-probes api-status))
+
+(defn- probe-map [probe]
+  (cond
+    (map? probe) probe
+    :else {}))
+
+(defn- probe-blocked? [probe]
+  (let [probe (probe-map probe)
+        reason (or (:reason probe) (get probe "reason"))]
+    (or (= :blocked reason)
+        (= "blocked" reason)
+        (= "cloudflare" (or (:server probe) (get probe "server"))))))
+
+(defn- api-status-cloudflare-blocked? [api-status]
+  (boolean
+   (and (map? api-status)
+        (or (probe-blocked? (or (:api api-status) (get api-status "api")))
+            (probe-blocked? (or (:api-v2 api-status) (get api-status "api-v2")))))))
 
 (defn- api-probe-row [label probe]
-  (let [available? (:available probe)
+  (let [probe (probe-map probe)
+        available? (:available probe)
         reason (:reason probe)
         reason-key (when reason
                      (keyword (str "connection/api-reason-" (name reason))))]
@@ -286,42 +312,93 @@
      [:code label]
      (when-let [status (:status probe)]
        [:span.text-muted (str " (HTTP " status ")")])
-     (when (and (not available?) reason-key)
+     (when (and (not available?) reason-key (not (probe-blocked? probe)))
        [:div.text-muted {:style {:margin-left "1em"}}
         (i18n/t reason-key)])
-     (when (and (not available?) (presence (:error probe)))
+     (when (and (not available?)
+                (not (probe-blocked? probe))
+                (presence (:error probe)))
        [:div.text-muted {:style {:margin-left "1em"}}
         [:small (:error probe)]])]))
 
-(defn api-status-component []
-  (when-let [api-status (:api-status @connection*)]
-    (let [availability (or (:availability @connection*)
-                           (:availability api-status)
-                           :neither)
-          api-mode (or (:api-mode @connection*) :api)
-          mode-ok? (case (keyword availability)
-                     :both true
-                     :api (#{:api} (keyword api-mode))
-                     :api-v2 (#{:api-v2} (keyword api-mode))
-                     false)]
-      [:div.api-status {:style {:margin-top "1em"}}
-       [:h4 (i18n/t :connection/api-status-title)]
-       [:p
-        (i18n/t :connection/api-availability-prefix)
-        " "
-        [:strong (i18n/t (keyword (str "connection/api-availability-"
-                                       (name availability))))]
-        ". "
-        (i18n/t :connection/api-mode-selected-prefix)
-        " "
-        [:code (name api-mode)]
-        "."]
-       (when-not mode-ok?
-         [:div.alert.alert-warning
-          (i18n/t :connection/api-mode-unavailable-warn)])
-       [:ul.list-unstyled
-        [api-probe-row "/api" (:api api-status)]
-        [api-probe-row "/api-v2" (:api-v2 api-status)]]])))
+(defn api-status-component
+  "Renders probe results from a live connection or the last failed connect."
+  []
+  (when-let [api-status (current-api-status)]
+    (let [availability (current-availability api-status)
+          api-mode (selected-api-mode)
+          connected? @connected?*
+          mode-ok? (if-not connected?
+                     true
+                     (case availability
+                       :both true
+                       :api (#{:api} (keyword api-mode))
+                       :api-v2 (#{:api-v2} (keyword api-mode))
+                       false))]
+      [:div.panel.panel-default.api-status
+       [:div.panel-heading
+        [:h3.panel-title {:style {:margin 0}}
+         (i18n/t :connection/api-status-title)]]
+       [:div.panel-body
+        (when (api-status-cloudflare-blocked? api-status)
+          [:div.alert.alert-warning
+           (i18n/t :connection/cloudflare-vpn-warn)])
+        [:p
+         (i18n/t :connection/api-availability-prefix)
+         " "
+         [:strong (i18n/t (keyword (str "connection/api-availability-"
+                                        (name availability))))]
+         (when connected?
+           [:span
+            ". "
+            (i18n/t :connection/api-mode-selected-prefix)
+            " "
+            [:code (name api-mode)]
+            "."])]
+        (when-not mode-ok?
+          [:div.alert.alert-warning
+           (i18n/t :connection/api-mode-unavailable-warn)])
+        (when-not connected?
+          [:p.help-block (i18n/t :connection/api-status-after-failed)])
+        [:ul.list-unstyled {:style {:margin-bottom 0}}
+         [api-probe-row "/api" (or (:api api-status) (get api-status "api"))]
+         [api-probe-row "/api-v2" (or (:api-v2 api-status) (get api-status "api-v2"))]]]])))
+
+(defn api-mode-form-component []
+  (when @connected?*
+    (let [api-mode (selected-api-mode)
+          api-status (current-api-status)
+          mode-available?
+          (fn [mode]
+            (if-not api-status
+              false
+              (case mode
+                :api (boolean (get-in api-status [:api :available]))
+                :api-v2 (boolean (get-in api-status [:api-v2 :available]))
+                :both (and (get-in api-status [:api :available])
+                           (get-in api-status [:api-v2 :available]))
+                false)))]
+      [:div.panel.panel-default.api-mode-selection
+       [:div.panel-heading
+        [:h3.panel-title {:style {:margin 0}}
+         (i18n/t :connection/api-mode-label)]]
+       [:div.panel-body
+        [:p.help-block {:style {:margin-top 0}}
+         (i18n/t :connection/api-mode-help)]
+        [:div.form-group {:style {:margin-bottom 0}}
+         [:label {:for "api-mode"} (i18n/t :connection/api-mode-label)]
+         [:select#api-mode.form-control
+          {:value (name api-mode)
+           :on-change #(set-api-mode! (keyword (-> % .-target .-value)))}
+          (doall
+           (for [mode [:api :api-v2 :both]]
+             ^{:key (name mode)}
+             [:option
+              {:value (name mode)
+               :disabled (when-not (mode-available? mode) true)}
+              (str (i18n/t (keyword (str "connection/api-mode-" (name mode))))
+                   (when (not (mode-available? mode))
+                     (str " — " (i18n/t :connection/api-unavailable))))]))]]]])))
 
 (defn connection-connected-component []
   [:div.connected
@@ -333,8 +410,7 @@
       (i18n/t :connection/connected-to-prefix) [:code (-> @connection* :url)]
       (i18n/t :connection/connected-as) [:code [:em (-> @connection* :auth-info :type)]] " "
       [:em (or (-> @connection* :auth-info :email_address presence)
-               (-> @connection* :auth-info :login presence))] "."]
-     [api-status-component]]]])
+               (-> @connection* :auth-info :login presence))] "."]]]])
 
 (defn status-icon-component []
   (let [connected? @connected?*]
@@ -376,9 +452,9 @@
 (defn page []
   [:div.page.connection
    [breadcrumb/page-breadcrumb (i18n/t :connection/title)]
-   [:h2 (i18n/t :connection/title)]
-   [api-mode-form-component]
    [connection-status-component]
+   [api-mode-form-component]
+   [api-status-component]
    (if-not @connected?*
      [:div
       [:h2 (i18n/t :connection/login-title)]

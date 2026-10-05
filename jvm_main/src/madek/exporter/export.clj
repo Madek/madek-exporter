@@ -7,6 +7,7 @@
    [logbug.catcher :as catcher :refer [snatch]]
    [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
    [logbug.thrown :as thrown]
+   [madek.exporter.api :as api]
    [madek.exporter.export.control :as control]
    [madek.exporter.export.files :as files :refer [download-media-files]]
    [madek.exporter.export.index-html :as index-html]
@@ -15,7 +16,7 @@
    [madek.exporter.export.progress :as progress]
    [madek.exporter.state :as state]
    [madek.exporter.utils :refer [authenticated-http-options? deep-merge presence]]
-   [taoensso.timbre :as logging :refer [debug]])
+   [taoensso.timbre :as logging :refer [debug info]])
 
   (:import
    [java.io File]
@@ -127,7 +128,8 @@
   ([skip-media-files? prefix-meta-key dir-path media-entry]
    (catcher/with-logging {}
      (ensure-not-cancelled!)
-     (let [id (str (-> media-entry roa/data :id))
+     (let [raw-id (str (-> media-entry roa/data :id))
+           id (api/scoped-item-id raw-id)
            entry-prefix-path (files/path-prefix prefix-meta-key media-entry)
            entry-dir-path (str dir-path File/separator entry-prefix-path)
            entity-md (meta-data/meta-data media-entry)
@@ -140,6 +142,7 @@
                          :type "MediaEntry"
                          :title item-title
                          :path entry-dir-path
+                         :api-label api/*export-api-label*
                          :progress 0.05
                          :progress-label "meta"
                          :file-progress 0.0
@@ -150,7 +153,7 @@
          (do (ensure-not-cancelled!)
              (delete-path-if-exists! entry-dir-path)
              (io/make-parents entry-dir-path)
-             (meta-data/write-meta-data entry-dir-path entity-md id
+             (meta-data/write-meta-data entry-dir-path entity-md raw-id
                                         entry-prefix-path)
              (index-html/write entry-dir-path
                                entity-md
@@ -254,11 +257,12 @@
 (defn download-set [id dl-path recursive? skip-media-files? prefix-meta-key
                     api-entry-point api-http-opts]
   (ensure-not-cancelled!)
-  (let [id (str id)
+  (let [raw-id (str id)
+        id (api/scoped-item-id raw-id)
         collection (-> (roa/get-root api-entry-point
                                      :default-conn-opts api-http-opts)
                        (roa/relation :collection)
-                       (roa/get {:id id}))
+                       (roa/get {:id raw-id}))
         path-prefix (files/path-prefix prefix-meta-key collection)
         target-dir-path (str dl-path File/separator path-prefix)
         entity-md (meta-data/meta-data collection)
@@ -271,6 +275,7 @@
                       :type "Collection"
                       :title item-title
                       :path target-dir-path
+                      :api-label api/*export-api-label*
                       :progress 0.1
                       :progress-label "meta"
                       :file-progress 0.0
@@ -282,7 +287,7 @@
         (ensure-not-cancelled!)
         (delete-path-if-exists! target-dir-path)
         (io/make-parents target-dir-path)
-        (meta-data/write-meta-data target-dir-path entity-md id
+        (meta-data/write-meta-data target-dir-path entity-md raw-id
                                    path-prefix)
         (index-html/write target-dir-path
                           entity-md
@@ -290,7 +295,7 @@
                           path-prefix)
         (progress/set-item-progress! id 0.3 {:progress-label "meta"})
         (download-media-entries-for-set
-         id target-dir-path skip-media-files? prefix-meta-key
+         raw-id target-dir-path skip-media-files? prefix-meta-key
          api-entry-point api-http-opts)
         (when recursive?
           (download-collections-for-collection
