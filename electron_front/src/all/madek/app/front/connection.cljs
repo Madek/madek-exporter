@@ -112,13 +112,24 @@
 
 ;;; form ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(def default-madek-url "https://medienarchiv.zhdk.ch")
+
+(defn- ensure-default-url! []
+  (when-not (presence (:url @form-data))
+    (update-form-data-value :url default-madek-url)))
+
+(defn- select-sign-in-method! [method]
+  (clear-form-sign-in-data)
+  (update-form-data-value :sign-in-method method)
+  (ensure-default-url!))
+
 (defn base-url-form-component []
   [:div.form-group {:class (if @url-is-valid "" "has-error")}
    [:label {:for "url"} (i18n/t :connection/base-url)]
    [:input.url.form-control
     {:class (if @url-is-valid "" "has-error")
      :type "url"
-     :placeholder "https://medienarchiv.zhdk.ch"
+     :placeholder default-madek-url
      :value (:url @form-data)
      :on-change #(update-form-data-value
                    :url (-> % .-target .-value presence))}]])
@@ -173,15 +184,15 @@
    [:ul.nav.nav-tabs {:style {:margin-bottom "1em"}}
     [:li {:class (when (= @sign-in-method* :token) "active")}
      [:a {:href "#"
-          :on-click (fn [_]
-                      (clear-form-sign-in-data)
-                      (update-form-data-value :sign-in-method :token))}
+          :on-click (fn [e]
+                      (.preventDefault e)
+                      (select-sign-in-method! :token))}
       (i18n/t :connection/sign-in-token)]]
     [:li {:class (when (= @sign-in-method* :login) "active")}
      [:a {:href "#"
-          :on-click (fn [_]
-                      (clear-form-sign-in-data)
-                      (update-form-data-value :sign-in-method :login))}
+          :on-click (fn [e]
+                      (.preventDefault e)
+                      (select-sign-in-method! :login))}
       (i18n/t :connection/sign-in-login)]]]
    [login-form-component]
    [token-form-component]
