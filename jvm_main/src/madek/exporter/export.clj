@@ -14,6 +14,7 @@
    [madek.exporter.export.meta-data :as meta-data]
    [madek.exporter.export.meta-data-schema :as meta-data-schema]
    [madek.exporter.export.progress :as progress]
+   [madek.exporter.request-log :as request-log]
    [madek.exporter.state :as state]
    [madek.exporter.utils :refer [authenticated-http-options? deep-merge presence]]
    [taoensso.timbre :as logging :refer [debug info]])
@@ -50,6 +51,37 @@
 
 (defn nio-path [s] (Paths/get s (into-array [""])))
 
+(defn- under-dir?
+  "True when `path` is `dir` or a descendant (after normalize)."
+  [dir path]
+  (let [dir-p (.normalize (.toAbsolutePath (nio-path (str dir))))
+        path-p (.normalize (.toAbsolutePath (nio-path (str path))))]
+    (.startsWith path-p dir-p)))
+
+(defn export-tree-root
+  "Root that owns an export path for symlink policy.
+
+  In :both mode trees live under `{target}/api` and `{target}/api-v2`. Symlinks
+  may only stay inside one of those roots (or inside the single-tree target)."
+  [path]
+  (let [target (get-in @state/db [:download :target-directory])
+        path (str path)]
+    (when (and (presence target) (presence path))
+      (let [api-root (str target File/separator "api")
+            v2-root (str target File/separator "api-v2")]
+        (cond
+          (under-dir? api-root path) api-root
+          (under-dir? v2-root path) v2-root
+          (under-dir? target path) (str target)
+          :else nil)))))
+
+(defn same-export-tree?
+  "True when both paths sit in the same export tree (api, api-v2, or single)."
+  [path-a path-b]
+  (let [a (export-tree-root path-a)
+        b (export-tree-root path-b)]
+    (and (presence a) (= a b))))
+
 (defn delete-path-if-exists!
   "Remove an existing export path so a re-download starts clean."
   [path]
@@ -61,6 +93,12 @@
           (io/delete-file f true))))))
 
 (defn symlink [id source target]
+  (when-not (same-export-tree? source target)
+    (throw (ex-info
+            "Refusing cross-tree symlink between api/ and api-v2/"
+            {:source source :target target
+             :source-root (export-tree-root source)
+             :target-root (export-tree-root target)})))
   (snatch
    {:level :debug
     :throwable java.nio.file.FileAlreadyExistsException}
@@ -83,7 +121,8 @@
 (defn claim-item!
   "Atomically register an item under (str id). Returns
    {:action :download} when this caller owns the download, or
-   {:action :symlink :target path} when the item was already claimed."
+   {:action :symlink :target path} when the item was already claimed in the
+   same export tree. Cross-tree hits (api ↔ api-v2) force a fresh download."
   [id claimed-data]
   (ensure-not-cancelled!)
   (let [id (str id)
@@ -91,8 +130,18 @@
     (swap! state/db
            (fn [db]
              (if-let [existing (get-in db [:download :items id])]
-               (do (reset! outcome {:action :symlink :target (:path existing)})
-                   db)
+               (if (same-export-tree? (:path claimed-data) (:path existing))
+                 (do (reset! outcome {:action :symlink :target (:path existing)})
+                     db)
+                 (do
+                   (logging/warn "cross-tree item id collision; downloading again"
+                                 {:id id
+                                  :existing-path (:path existing)
+                                  :new-path (:path claimed-data)
+                                  :api-label api/*export-api-label*})
+                   (reset! outcome {:action :download})
+                   (assoc-in db [:download :items id]
+                             (assoc claimed-data :id id))))
                (do (reset! outcome {:action :download})
                    (assoc-in db [:download :items id]
                              (assoc claimed-data :id id))))))
@@ -119,7 +168,7 @@
   ([id target-dir skip-media-files? prefix-meta-key api-entry-point api-http-opts]
    (catcher/with-logging {}
      (let [media-entry (I> identity-with-logging
-                           (roa/get-root api-entry-point
+                           (request-log/get-root api-entry-point
                                          :default-conn-opts api-http-opts)
                            (roa/relation :media-entry)
                            (roa/get {:id id}))]
@@ -153,7 +202,7 @@
          (do (ensure-not-cancelled!)
              (delete-path-if-exists! entry-dir-path)
              (io/make-parents entry-dir-path)
-             (meta-data/write-meta-data entry-dir-path entity-md raw-id
+             (meta-data/write-meta-data entry-dir-path entity-md id
                                         entry-prefix-path)
              (index-html/write entry-dir-path
                                entity-md
@@ -173,13 +222,15 @@
 
 (defn run-bounded!
   "Run (f item) for each item with at most n worker threads. Rethrows the first
-  worker failure and cancels remaining tasks. Re-binds download generation on
-  each worker so cancel/supersede checks work off the pool threads."
+  worker failure and cancels remaining tasks. Re-binds download generation and
+  export API label on each worker so cancel/supersede checks and scoped item
+  ids work off the pool threads."
   [n f items]
   (when (seq items)
     (let [pool (Executors/newFixedThreadPool (int n))
           futs (atom [])
-          gen control/*download-generation*]
+          gen control/*download-generation*
+          api-label api/*export-api-label*]
       (reset! active-download-pool pool)
       (try
         (doseq [item items]
@@ -189,7 +240,8 @@
                           ^Callable
                           (reify Callable
                             (call [_]
-                              (binding [control/*download-generation* gen]
+                              (binding [control/*download-generation* gen
+                                        api/*export-api-label* api-label]
                                 (f item)))))))
         (doseq [^Future fut @futs]
           (try
@@ -205,7 +257,7 @@
 ;### check credentials ########################################################
 
 (defn check-credentials [api-entry-point api-http-opts]
-  (let [response (-> (roa/get-root api-entry-point :default-conn-opts api-http-opts)
+  (let [response (-> (request-log/get-root api-entry-point :default-conn-opts api-http-opts)
                      (roa/relation :auth-info)
                      (roa/get {}))]
     (debug (-> response roa/data))))
@@ -222,7 +274,7 @@
                              {:public_get_full_size "true"}))
         me-rels (doall
                  (I> identity-with-logging
-                     (roa/get-root api-entry-point
+                     (request-log/get-root api-entry-point
                                    :default-conn-opts api-http-opts)
                      (roa/relation :media-entries)
                      (roa/get me-get-opts)
@@ -259,7 +311,7 @@
   (ensure-not-cancelled!)
   (let [raw-id (str id)
         id (api/scoped-item-id raw-id)
-        collection (-> (roa/get-root api-entry-point
+        collection (-> (request-log/get-root api-entry-point
                                      :default-conn-opts api-http-opts)
                        (roa/relation :collection)
                        (roa/get {:id raw-id}))
@@ -287,7 +339,7 @@
         (ensure-not-cancelled!)
         (delete-path-if-exists! target-dir-path)
         (io/make-parents target-dir-path)
-        (meta-data/write-meta-data target-dir-path entity-md raw-id
+        (meta-data/write-meta-data target-dir-path entity-md id
                                    path-prefix)
         (index-html/write target-dir-path
                           entity-md
