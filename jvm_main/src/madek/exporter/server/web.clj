@@ -25,6 +25,8 @@
    [madek.exporter.connection :as connection]
 
    [madek.exporter.export :as export]
+   [madek.exporter.export.api-v2 :as export-api-v2]
+   [madek.exporter.export.compare :as export-compare]
    [madek.exporter.export.control :as control]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils :refer [str keyword deep-merge presence]]
@@ -136,7 +138,9 @@
                (assoc-in [:download :download-cancelled] false)
                (assoc-in [:download :cancel-requested] false)
                (assoc-in [:download :errors] nil)
-               (assoc-in [:download :items] {})))))
+               (assoc-in [:download :items] {})
+               (assoc-in [:download :logs] [])
+               (assoc-in [:download :data-check] nil)))))
 
 (def snatch-dl-exception-params
   {:return-fn (fn [e]
@@ -164,22 +168,40 @@
                (doseq [run runs]
                  (control/ensure-not-cancelled!)
                  (info "export-run" {:label (:label run)
+                                     :transport (:transport run)
                                      :target-dir (:target-dir run)
                                      :entry-point (:entry-point run)})
                  (binding [api/*export-api-label* (:label run)]
-                   (case entity-type
-                     :collection (export/download-set
-                                  id (:target-dir run) recursive? skip-media-files?
-                                  prefix-meta-key (:entry-point run) http-options)
-                     :media-entry (export/download-media-entry
-                                   id (:target-dir run) skip-media-files? prefix-meta-key
-                                   (:entry-point run) http-options))))
+                   (case (:transport run)
+                     :rest
+                     (let [ctx (export-api-v2/context (:entry-point run) http-options)]
+                       (case entity-type
+                         :collection (export-api-v2/download-set
+                                      ctx id (:target-dir run) recursive?
+                                      skip-media-files? prefix-meta-key)
+                         :media-entry (export-api-v2/download-media-entry
+                                       ctx id (:target-dir run) skip-media-files?
+                                       prefix-meta-key)))
+                     ;; :roa (default)
+                     (case entity-type
+                       :collection (export/download-set
+                                    id (:target-dir run) recursive? skip-media-files?
+                                    prefix-meta-key (:entry-point run) http-options)
+                       :media-entry (export/download-media-entry
+                                     id (:target-dir run) skip-media-files? prefix-meta-key
+                                     (:entry-point run) http-options)))))
                (when (still-current?)
                  (if (download-cancelled?)
                    (mark-download-cancelled!)
                    (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true))))))))]
     (reset! owned f)
     (reset! download-future f)))
+
+(defn- download-meta-data-schema-for-run! [run http-options]
+  (case (:transport run)
+    :rest (export-api-v2/download-meta-data-schema
+           (:entry-point run) http-options (:target-dir run))
+    (export/download-meta-data-schema (:target-dir run))))
 
 (defn download [request]
   (catcher/snatch
@@ -200,10 +222,11 @@
          runs (api/export-runs base-url target-dir api-mode)
          ;; Capture pool after stop/reset so we use the fresh manager.
          http-options (state/connection-http-options)]
-     (info "download" {:api-mode api-mode :runs (mapv #(select-keys % [:label :target-dir]) runs)})
+     (info "download" {:api-mode api-mode
+                       :runs (mapv #(select-keys % [:label :transport :target-dir]) runs)})
      (when download-meta-data-schema?
        (doseq [run runs]
-         (export/download-meta-data-schema (:target-dir run))))
+         (download-meta-data-schema-for-run! run http-options)))
      (start-download-future id runs recursive? skip-media-files? prefix-meta-key
                             http-options))
    {:status 202}))
@@ -212,6 +235,19 @@
   (stop-download-work!)
   (mark-download-cancelled!)
   {:status 204})
+
+(defn compare-download-data [_]
+  (catcher/snatch
+   {:return-fn (fn [e] {:status 500 :body {:message (thrown/stringify e)}})
+    :throwable Throwable}
+   (let [mode (api/current-mode)]
+     (if-not (= :both mode)
+       {:status 422
+        :body {:message "Data check is only available when API mode is “both”."
+               :api-mode mode}}
+       (let [result (export-compare/compare-current-download!)]
+         {:status (if (:ok result) 200 422)
+          :body result})))))
 
 (defn patch-download-item [request]
   (logging/debug 'patch-download-item {:request request})
@@ -307,6 +343,8 @@
   (POST "/download" _ #'download)
 
   (POST "/download/cancel" _ #'cancel-download)
+
+  (POST "/download/compare" _ #'compare-download-data)
 
   (POST "/download/step1" _ #'download-step1)
 

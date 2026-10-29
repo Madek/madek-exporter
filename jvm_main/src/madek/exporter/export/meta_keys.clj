@@ -1,11 +1,12 @@
 (ns madek.exporter.export.meta-keys
   (:require
    [json-roa.client.core :as roa]
+   [madek.exporter.request-log :as request-log]
    [madek.exporter.state :as state]))
 
 (defn meta-keys_unmemoized []
-  (->> (-> (roa/get-root (state/connection-entry-point)
-                         :default-conn-opts (state/connection-http-options))
+  (->> (-> (request-log/get-root (state/connection-entry-point)
+                                 :default-conn-opts (state/connection-http-options))
            (roa/relation :meta-keys)
            (roa/get {})
            roa/coll-seq)

@@ -7,9 +7,11 @@
     [madek.app.front.request :as request]
     [madek.app.front.connection :as connection]
 
+    [clojure.string :as string]
     [inflections.core :refer [pluralize]]
 
     [cljs.nodejs :as nodejs]
+    [reagent.core :as reagent]
     [reagent.ratom :as ratom :refer [reaction]]
     ))
 
@@ -291,7 +293,9 @@
               :download-cancelled false
               :cancel-requested false
               :items nil
-              :errors nil}
+              :errors nil
+              :logs nil
+              :data-check nil}
              :path "/download"}]
     (request/send-off
       req {:title (i18n/t :download/dismiss-req)})))
@@ -309,24 +313,150 @@
     "win32" :download/open-explorer
     :download/open-file-manager))
 
+(defn both-api-mode? []
+  (= :both (keyword (-> @state/jvm-main-db :connection :api-mode))))
+
 (defn open-target-directory [e]
   (.preventDefault e)
   (when-let [dir (presence (:target-directory @download*))]
     (.openPath shell dir)))
 
+(defn check-export-data []
+  (let [req {:method :post
+             :path "/download/compare"}]
+    (request/send-off
+      req {:title (i18n/t :download/check-data-req)
+           :show_request_modal false
+           :show_response_success_modal false})))
+
+(defn- listed-paths [section]
+  (or (:items section) []))
+
+(defn- format-key-count-row [row]
+  (str (:path row)
+       ": api " (:api-key-count row)
+       " keys, api-v2 " (:api-v2-key-count row) " keys"))
+
+(defn- format-key-mismatch-row [row]
+  (let [missing (or (:missing-keys row) [])
+        broken (or (:broken-structure row) [])]
+    (str (:path row) " error:\n"
+         (string/join
+          "\n"
+          (concat
+           [(str "        api " (:api-key-count row)
+                 " keys, api-v2 " (:api-v2-key-count row) " keys")]
+           (when-let [err (:error row)]
+             [(str "        " err)])
+           (map #(str "        missing key " %) missing)
+           (when (seq broken)
+             ["        broken structure"]))))))
+
+(defn data-check-result-component []
+  (when-let [check (:data-check @download*)]
+    (let [counts (:counts check)
+          equal? (:equal? check)]
+      [:div.download-data-check-result
+       {:class (if equal? "text-success" "text-danger")}
+       (cond
+         (not (:ok check))
+         [:p [:strong (i18n/t :download/check-data-failed)]
+          " " (or (:error check) "")]
+
+         :else
+         [:div
+          [:p [:strong (if equal?
+                         (i18n/t :download/check-data-equal)
+                         (i18n/t :download/check-data-diff))]
+           " "
+           (i18n/t :download/check-data-summary
+                   {:api (:api counts)
+                    :api-v2 (:api-v2 counts)
+                    :common (:common counts)})]
+          [:ul.list-unstyled
+           [:li (i18n/t :download/check-data-keys
+                        {:api (:api-keys counts)
+                         :api-v2 (:api-v2-keys counts)})]
+           [:li (i18n/t :download/check-data-only-api
+                        {:count (:only-in-api counts)})]
+           [:li (i18n/t :download/check-data-only-api-v2
+                        {:count (:only-in-api-v2 counts)})]
+           [:li (i18n/t :download/check-data-key-mismatch
+                        {:count (:key-mismatch counts)})]]
+          (when (seq (listed-paths (:key-counts check)))
+            [:div
+             [:h5 (i18n/t :download/check-data-keys-title)]
+             [:pre.download-data-check-pre
+              (->> (listed-paths (:key-counts check))
+                   (map format-key-count-row)
+                   (string/join "\n"))]])
+          (when (seq (listed-paths (:only-in-api check)))
+            [:div
+             [:h5 (i18n/t :download/check-data-only-api-title)]
+             [:pre.download-data-check-pre
+              (string/join "\n" (listed-paths (:only-in-api check)))]])
+          (when (seq (listed-paths (:only-in-api-v2 check)))
+            [:div
+             [:h5 (i18n/t :download/check-data-only-api-v2-title)]
+             [:pre.download-data-check-pre
+              (string/join "\n" (listed-paths (:only-in-api-v2 check)))]])
+          (when (seq (listed-paths (:key-mismatches check)))
+            [:div
+             [:h5 (i18n/t :download/check-data-hash-title)]
+             [:pre.download-data-check-pre
+              (->> (listed-paths (:key-mismatches check))
+                   (map format-key-mismatch-row)
+                   (string/join "\n"))]])])])))
 (defn open-folder-component []
   (when (presence (:target-directory @download*))
     [:div.open-download-dir
-     [:button.btn.btn-default
-      {:type "button"
-       :on-click open-target-directory}
-      [:span.glyphicon.glyphicon-folder-open {:aria-hidden "true"}]
-      (i18n/t (file-manager-label-key))]]))
+     [:div.open-download-dir-actions
+      [:button.btn.btn-default
+       {:type "button"
+        :on-click open-target-directory}
+       [:span.glyphicon.glyphicon-folder-open {:aria-hidden "true"}]
+       (i18n/t (file-manager-label-key))]
+      (when (and (both-api-mode?)
+                 (or (:download-finished @download*)
+                     (:download-cancelled @download*)))
+        [:button.btn.btn-default
+         {:type "button"
+          :on-click check-export-data}
+         [:span.glyphicon.glyphicon-check {:aria-hidden "true"}]
+         (i18n/t :download/check-data)])]
+     [data-check-result-component]]))
+
+(defn logs-component []
+  (let [open?* (reagent/atom false)]
+    (fn []
+      (let [logs (or (:logs @download*) [])
+            n (count logs)]
+        [:div.download-logs
+         [:button.btn.btn-link.download-logs-toggle
+          {:type "button"
+           :aria-expanded (boolean @open?*)
+           :on-click #(swap! open?* not)}
+          [:span.glyphicon
+           {:class (if @open?*
+                     "glyphicon-chevron-down"
+                     "glyphicon-chevron-right")
+            :aria-hidden "true"}]
+          (i18n/t :download/logs)
+          (when (pos? n)
+            [:span.text-muted (str " (" n ")")])]
+         (when @open?*
+           [:textarea.form-control.download-logs-text
+            {:readOnly true
+             :rows (min 16 (max 4 (inc n)))
+             :value (if (seq logs)
+                      (string/join "\n" logs)
+                      (i18n/t :download/logs-empty))}])]))))
 
 (defn downloading-component []
   [:div
    [:h2 (i18n/t :download/downloading-now)]
    [progress-detail-component]
+   [logs-component]
    [open-folder-component]
    [:div.dismiss.download-cancel
     [:button.btn.btn-warning
@@ -354,6 +484,7 @@
           (i18n/t :download/cancelled)
           (i18n/t :download/finished))]
    [progress-detail-component]
+   [logs-component]
    [open-folder-component]
    [errors-component]
    [dismiss-component]])
