@@ -53,6 +53,32 @@ lein run -m madek.exporter.main server
 npx electron app/dev
 ```
 
+## Release
+
+The packaged version is the first entry in `releases.yml` (`major.minor.patch`, plus optional `-pre` and `+build`). Add a new entry at the top, with a `description` of `Fixes and Features` and optional `Notes`, then regenerate the JSON the app ships:
+
+```zsh
+bundle exec ./bin/update-releases
+```
+
+That writes `app/prod/releases.json` and `app/dev/releases.json`. Commit both with `releases.yml`. CI rejects the branch if `app/prod/releases.json` is stale.
+
+Push the branch. CI builds Linux (x64, ARM64), macOS (x64, ARM64), and Windows, then `./bin/prepare-release-infos` copies the zips to a durable path on the executor and prints the version, notes, fetch command, and draft URL. Fetch as soon as those platform jobs finish — the CI working tree is cleaned shortly after:
+
+```zsh
+./bin/fetch-server-artefacts <user@host> /var/tmp/madek-exporter-artefacts-<job-id>
+```
+
+Zips land in `target/server-artefacts/`:
+
+- `Madek-Exporter_Linux-x64.zip`
+- `Madek-Exporter_Linux-ARM64.zip`
+- `Madek-Exporter_Mac-OS-x64.zip`
+- `Madek-Exporter_Mac-OS-ARM64.zip`
+- `Madek-Exporter_Windows.zip`
+
+Open the printed draft URL (`https://github.com/Madek/madek-exporter/releases/new?tag=<version>&title=<version>`), attach the five zips, and publish. Publishing creates the git tag. There is no automated GitHub release.
+
 ## License
 
 Copyright Zuercher Hochschule der Kuenste (Zurich University of the Arts).
