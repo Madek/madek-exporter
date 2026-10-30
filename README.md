@@ -53,6 +53,46 @@ lein run -m madek.exporter.main server
 npx electron app/dev
 ```
 
+## Testing
+
+Fake Madek API (v1 JSON-ROA + v2 REST) for local checks:
+
+```zsh
+npm run fake-madek-api
+```
+
+JVM connect/probe tests against the fake server:
+
+```zsh
+npm run test:login
+```
+
+Playwright Electron UI tests (starts fake server automatically):
+
+```zsh
+./bin/build-electron-dev   # once, if app/dev artifacts are missing
+npm run test:e2e
+```
+
+Run both:
+
+```zsh
+npm test
+```
+
+Login coverage (fake API, JVM connect, Playwright UI) mirrors Madek `/api`:
+
+| Credentials | Result |
+|-------------|--------|
+| api-token only | ok |
+| login / api-token | ok |
+| email / api-token | ok |
+| login / account password | rejected (401) |
+| email / account password | rejected (401) |
+| api-client / api-client password | ok |
+
+Plus JVM edge cases (missing URL, unreachable host, empty credentials, v1-only hosts via `FAKE_MADEK_API_V2_DISABLED=1`) and UI form validation / disconnect.
+
 ## Release
 
 The packaged version is the first entry in `releases.yml` (`major.minor.patch`, plus optional `-pre` and `+build`). Add a new entry at the top, with a `description` of `Fixes and Features` and optional `Notes`, then regenerate the JSON the app ships:

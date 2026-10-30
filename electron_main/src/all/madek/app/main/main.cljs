@@ -43,6 +43,8 @@
 (.log js/console "__dirname" (js* "__dirname"))
 
 (defn -main []
+  (when-let [user-data-dir (some-> nodejs/process .-env (aget "MADEK_USER_DATA_DIR") not-empty)]
+    (.setPath app "userData" user-data-dir))
   (file-log/init!)
   (if-not (.requestSingleInstanceLock app)
     (do

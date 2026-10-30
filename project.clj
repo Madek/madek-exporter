@@ -97,6 +97,8 @@
 
              :prod {}
 
+             :test {:test-paths ["jvm_main/test"]}
+
              :uberjar {
                        :prep-tasks ["compile"]
                        :source-paths ["jvm_main/src"]
