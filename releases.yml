@@ -3,6 +3,44 @@
 - version_major: 0
   version_minor: 11
   version_patch: 1
+  version_pre: 
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Add a Browse button for the export target directory (native Electron folder dialog).
+    * Add an Open Finder / Explorer / file manager button on the download view that opens the export target directory.
+    * Improve HTML export: WebApp-style person names with roles; skip empty text, keyword, and people fields; always list JSON meta-data (including empty annotations) and join JSON lists with commas.
+    * Enrich exported meta-data with meta-key labels (shared meta-keys lookup for HTML and JSON).
+    * Replace the connection password/token “show” checkbox with an eye-icon toggle.
+    * Fix release-infos helper Notes formatting; ignore vendor/ in git.
+    * Drop the export-structure chooser. Folders are named `{title}_{uuid}`; each folder gets `index.html` and `meta-data.json` plus prefixed copies.
+    * Async export/download with progress reporting, status bar, and spinner; improve re-download / export control.
+    * Export UI polish: breadcrumbs, Step 1–3 styling, and related i18n strings.
+    * Fetch CI/server artefacts incrementally (skip unchanged zips by size+mtime); add `--clean` and `--checksum` flags.
+    * Probe both `/api` and `/api-v2` auth-info on connect and report which APIs are available (connect still requires `/api`).
+    * Fix the dev front-end hanging on "Loading ..." (missing routes require).
+    * Add a standalone fake Madek API (`tests/fake-madek-api`) for `/api` (JSON-ROA) and `/api-v2`, mirroring Madek auth: token, login/email + api-token, api-client + password; account passwords are rejected.
+    * Add login tests: fake-API auth matrix (`node --test`) and JVM connect/probe tests (`lein test`), run via `npm run test:login`.
+    * Add Playwright Electron E2E login tests (`npm run test:e2e`): all sign-in variants, error cases, form validation, disconnect, and Export menu disabled until login succeeds.
+    * Run tests in Cider-CI ("All tests" job; End2End-Tests run Playwright headless under xvfb).
+    * Remove the legacy Capybara/RSpec suite (`spec/`, `bin/rspec`).
+
+    Notes
+    -----
+
+    * Same packaging, toolchain, and platform notes as 0.11.0.
+    * Dev Electron honours `MADEK_JVM_PORT` and `MADEK_USER_DATA_DIR` (used by E2E to avoid clashing with a running dev app).
+
+####### 0.11.1 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 1
   version_pre: 4
   version_build: NULL
   name: NULL
