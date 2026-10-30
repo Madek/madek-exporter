@@ -77,7 +77,9 @@
 
 (defn connect-params []
   (let [fd @form-data
-        base (select-keys fd [:url :sign-in-method :show-password])]
+        ;; API mode is chosen after login; connect with provisional :api.
+        base (merge (select-keys fd [:url :sign-in-method :show-password])
+                    {:api-mode :api})]
     (case (or (:sign-in-method fd) :token)
       :login (merge base (select-keys fd [:login :password]))
       :token (merge base
@@ -92,6 +94,21 @@
     (request/send-off
       req {:title (i18n/t :connection/connect-req)
            :error-title (i18n/t :connection/connect-failed)})))
+
+(defn set-api-mode! [mode]
+  (let [previous (or (:api-mode @form-data)
+                     (-> @state/jvm-main-db :connection :api-mode)
+                     :api)
+        req {:method :post
+             :json-params {:api-mode mode}
+             :path "/connect/api-mode"}]
+    (update-form-data-value :api-mode mode)
+    (request/send-off
+      req {:title (i18n/t :connection/api-mode-update-req)
+           :error-title (i18n/t :connection/api-mode-update-failed)}
+      :callback (fn [resp]
+                  (when-not (request/response-success? resp)
+                    (update-form-data-value :api-mode previous))))))
 
 
 ;;; disconnect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -112,13 +129,23 @@
 
 ;;; form ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(def default-madek-url "https://medienarchiv.zhdk.ch")
+
+(defn- ensure-default-url! []
+  (when-not (presence (:url @form-data))
+    (update-form-data-value :url default-madek-url)))
+
+(defn- select-sign-in-method! [method]
+  (update-form-data-value :sign-in-method method)
+  (ensure-default-url!))
+
 (defn base-url-form-component []
   [:div.form-group {:class (if @url-is-valid "" "has-error")}
    [:label {:for "url"} (i18n/t :connection/base-url)]
    [:input.url.form-control
     {:class (if @url-is-valid "" "has-error")
      :type "url"
-     :placeholder "https://medienarchiv.zhdk.ch"
+     :placeholder default-madek-url
      :value (:url @form-data)
      :on-change #(update-form-data-value
                    :url (-> % .-target .-value presence))}]])
@@ -149,7 +176,9 @@
       [:input.password.form-control
        {:type (if show-password? "text" "password")
         :id "password"
-        :placeholder (i18n/t :connection/password-placeholder)
+        :placeholder (case @sign-in-method*
+                       :token (i18n/t :connection/token-placeholder)
+                       (i18n/t :connection/password-placeholder))
         :value (:password @form-data)
         :on-change #(update-form-data-value
                       :password (-> % .-target .-value presence))}]
@@ -173,15 +202,15 @@
    [:ul.nav.nav-tabs {:style {:margin-bottom "1em"}}
     [:li {:class (when (= @sign-in-method* :token) "active")}
      [:a {:href "#"
-          :on-click (fn [_]
-                      (clear-form-sign-in-data)
-                      (update-form-data-value :sign-in-method :token))}
+          :on-click (fn [e]
+                      (.preventDefault e)
+                      (select-sign-in-method! :token))}
       (i18n/t :connection/sign-in-token)]]
     [:li {:class (when (= @sign-in-method* :login) "active")}
      [:a {:href "#"
-          :on-click (fn [_]
-                      (clear-form-sign-in-data)
-                      (update-form-data-value :sign-in-method :login))}
+          :on-click (fn [e]
+                      (.preventDefault e)
+                      (select-sign-in-method! :login))}
       (i18n/t :connection/sign-in-login)]]]
    [login-form-component]
    [token-form-component]
@@ -211,6 +240,50 @@
   (reaction (and (-> @connection* :url presence boolean)
                  (or (-> @connection* :email_address presence boolean)
                      (-> @connection* :login presence boolean)))))
+
+(defn- selected-api-mode []
+  (or (:api-mode @form-data)
+      (:api-mode @connection*)
+      :api))
+
+(defn- current-api-status []
+  (:api-status @connection*))
+
+(defn api-mode-form-component []
+  (when @connected?*
+    (let [api-mode (selected-api-mode)
+          api-status (current-api-status)
+          mode-available?
+          (fn [mode]
+            (if-not api-status
+              false
+              (case mode
+                :api (boolean (get-in api-status [:api :available]))
+                :api-v2 (boolean (get-in api-status [:api-v2 :available]))
+                :both (and (get-in api-status [:api :available])
+                           (get-in api-status [:api-v2 :available]))
+                false)))]
+      [:div.panel.panel-default.api-mode-selection
+       [:div.panel-heading
+        [:h3.panel-title {:style {:margin 0}}
+         (i18n/t :connection/api-mode-label)]]
+       [:div.panel-body
+        [:p.help-block {:style {:margin-top 0}}
+         (i18n/t :connection/api-mode-help)]
+        [:div.form-group {:style {:margin-bottom 0}}
+         [:label {:for "api-mode"} (i18n/t :connection/api-mode-label)]
+         [:select#api-mode.form-control
+          {:value (name api-mode)
+           :on-change #(set-api-mode! (keyword (-> % .-target .-value)))}
+          (doall
+           (for [mode [:api :api-v2 :both]]
+             ^{:key (name mode)}
+             [:option
+              {:value (name mode)
+               :disabled (when-not (mode-available? mode) true)}
+              (str (i18n/t (keyword (str "connection/api-mode-" (name mode))))
+                   (when (not (mode-available? mode))
+                     (str " — " (i18n/t :connection/api-unavailable))))]))]]]])))
 
 (defn connection-connected-component []
   [:div.connected
@@ -265,6 +338,7 @@
   [:div.page.connection
    [breadcrumb/page-breadcrumb (i18n/t :connection/title)]
    [connection-status-component]
+   [api-mode-form-component]
    (if-not @connected?*
      [:div
       [:h2 (i18n/t :connection/login-title)]
