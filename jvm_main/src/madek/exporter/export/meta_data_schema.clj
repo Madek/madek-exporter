@@ -39,6 +39,11 @@
 
 (def meta-data-schema (memoize meta-data-schema_unmemoized))
 
+(defn reset-cache!
+  "Drop memoized schema (each download should log schema HTTP again)."
+  []
+  (alter-var-root #'meta-data-schema (constantly (memoize meta-data-schema_unmemoized))))
+
 (defn download [target-dir]
   (let [path (str target-dir File/separator "meta-data_schema.json")
         schema (meta-data-schema)]

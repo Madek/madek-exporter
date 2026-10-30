@@ -7,6 +7,7 @@
    [logbug.debug :as debug :refer [I>]]
    [logbug.ring :as logbug-ring :refer [wrap-handler-with-logging]]
    [logbug.thrown]
+   [madek.exporter.download-log-lines :as download-log-lines]
    [madek.exporter.utils :as utils :refer [exit presence deep-merge]]
    [taoensso.sente :as sente]
    [taoensso.sente.server-adapters.http-kit :refer [get-sch-adapter]]
@@ -75,29 +76,61 @@
 
 (defonce last-client-pushes (atom {}))
 
-(defn swap-in-last-db [client-id data]
-  (swap! last-client-pushes
-         (fn [last-client-pushes client-id data]
-           (assoc last-client-pushes client-id data))
-         client-id data))
-
-(defn push-full [client-id data]
-  (chsk-send! client-id [(keyword "madek" "db") data])
-  (swap-in-last-db client-id data))
-
 (defn diff [a b]
   (patchin/diff a b))
 
-(defn push-diff [client-id lastly-pushed-data data]
-  (chsk-send! client-id [(keyword "madek" "patch")
-                         {:diff (diff lastly-pushed-data data)
-                          :checksum nil}])
-  (swap-in-last-db client-id data))
+(defn- data-for-clients [db]
+  (download-log-lines/attach-to-db db))
 
-(defn publish [client-id event-id data]
-  (if-let [lastly-pushed-data (get @last-client-pushes client-id)]
-    (push-diff client-id lastly-pushed-data data)
-    (push-full client-id data)))
+(defn publish
+  "Push db updates to a client. Retries with compare-and-set so concurrent
+  swaps (e.g. progress + request-log lines) never publish diffs from a stale base."
+  [client-id _event-id data]
+  (let [data (data-for-clients data)]
+    (loop []
+      (let [pushes @last-client-pushes
+            prev (get pushes client-id)]
+        (cond
+          (= prev data)
+          nil
+
+          (nil? prev)
+          (do
+            (chsk-send! client-id [(keyword "madek" "db") data])
+            (if (compare-and-set! last-client-pushes pushes (assoc pushes client-id data))
+              nil
+              (recur)))
+
+          :else
+          (let [d (diff prev data)]
+            (when (seq d)
+              (chsk-send! client-id [(keyword "madek" "patch")
+                                     {:diff d :checksum nil}]))
+            (if (compare-and-set! last-client-pushes pushes (assoc pushes client-id data))
+              nil
+              (recur))))))))
+
+(defn broadcast-download-logs!
+  "Push log lines via :madek/patch (same channel as export progress)."
+  []
+  (let [lines (vec (download-log-lines/lines))]
+    (doseq [client-id (keys @clients)]
+      (when-let [prev (get @last-client-pushes client-id)]
+        (let [data (assoc-in prev [:download :logs] lines)
+              d (diff prev data)]
+          (when (seq d)
+            (chsk-send! client-id [(keyword "madek" "patch")
+                                   {:diff d :checksum nil}])
+            (swap! last-client-pushes assoc client-id data))))
+      (chsk-send! client-id [(keyword "madek" "download-logs") lines]))))
+
+(defn republish-full-to-all-clients!
+  "Send a full db snapshot (e.g. when an export run completes)."
+  []
+  (let [data (data-for-clients @db)]
+    (doseq [client-id (keys @clients)]
+      (chsk-send! client-id [(keyword "madek" "db") data])
+      (swap! last-client-pushes assoc client-id data))))
 
 (defn watch-db [_ _ _ new-state]
   (doseq [client (keys @clients)]
@@ -116,7 +149,8 @@
       (swap! clients (fn [cls cid] (dissoc cls cid)) removed-client))
     (doseq [added-client added-clients]
       (swap! clients (fn [cls cid] (assoc cls cid {})) added-client)
-      (publish added-client "db" @db))))
+      (publish added-client "db" @db)
+      (broadcast-download-logs!))))
 
 ;### initialize ###############################################################
 

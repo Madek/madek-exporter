@@ -34,12 +34,15 @@
     ;(js/console.log (clj->js {:message message}))
     (when (= id :chsk/recv)
       (let [[event-id data] ?data]
-        (when (and event-id data)
-          ;(js/console.log (clj->js {:event-id event-id :data data}))
+        (when event-id
           (case event-id
-            :madek/db (reset! jvm-main-db data)
-            :madek/patch (patch-db data)
-            )))))
+            :madek/download-logs
+            (swap! jvm-main-db assoc-in [:download :logs] (vec (or data [])))
+            :madek/db
+            (when data (reset! jvm-main-db data))
+            :madek/patch
+            (when data (patch-db data))
+            nil)))))
 
   (def message-router (atom nil))
   (defn stop-message-router [] (when-let [stop-f @message-router] (stop-f)))

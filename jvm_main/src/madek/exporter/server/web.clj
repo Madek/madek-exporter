@@ -27,7 +27,10 @@
    [madek.exporter.export :as export]
    [madek.exporter.export.api-v2 :as export-api-v2]
    [madek.exporter.export.compare :as export-compare]
+   [madek.exporter.export.meta-data-schema :as export-meta-data-schema]
+   [madek.exporter.export.meta-keys :as export-meta-keys]
    [madek.exporter.export.control :as control]
+   [madek.exporter.request-log :as request-log]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils :refer [str keyword deep-merge presence]]
    [taoensso.timbre :as timbre :refer [info]]
@@ -74,12 +77,15 @@
 (defn patch-download [request]
   (catcher/snatch
    {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
-   (swap! state/db
-          (fn [db body]
-            (assoc-in db [:download]
-                      (deep-merge (:download db)
-                                  body)))
-          (:body request))
+   (let [body (:body request)]
+     (when (nil? (:logs body))
+       (request-log/clear!))
+     (swap! state/db
+            (fn [db body]
+              (assoc-in db [:download]
+                          (deep-merge (:download db)
+                                      body)))
+            body))
    {:status 204}))
 
 ;##############################################################################
@@ -91,6 +97,10 @@
 (defn- download-cancelled? []
   (boolean (get-in @state/db [:download :cancel-requested])))
 
+(defn- notify-download-ui! []
+  (state/republish-full-to-all-clients!)
+  (state/broadcast-download-logs!))
+
 (defn- mark-download-cancelled! []
   (swap! state/db
          (fn [db]
@@ -98,7 +108,8 @@
                        {:download
                         {:download-finished true
                          :download-cancelled true
-                         :cancel-requested true}}))))
+                         :cancel-requested true}})))
+  (notify-download-ui!))
 
 (defn- mark-download-failed! [e]
   (swap! state/db
@@ -107,7 +118,8 @@
                        {:download
                         {:download-finished true
                          :errors {:dowload-error (str e)}}}))
-         e))
+         e)
+  (notify-download-ui!))
 
 (defn- stop-download-work!
   "Cancel in-flight download work, await a brief shutdown, and recreate the
@@ -129,6 +141,9 @@
   "Hard-clear progress so a restart never reuses stale items/errors.
   Bumps download-generation so the new run has a fresh token."
   []
+  (request-log/clear!)
+  (export-meta-data-schema/reset-cache!)
+  (export-meta-keys/reset-cache!)
   (swap! state/db
          (fn [db]
            (-> db
@@ -139,7 +154,6 @@
                (assoc-in [:download :cancel-requested] false)
                (assoc-in [:download :errors] nil)
                (assoc-in [:download :items] {})
-               (assoc-in [:download :logs] [])
                (assoc-in [:download :data-check] nil)))))
 
 (def snatch-dl-exception-params
@@ -193,7 +207,10 @@
                (when (still-current?)
                  (if (download-cancelled?)
                    (mark-download-cancelled!)
-                   (swap! state/db (fn [db] (assoc-in db [:download :download-finished] true))))))))]
+                   (do
+                     (swap! state/db
+                            (fn [db] (assoc-in db [:download :download-finished] true)))
+                     (notify-download-ui!)))))))]
     (reset! owned f)
     (reset! download-future f)))
 

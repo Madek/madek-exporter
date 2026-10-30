@@ -426,11 +426,48 @@
          (i18n/t :download/check-data)])]
      [data-check-result-component]]))
 
+(defn- log-line-api-tag [line]
+  (when (and (string? line) (not-empty line))
+    (cond
+      (re-find #"/api-v2(/|\?|$)" line) :api-v2
+      (re-find #"/api(/|\?|$)" line) :api
+      :else nil)))
+
+(defn- log-line-visible? [line filter-mode]
+  (case filter-mode
+    :both true
+    :api (= :api (log-line-api-tag line))
+    :api-v2 (= :api-v2 (log-line-api-tag line))
+    true))
+
+(defn- filter-log-lines [lines filter-mode]
+  (vec (filter #(log-line-visible? % filter-mode) lines)))
+
+(defn- logs-filter-buttons [filter*]
+  [:div.download-logs-filter
+   [:span.download-logs-filter-label (i18n/t :download/logs-filter-label)]
+   (for [mode [:both :api :api-v2]]
+     ^{:key mode}
+     [:button.btn.btn-sm.download-logs-filter-btn
+      {:type "button"
+       :class (when (= @filter* mode) "active")
+       :aria-pressed (= @filter* mode)
+       :on-click #(reset! filter* mode)}
+      (i18n/t (keyword (str "download/logs-filter-" (name mode))))])])
+
 (defn logs-component []
-  (let [open?* (reagent/atom false)]
+  (let [open?* (reagent/atom false)
+        auto-opened?* (reagent/atom false)
+        filter* (reagent/atom :both)]
     (fn []
       (let [logs (or (:logs @download*) [])
-            n (count logs)]
+            n (count logs)
+            visible (filter-log-lines logs @filter*)
+            n-visible (count visible)
+            finished? (boolean (:download-finished @download*))]
+        (when (and finished? (pos? n) (not @auto-opened?*))
+          (reset! auto-opened?* true)
+          (reset! open?* true))
         [:div.download-logs
          [:button.btn.btn-link.download-logs-toggle
           {:type "button"
@@ -443,14 +480,25 @@
             :aria-hidden "true"}]
           (i18n/t :download/logs)
           (when (pos? n)
-            [:span.text-muted (str " (" n ")")])]
+            [:span.text-muted
+             (if (and (not= @filter* :both) (not= n-visible n))
+               (str " (" n-visible "/" n ")")
+               (str " (" n ")"))])]
          (when @open?*
-           [:textarea.form-control.download-logs-text
-            {:readOnly true
-             :rows (min 16 (max 4 (inc n)))
-             :value (if (seq logs)
-                      (string/join "\n" logs)
-                      (i18n/t :download/logs-empty))}])]))))
+           (when (pos? n)
+             [logs-filter-buttons filter*])
+           (cond
+             (zero? n)
+             [:p.text-muted.download-logs-empty
+              (i18n/t :download/logs-empty)]
+
+             (zero? n-visible)
+             [:p.text-muted.download-logs-empty
+              (i18n/t :download/logs-filter-empty)]
+
+             :else
+             [:pre.download-logs-text
+              (string/join "\n" visible)]))]))))
 
 (defn downloading-component []
   [:div

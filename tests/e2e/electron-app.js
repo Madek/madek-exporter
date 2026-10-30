@@ -134,6 +134,9 @@ async function closeMadekExporter(app, jvmPort) {
  * @param {number} jvmPort
  */
 async function resetSession(page, jvmPort) {
+  await fetch(`http://127.0.0.1:${jvmPort}/download`, { method: 'DELETE' }).catch(
+    () => {}
+  );
   await fetch(`http://127.0.0.1:${jvmPort}/connect`, { method: 'DELETE' }).catch(
     () => {}
   );
@@ -197,11 +200,43 @@ function getFakeBaseUrl() {
   return process.env.FAKE_MADEK_API_TEST_URL || 'http://127.0.0.1:9191';
 }
 
+/** @see tests/fake-madek-api/export-fixtures.mjs */
+const fakeMediaEntryId =
+  process.env.FAKE_MADEK_MEDIA_ENTRY_ID || '00000000-0000-4000-8000-000000000010';
+const fakeMediaEntryTitle =
+  process.env.FAKE_MADEK_MEDIA_ENTRY_TITLE || 'Fake export entry';
+const fakeSetId = process.env.FAKE_MADEK_SET_ID || '00000000-0000-4000-8000-000000000020';
+const fakeSetMediaEntryIds = [
+  fakeMediaEntryId,
+  '00000000-0000-4000-8000-000000000021',
+  '00000000-0000-4000-8000-000000000022',
+];
+
+/** HTTP log lines during POST /download against the fake API (see export_fake_api_test.clj). */
+const fakeExportLogCounts = {
+  mediaEntryMetadata: 12,
+  mediaEntryWithFile: 14,
+  setMetadata: 23,
+  /** v1 schema (5) + v2 schema (2) + v1 entry (7) + v2 entry (3) — see export_fake_api_test */
+  mediaEntryBothApis: 17,
+};
+
+/** @returns {string} empty directory for an export run */
+function createE2eExportDir() {
+  return fs.mkdtempSync(path.join(repoRoot, 'tmp/e2e-export-'));
+}
+
 module.exports = {
   repoRoot,
   appDevDir: path.join(repoRoot, appDevDir),
   indexUrl,
   getFakeBaseUrl,
+  fakeMediaEntryId,
+  fakeMediaEntryTitle,
+  fakeSetId,
+  fakeSetMediaEntryIds,
+  fakeExportLogCounts,
+  createE2eExportDir,
   /** Matches `default-madek-url` in connection.cljs (label click preset). */
   defaultMadekPresetUrl: 'https://medienarchiv.zhdk.ch',
   fakeToken: process.env.FAKE_MADEK_API_TOKEN || 'test-token',

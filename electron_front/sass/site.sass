@@ -249,13 +249,39 @@ pre
       .glyphicon
         margin-right: 0.4em
 
+    .download-logs-filter
+      display: flex
+      flex-wrap: wrap
+      align-items: center
+      gap: 0.35em
+      margin-top: 0.5em
+
+      .download-logs-filter-label
+        font-size: 0.9em
+        color: #666
+        margin-right: 0.25em
+
+      .download-logs-filter-btn
+        &.active
+          color: #fff
+          background-color: #337ab7
+          border-color: #2e6da4
+
     .download-logs-text
       margin-top: 0.5em
+      max-height: 16em
+      overflow: auto
+      padding: 0.5em 0.75em
       font-family: Menlo, Monaco, Consolas, monospace
       font-size: 0.85em
-      white-space: pre
-      resize: vertical
+      white-space: pre-wrap
+      word-break: break-all
       background: #fafafa
+      border: 1px solid #ddd
+      border-radius: 4px
+
+    .download-logs-empty
+      margin-top: 0.5em
 
   .open-download-dir
     margin-top: 1.5em

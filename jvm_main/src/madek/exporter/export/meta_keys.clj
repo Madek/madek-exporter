@@ -16,3 +16,8 @@
        (into {})))
 
 (def meta-keys (memoize meta-keys_unmemoized))
+
+(defn reset-cache!
+  "Drop memoized meta-keys (each download should log list HTTP again)."
+  []
+  (alter-var-root #'meta-keys (constantly (memoize meta-keys_unmemoized))))

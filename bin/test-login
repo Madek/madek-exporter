@@ -66,7 +66,9 @@ start_fake() {
 
 start_fake "$PORT"
 run_node --test tests/fake-madek-api/login-auth.test.mjs
+run_node --test tests/fake-madek-api/export.test.mjs
 $LEIN test :only madek.exporter.connection-test
+$LEIN test :only madek.exporter.export-fake-api-test
 stop_fake
 
 start_fake "$V1_ONLY_PORT" FAKE_MADEK_API_V2_DISABLED=1
