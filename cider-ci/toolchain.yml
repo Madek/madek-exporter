@@ -1,0 +1,17 @@
+# Node 22: bin/with-node22. Java 21: bin/with-java21 (vendor Temurin or download).
+scripts:
+  check-node-toolchain:
+    body: |
+      set -euo pipefail
+      ./bin/with-node22
+  check-java-toolchain:
+    body: |
+      set -euo pipefail
+      ./bin/with-java21
+  install-npm-packages:
+    body: |
+      set -euo pipefail
+      ./bin/with-node22 npm install
+    start_when:
+      node toolchain is ready:
+        script_key: check-node-toolchain

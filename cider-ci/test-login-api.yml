@@ -1,0 +1,27 @@
+# Fake Madek API auth matrix (node --test) + JVM connect/probe tests (lein test).
+include:
+  - cider-ci/environment_variables.yml
+  - cider-ci/toolchain.yml
+git_options:
+  submodules:
+    include_match: ^vendor
+trial_attachments:
+  logs:
+    include_match: 'logs\/.+\.log$'
+    content_type: text/plain
+traits:
+  JDK: true
+  Leiningen: true
+  nodejs: true
+scripts:
+  test-login:
+    timeout: 20 Minutes
+    body: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      LEIN=lein ./bin/with-java21 ./bin/with-node22 ./bin/test-login
+    start_when:
+      node toolchain is ready:
+        script_key: check-node-toolchain
+      java toolchain is ready:
+        script_key: check-java-toolchain

@@ -1,0 +1,52 @@
+# Playwright drives the dev Electron app (headless via xvfb) against the fake Madek API.
+include:
+  - cider-ci/environment_variables.yml
+  - cider-ci/install-missing-libs.yml
+  - cider-ci/toolchain.yml
+git_options:
+  submodules:
+    include_match: ^vendor
+trial_attachments:
+  screenshots:
+    include_match: 'test-results\/.+\.png$'
+    content_type: image/png
+  playwright-error-context:
+    include_match: 'test-results\/.+\.md$'
+    content_type: text/plain
+  playwright-report:
+    include_match: 'playwright-report\/index\.html$'
+    content_type: text/html
+  logs:
+    include_match: 'logs\/.+\.log$'
+    content_type: text/plain
+traits:
+  JDK: true
+  Leiningen: true
+  nodejs: true
+scripts:
+  build-dev-app:
+    timeout: 30 Minutes
+    body: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      ./bin/with-java21 ./bin/with-node22 ./bin/build-electron-dev
+    start_when:
+      install-npm-packages has passed:
+        script_key: install-npm-packages
+      java toolchain is ready:
+        script_key: check-java-toolchain
+  test-e2e:
+    timeout: 20 Minutes
+    body: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      if [[ -f .tools/sysroot-env.sh ]]; then
+        # shellcheck disable=SC1091
+        source .tools/sysroot-env.sh
+      fi
+      CI=1 ./bin/with-java21 ./bin/with-node22 ./bin/test-e2e
+    start_when:
+      missing libs installed:
+        script_key: install-missing-libs
+      dev app has been built:
+        script_key: build-dev-app

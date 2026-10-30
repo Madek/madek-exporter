@@ -64,7 +64,7 @@ mkdir -p "$OUTPUT_DIR/resources/jre"
 cp -Lrf "${JRE_EXTRACT_DIR}/." "$OUTPUT_DIR/resources/jre"
 cp -Lf app/prod/jvm-main.jar "$OUTPUT_DIR/resources/jvm-main.jar"
 wrap_linux_electron "$OUTPUT_DIR"
-cp packaging/README.txt "$OUTPUT_DIR/README.txt"
+cp resources/packaging/README.txt "$OUTPUT_DIR/README.txt"
 substitute_madek_exporter_version_in_readme "$OUTPUT_DIR/README.txt"
 
 echo "  ${OUTPUT_DIR}/"

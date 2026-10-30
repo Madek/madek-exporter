@@ -4,13 +4,6 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$ROOT"
 
-export FAKE_MADEK_API_PORT="${FAKE_MADEK_API_PORT:-9191}"
-export FAKE_MADEK_API_TOKEN="${FAKE_MADEK_API_TOKEN:-test-token}"
-export FAKE_MADEK_API_TEST_URL="http://127.0.0.1:${FAKE_MADEK_API_PORT}"
-export MADEK_E2E=1
-# Non-TTY output: the list reporter otherwise truncates titles to the pane width.
-export PLAYWRIGHT_FORCE_TTY="${PLAYWRIGHT_FORCE_TTY:-0}"
-
 run_node() {
   if command -v node >/dev/null 2>&1; then
     node "$@"
@@ -21,26 +14,46 @@ run_node() {
   fi
 }
 
-run_playwright() {
-  if command -v mise >/dev/null 2>&1 && mise which npx >/dev/null 2>&1; then
-    mise exec -- npx "$@"
-  elif command -v npx >/dev/null 2>&1; then
-    npx "$@"
+npx_cmd() {
+  if command -v npx >/dev/null 2>&1; then
+    echo npx
+  elif command -v mise >/dev/null 2>&1 && mise which npx >/dev/null 2>&1; then
+    # npx needs node on PATH too, which `mise exec` provides.
+    echo "mise exec -- npx"
   else
-    "${ROOT}/bin/with-node22" npx "$@"
+    echo "${ROOT}/bin/with-node22 npx"
   fi
 }
 
-if [[ ! -f app/dev/js/front.js || ! -f app/dev/jvm-main.jar ]]; then
+if [[ -z "${FAKE_MADEK_API_PORT:-}" ]]; then
+  if [[ -n "${CI:-}" ]]; then
+    # Executors run trials in parallel; a fixed port could hit another trial's server.
+    FAKE_MADEK_API_PORT="$(run_node -e "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
+  else
+    FAKE_MADEK_API_PORT=9191
+  fi
+fi
+export FAKE_MADEK_API_PORT
+export FAKE_MADEK_API_TOKEN="${FAKE_MADEK_API_TOKEN:-test-token}"
+export FAKE_MADEK_API_TEST_URL="http://127.0.0.1:${FAKE_MADEK_API_PORT}"
+export MADEK_E2E=1
+# Non-TTY output: the list reporter otherwise truncates titles to the pane width.
+export PLAYWRIGHT_FORCE_TTY="${PLAYWRIGHT_FORCE_TTY:-0}"
+
+if [[ ! -f app/dev/js/front.js || ! -f app/dev/js/main.js || ! -f app/dev/jvm-main.jar ]]; then
   echo "[test-e2e] building dev artifacts (first run)..." >&2
   ./bin/build-electron-dev
 fi
 
-if [[ -n "${CI:-}" ]] && command -v xvfb-run >/dev/null 2>&1; then
-  echo "[test-e2e] running under xvfb-run (CI)" >&2
-  xvfb-run -a mise exec -- npx playwright test "$@"
+NPX="$(npx_cmd)"
+
+if [[ "$(uname -s)" == "Linux" && -z "${DISPLAY:-}" ]]; then
+  echo "[test-e2e] no DISPLAY; running under xvfb-run" >&2
+  # shellcheck disable=SC2086
+  xvfb-run -a $NPX playwright test "$@"
 else
-  run_playwright playwright test "$@"
+  # shellcheck disable=SC2086
+  $NPX playwright test "$@"
 fi
 
 echo "[test-e2e] OK"

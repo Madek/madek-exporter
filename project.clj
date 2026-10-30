@@ -5,11 +5,11 @@
             :url "https://de.wikipedia.org/wiki/GNU_General_Public_License"}
 
   ;; Pin transitive versions that OSV flags.
-  :managed-dependencies [[com.fasterxml.jackson.core/jackson-core "2.18.9"]
-                         [com.fasterxml.jackson.core/jackson-databind "2.18.9"]
-                         [com.fasterxml.jackson.core/jackson-annotations "2.18.9"]
-                         [com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.18.9"]
-                         [com.fasterxml.jackson.dataformat/jackson-dataformat-smile "2.18.9"]
+  :managed-dependencies [[com.fasterxml.jackson.core/jackson-core "2.18.11"]
+                         [com.fasterxml.jackson.core/jackson-databind "2.18.11"]
+                         [com.fasterxml.jackson.core/jackson-annotations "2.18.11"]
+                         [com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.18.11"]
+                         [com.fasterxml.jackson.dataformat/jackson-dataformat-smile "2.18.11"]
                          [commons-fileupload "1.5"]
                          [org.apache.commons/commons-fileupload2-core "2.0.0-M5"]
                          [commons-io "2.15.1"]
@@ -18,7 +18,7 @@
                          [org.apache.httpcomponents/httpmime "4.5.14"]
                          [com.google.code.gson/gson "2.11.0"]
                          [com.google.protobuf/protobuf-java "3.25.5"]
-                         [com.google.guava/guava "32.1.3-jre"]
+                         [com.google.guava/guava "33.7.2-jre"]
                          [org.yaml/snakeyaml "2.3"]
                          ;; 1.15.11+ data_readers.cljc uses #? conditionals; breaks cljs 1.10.773
                          [org.flatland/ordered "1.15.10"]]

@@ -1,6 +1,7 @@
 include:
   - cider-ci/environment_variables.yml
   - cider-ci/install-missing-libs.yml
+  - cider-ci/toolchain.yml
 git_options:
   submodules:
     # vendor only (Temurin 21 JDK + assets). Skip node_modules submodule; use npm install.
@@ -17,23 +18,7 @@ traits:
   Leiningen: true
   nodejs: true
   # Desktop/wine/xorg libs are installed by install-missing-libs (not via Cider traits).
-  # Node 22: bin/with-node22. Java 21: bin/with-java21 (vendor Temurin or download).
 scripts:
-  check-node-toolchain:
-    body: |
-      set -euo pipefail
-      ./bin/with-node22
-  check-java-toolchain:
-    body: |
-      set -euo pipefail
-      ./bin/with-java21
-  install-npm-packages:
-    body: |
-      set -euo pipefail
-      ./bin/with-node22 npm install
-    start_when:
-      node toolchain is ready:
-        script_key: check-node-toolchain
   build-stylesheets:
     body: |
       set -euo pipefail

@@ -91,6 +91,8 @@ Login coverage (fake API, JVM connect, Playwright UI) mirrors Madek `/api`:
 | email / account password | rejected (401) |
 | api-client / api-client password | ok |
 
+Cider-CI runs both suites in the `tests` job ("All tests") (`cider-ci/test-login-api.yml`, `cider-ci/test-login-e2e.yml`); Playwright runs headless under `xvfb-run` there.
+
 Plus JVM edge cases (missing URL, unreachable host, empty credentials, v1-only hosts via `FAKE_MADEK_API_V2_DISABLED=1`) and UI form validation / disconnect.
 
 ## Release
