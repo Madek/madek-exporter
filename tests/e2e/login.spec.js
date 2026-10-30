@@ -2,6 +2,7 @@ const {
   test,
   expect,
   connectButton,
+  fillConnectionUrl,
   useLoginTab,
   connectWithToken,
   connectWithLogin,
@@ -11,13 +12,14 @@ const {
   expectConnected,
 } = require('./fixtures');
 const {
-  fakeBaseUrl,
+  getFakeBaseUrl,
   fakeToken,
   fakeLogin,
   fakeEmail,
   fakePassword,
   fakeApiClient,
   fakeApiClientPassword,
+  defaultMadekPresetUrl,
 } = require('./electron-app');
 
 test('export: menu disabled before login', async ({ page }) => {
@@ -27,7 +29,7 @@ test('export: menu disabled before login', async ({ page }) => {
 test('token only: connects (api + api-v2)', async ({ page }) => {
   await connectWithToken(page, fakeToken);
   await expectConnected(page);
-  await expect(page.locator('.connected')).toContainText(fakeBaseUrl);
+  await expect(page.locator('.connected')).toContainText(getFakeBaseUrl());
   await expect(page.getByRole('link', { name: /Continue to export/i })).toBeVisible();
 });
 
@@ -88,22 +90,30 @@ test('disconnect shows login form, export disabled again', async ({ page }) => {
   await expectExportDisabled(page);
 });
 
+test('form: base URL empty until label clicked', async ({ page }) => {
+  const urlInput = page.locator('input.url');
+  await expect(urlInput).toHaveValue('');
+  await expect(urlInput).toHaveAttribute('placeholder', defaultMadekPresetUrl);
+  await page.locator('label[for="url"]').click();
+  await expect(urlInput).toHaveValue(defaultMadekPresetUrl);
+});
+
 test('form: invalid URL disables Connect', async ({ page }) => {
-  await page.locator('input.url').fill('not-a-valid-url');
+  await fillConnectionUrl(page, 'not-a-valid-url');
   await page.locator('input.password').fill(fakeToken);
   await expect(connectButton(page)).toBeDisabled();
   await expectExportDisabled(page);
 });
 
 test('form: empty token disables Connect', async ({ page }) => {
-  await page.locator('input.url').fill(fakeBaseUrl);
+  await fillConnectionUrl(page, getFakeBaseUrl());
   await expect(connectButton(page)).toBeDisabled();
   await expectExportDisabled(page);
 });
 
 test('form: empty password disables Connect', async ({ page }) => {
   await useLoginTab(page);
-  await page.locator('input.url').fill(fakeBaseUrl);
+  await fillConnectionUrl(page, getFakeBaseUrl());
   await page.locator('input.login').fill(fakeLogin);
   await expect(connectButton(page)).toBeDisabled();
   await expectExportDisabled(page);

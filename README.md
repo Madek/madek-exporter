@@ -36,22 +36,29 @@ Build outputs are written to `target/packages/` and `target/dist/`.
 
 ## Development
 
-Build development artifacts:
+One-click dev stack (Cursor terminals: Figwheel, CLJS main, CSS, Electron):
+
+```zsh
+./tmp/dev-madek-exporter/one-click-runner start
+```
+
+Fake Madek for local login / tests:
+
+```zsh
+./tmp/dev-madek-exporter/one-click-runner start-test
+./tmp/dev-madek-exporter/one-click-runner test
+```
+
+See `tmp/dev-madek-exporter/README.md` for `stop` and `cleanup`.
+
+Manual setup:
 
 ```zsh
 ./bin/build-electron-dev
-```
-
-Run the backend and Electron app in separate terminals:
-
-```zsh
-lein clean
-lein run -m madek.exporter.main server
-```
-
-```zsh
 npx electron app/dev
 ```
+
+(Electron spawns the JVM backend on port 8383; a separate `lein run -m madek.exporter.main server` is only needed without Electron.)
 
 ## Testing
 

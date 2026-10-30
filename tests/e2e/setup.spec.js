@@ -3,8 +3,9 @@ const { indexUrl } = require('./electron-app');
 
 const LOCALE_KEY = 'madek-exporter-locale';
 
+// Navbar labels use :nav/* keys (see i18n/messages.cljs), not :connection/title.
 const LOCALES = [
-  { code: 'de', label: 'DE', connection: 'Verbindung', help: 'Hilfe', export: 'Export' },
+  { code: 'de', label: 'DE', connection: 'Verbindungen', help: 'Hilfe', export: 'Export' },
   { code: 'fr', label: 'FR', connection: 'Connexion', help: 'Aide', export: 'Export' },
   { code: 'it', label: 'IT', connection: 'Connessione', help: 'Aiuto', export: 'Esporta' },
   { code: 'es', label: 'ES', connection: 'Conexión', help: 'Ayuda', export: 'Exportar' },
@@ -95,13 +96,17 @@ test('language: choice survives a reload', async ({ page }) => {
   try {
     await toggle.click();
     await menu.locator('ul.dropdown-menu').getByRole('link', { name: 'DE', exact: true }).click();
-    await expect(mainNav(page).getByRole('link', { name: 'Verbindung', exact: true })).toBeVisible();
+    await expect(mainNav(page).getByRole('link', { name: 'Verbindungen', exact: true })).toBeVisible();
 
     // A plain reload hits the rewritten router path; restart from index.html.
     await page.goto(indexUrl);
+    await page.waitForFunction(
+      () => document.querySelector('input.url') != null,
+      { timeout: 60_000 }
+    );
     await expect(page.locator('html')).toHaveAttribute('lang', 'de');
     await expect(toggle.locator('.language-code')).toHaveText('DE');
-    await expect(mainNav(page).getByRole('link', { name: 'Verbindung', exact: true })).toBeVisible();
+    await expect(mainNav(page).getByRole('link', { name: 'Verbindungen', exact: true })).toBeVisible();
   } finally {
     await page.evaluate((k) => localStorage.setItem(k, 'en'), LOCALE_KEY);
   }

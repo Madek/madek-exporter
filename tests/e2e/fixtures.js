@@ -1,6 +1,6 @@
 const base = require('@playwright/test');
 const {
-  fakeBaseUrl,
+  getFakeBaseUrl,
   launchMadekExporter,
   attachPageDiagnostics,
   waitForFrontReady,
@@ -38,14 +38,24 @@ function connectButton(page) {
   return page.getByRole('button', { name: /^Connect$/i });
 }
 
+/** @param {import('@playwright/test').Page} page @param {string} url */
+async function fillConnectionUrl(page, url) {
+  const input = page.locator('input.url');
+  await input.click();
+  await input.fill('');
+  await input.fill(url);
+  await expect(input).toHaveValue(url);
+}
+
 /** @param {import('@playwright/test').Page} page */
 async function useLoginTab(page) {
   await page.getByRole('link', { name: /Sign in with login and password/i }).click();
 }
 
 /** @param {import('@playwright/test').Page} page */
-async function connectWithToken(page, token, url = fakeBaseUrl) {
-  await page.locator('input.url').fill(url);
+async function connectWithToken(page, token, url) {
+  const baseUrl = url ?? getFakeBaseUrl();
+  await fillConnectionUrl(page, baseUrl);
   await page.locator('input.password').fill(token);
   await connectButton(page).click();
 }
@@ -53,7 +63,7 @@ async function connectWithToken(page, token, url = fakeBaseUrl) {
 /** @param {import('@playwright/test').Page} page */
 async function connectWithLogin(page, login, password) {
   await useLoginTab(page);
-  await page.locator('input.url').fill(fakeBaseUrl);
+  await fillConnectionUrl(page, getFakeBaseUrl());
   await page.locator('input.login').fill(login);
   await page.locator('input.password').fill(password);
   await connectButton(page).click();
@@ -86,14 +96,22 @@ async function expectExportEnabled(page) {
 }
 
 /** @param {import('@playwright/test').Page} page */
+function connectionErrorModal(page) {
+  return page.locator('.modal-content.modal-danger');
+}
+
+/** @param {import('@playwright/test').Page} page */
 async function dismissConnectionError(page) {
-  await page.getByRole('button', { name: /^Dismiss$/i }).click();
+  await connectionErrorModal(page).getByRole('button', { name: /^Dismiss$/i }).click();
 }
 
 /** @param {import('@playwright/test').Page} page */
 async function expectRejected(page) {
-  await expect(page.getByText(/Connection failed/i)).toBeVisible();
-  await expect(page.getByText(/Authentication failed/i)).toBeVisible();
+  const modal = connectionErrorModal(page);
+  await expect(modal).toBeVisible({ timeout: 15_000 });
+  await expect(modal.locator('.modal-header')).toContainText(/Connection failed/i);
+  // Main alert only — probe lines also contain “Authentication failed (HTTP 401)”.
+  await expect(modal.locator('.alert-danger')).toContainText(/Authentication failed/i);
   await expect(page.getByText(/Connected!/i)).not.toBeVisible();
   await dismissConnectionError(page);
   await expectExportDisabled(page);
@@ -109,6 +127,7 @@ module.exports = {
   test,
   expect,
   connectButton,
+  fillConnectionUrl,
   useLoginTab,
   connectWithToken,
   connectWithLogin,
