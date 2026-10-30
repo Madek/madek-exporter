@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+PORT="${FAKE_MADEK_API_LOGIN_TEST_PORT:-19191}"
+V1_ONLY_PORT="$((PORT + 1))"
+export FAKE_MADEK_API_TOKEN="${FAKE_MADEK_API_TOKEN:-test-token}"
+
+FAKE_PID=""
+
+stop_fake() {
+  if [[ -n "$FAKE_PID" ]] && kill -0 "$FAKE_PID" 2>/dev/null; then
+    kill "$FAKE_PID" 2>/dev/null || true
+    wait "$FAKE_PID" 2>/dev/null || true
+  fi
+  FAKE_PID=""
+}
+trap stop_fake EXIT INT TERM
+
+cd "$ROOT"
+
+run_node() {
+  if command -v node >/dev/null 2>&1; then
+    node "$@"
+  elif command -v mise >/dev/null 2>&1 && mise which node >/dev/null 2>&1; then
+    "$(mise which node)" "$@"
+  else
+    "${ROOT}/bin/with-node22" node "$@"
+  fi
+}
+
+# start_fake <port> [extra env assignments...]
+# Refuses a busy port: a leftover fake server would silently run old code or
+# the wrong mode (e.g. with /api-v2 when v1-only is expected).
+start_fake() {
+  local port="$1"
+  shift
+  if curl -s -o /dev/null "http://127.0.0.1:${port}/"; then
+    echo "[test-login] ERROR: port ${port} is already in use; stop the process or set FAKE_MADEK_API_LOGIN_TEST_PORT" >&2
+    exit 1
+  fi
+  env FAKE_MADEK_API_PORT="$port" "$@" "$(command -v node || mise which node)" \
+    tests/fake-madek-api/server.mjs &
+  FAKE_PID=$!
+  for _ in $(seq 1 50); do
+    if curl -s -o /dev/null "http://127.0.0.1:${port}/"; then
+      export FAKE_MADEK_API_TEST_URL="http://127.0.0.1:${port}"
+      echo "[test-login] fake-madek-api on ${FAKE_MADEK_API_TEST_URL} $*"
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "[test-login] ERROR: fake-madek-api did not start on port ${port}" >&2
+  exit 1
+}
+
+start_fake "$PORT"
+run_node --test tests/fake-madek-api/login-auth.test.mjs
+"${ROOT}/bin/lein" test :only madek.exporter.connection-test
+stop_fake
+
+start_fake "$V1_ONLY_PORT" FAKE_MADEK_API_V2_DISABLED=1
+"${ROOT}/bin/lein" test :only madek.exporter.connection-v1-only-test
+stop_fake
+
+echo "[test-login] OK"

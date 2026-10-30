@@ -20,7 +20,9 @@
         relative-app-dir "./app/dev"]
     (.resolve path process-dir relative-app-dir)))
 
-(def jvm-port 8383)
+(def jvm-port
+  (let [p (some-> js/process .-env (aget "MADEK_JVM_PORT") js/parseInt)]
+    (if (and p (not (js/isNaN p))) p 8383)))
 (def jvm-password "secret")
 
 

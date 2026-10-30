@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$ROOT"
+
+export FAKE_MADEK_API_PORT="${FAKE_MADEK_API_PORT:-9191}"
+export FAKE_MADEK_API_TOKEN="${FAKE_MADEK_API_TOKEN:-test-token}"
+export FAKE_MADEK_API_TEST_URL="http://127.0.0.1:${FAKE_MADEK_API_PORT}"
+export MADEK_E2E=1
+# Non-TTY output: the list reporter otherwise truncates titles to the pane width.
+export PLAYWRIGHT_FORCE_TTY="${PLAYWRIGHT_FORCE_TTY:-0}"
+
+run_node() {
+  if command -v node >/dev/null 2>&1; then
+    node "$@"
+  elif command -v mise >/dev/null 2>&1 && mise which node >/dev/null 2>&1; then
+    "$(mise which node)" "$@"
+  else
+    "${ROOT}/bin/with-node22" node "$@"
+  fi
+}
+
+run_playwright() {
+  if command -v mise >/dev/null 2>&1 && mise which npx >/dev/null 2>&1; then
+    mise exec -- npx "$@"
+  elif command -v npx >/dev/null 2>&1; then
+    npx "$@"
+  else
+    "${ROOT}/bin/with-node22" npx "$@"
+  fi
+}
+
+if [[ ! -f app/dev/js/front.js || ! -f app/dev/jvm-main.jar ]]; then
+  echo "[test-e2e] building dev artifacts (first run)..." >&2
+  ./bin/build-electron-dev
+fi
+
+if [[ -n "${CI:-}" ]] && command -v xvfb-run >/dev/null 2>&1; then
+  echo "[test-e2e] running under xvfb-run (CI)" >&2
+  xvfb-run -a mise exec -- npx playwright test "$@"
+else
+  run_playwright playwright test "$@"
+fi
+
+echo "[test-e2e] OK"
