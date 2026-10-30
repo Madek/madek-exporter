@@ -18,11 +18,15 @@
     * Compare an api vs api-v2 export (file counts, JSON keys, and files present on only one side).
     * api-v2 auth requires a token or session; HTTP Basic and API-client passwords are reported as unsupported.
     * When Cloudflare blocks requests, show a VPN hint instead of a generic connection error.
+    * Show Madek HTTP requests in the download log panel (live during export); filter lines by `api`, `api-v2`, or both (default).
+    * Extend `tests/fake-madek-api` with `/api-v2` export stubs (vocabularies, meta-keys, media entries). Use `npm run fake-madek-api` (`bin/fake-madek-api`) so a fresh stub replaces any stale listener on the port.
+    * Playwright export E2E: projects `export-from-api` and `export-from-both-apis`; JVM `export-fake-api-test` covers the same flows and request-log counts against the fake API.
 
     Notes
     -----
 
     * Same packaging, toolchain, and platform notes as 0.11.1.
+    * After pulling, rebuild dev JVM/front (`bin/build-jvm-main-dev`, `bin/build-electron-dev`) to pick up log sync and UI changes.
 
 ####### 0.11.1 ######################################################################
 

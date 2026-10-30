@@ -27,7 +27,7 @@
     "smoke": "./bin/smoke-run",
     "check:artifacts": "./bin/validate-build-artifacts",
     "audit:security": "./bin/security-audit",
-    "fake-madek-api": "node tests/fake-madek-api/server.mjs",
+    "fake-madek-api": "./bin/fake-madek-api",
     "test:login": "./bin/test-login",
     "test:e2e": "./bin/test-e2e",
     "test": "./bin/test-login && ./bin/test-e2e"

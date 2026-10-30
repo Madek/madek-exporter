@@ -22,8 +22,8 @@ module.exports = {
   reporter: [['list'], ['html', { open: 'never' }]],
   outputDir: path.join(__dirname, 'test-results/playwright'),
   webServer: {
-    command: `node tests/fake-madek-api/server.mjs`,
-    url: `http://127.0.0.1:${FAKE_PORT}/api-v2/api-docs/openapi.json`,
+    command: `./bin/fake-madek-api`,
+    url: `http://127.0.0.1:${FAKE_PORT}/api-v2/_export-stubs-ready`,
     env: {
       FAKE_MADEK_API_PORT: FAKE_PORT,
       FAKE_MADEK_API_TOKEN: FAKE_TOKEN,
@@ -39,5 +39,17 @@ module.exports = {
   projects: [
     { name: 'setup', testMatch: /setup\.spec\.js$/ },
     { name: 'login', testMatch: /login\.spec\.js$/, dependencies: ['setup'] },
+    {
+      name: 'export-from-api',
+      testMatch: /export-from-api\.spec\.js$/,
+      dependencies: ['setup'],
+      timeout: 120_000,
+    },
+    {
+      name: 'export-from-both-apis',
+      testMatch: /export-from-both-apis\.spec\.js$/,
+      dependencies: ['setup'],
+      timeout: 120_000,
+    },
   ],
 };

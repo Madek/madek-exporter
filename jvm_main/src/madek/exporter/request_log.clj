@@ -4,14 +4,19 @@
    [clj-http.client :as http-client]
    [clojure.string :as string]
    [json-roa.client.core :as roa]
+   [madek.exporter.download-log-lines :as download-log-lines]
    [madek.exporter.state :as state]))
 
 (def ^:private max-logs 2000)
 
+(defn lines [] (download-log-lines/lines))
+
 (defn clear!
   "Reset request logs for a new download run."
   []
-  (swap! state/db assoc-in [:download :logs] []))
+  (download-log-lines/clear!)
+  (swap! state/db assoc-in [:download :logs] [])
+  (state/broadcast-download-logs!))
 
 (defn- logging-enabled? []
   (boolean (get-in @state/db [:download :download-started])))
@@ -34,12 +39,9 @@
   (when (logging-enabled?)
     (let [line (str (string/upper-case (name (or method :get)))
                     " " url " " (status-label status))]
-      (swap! state/db update-in [:download :logs]
-             (fn [logs]
-               (let [v (conj (vec (or logs [])) line)]
-                 (if (> (count v) max-logs)
-                   (subvec v (- (count v) max-logs))
-                   v)))))))
+      (download-log-lines/append! line :max-logs max-logs)
+      (swap! state/db assoc-in [:download :logs] (download-log-lines/lines))
+      (state/broadcast-download-logs!))))
 
 (defn- log-from-exception! [req e]
   (append-line! (:method req)
