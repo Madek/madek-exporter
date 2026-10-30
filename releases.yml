@@ -1,3 +1,29 @@
+####### 0.11.2 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 2
+  version_pre: 1
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Export through `/api`, `/api-v2`, or both. Mode “both” writes into `api/` and `api-v2/` subfolders.
+    * Choose the export API after login. Connect still probes `/api` and `/api-v2` and reports which are available.
+    * Prefill an empty Madek URL with `https://medienarchiv.zhdk.ch`.
+    * Compare an api vs api-v2 export (file counts, JSON keys, and files present on only one side).
+    * api-v2 auth requires a token or session; HTTP Basic and API-client passwords are reported as unsupported.
+    * When Cloudflare blocks requests, show a VPN hint instead of a generic connection error.
+
+    Notes
+    -----
+
+    * Same packaging, toolchain, and platform notes as 0.11.1.
+
 ####### 0.11.1 ######################################################################
 
 - version_major: 0
