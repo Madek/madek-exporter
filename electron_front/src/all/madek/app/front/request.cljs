@@ -30,13 +30,18 @@
   (<= 200 (-> resp :status) 299))
 
 (defn response-error-message [response]
-  (let [body (:body response)]
-    (or (when (map? body)
-          (or (:message body)
-              (get body "message")))
-        (when (= 0 (:status response))
-          (i18n/t :request/service-unreachable))
-        (i18n/t :request/could-not-complete))))
+  (let [body (:body response)
+        status (:status response)
+        msg (or (when (map? body)
+                  (or (:message body)
+                      (get body "message")))
+                (when (= 0 status)
+                  (i18n/t :request/service-unreachable))
+                (when (integer? status)
+                  (str (i18n/t :request/could-not-complete)
+                       " (HTTP " status ")"))
+                (i18n/t :request/could-not-complete))]
+    msg))
 
 (defn autoremove [id meta]
   (go (<! (timeout 30000))
@@ -112,6 +117,58 @@
            (filter show-modal?)
            first))))
 
+(defn- probe-blocked? [probe]
+  (let [reason (or (:reason probe) (get probe "reason"))]
+    (or (= :blocked reason)
+        (= "blocked" reason)
+        (= "cloudflare" (or (:server probe) (get probe "server"))))))
+
+(defn- api-status-cloudflare-blocked? [api-status]
+  (boolean
+   (and (map? api-status)
+        (or (probe-blocked? (or (:api api-status) (get api-status "api")))
+            (probe-blocked? (or (:api-v2 api-status) (get api-status "api-v2")))))))
+
+(defn- api-status-in-modal [api-status]
+  (when (map? api-status)
+    [:div
+     (when (api-status-cloudflare-blocked? api-status)
+       [:div.alert.alert-warning
+        (i18n/t :connection/cloudflare-vpn-warn)])
+     [:h5 (i18n/t :connection/api-status-title)]
+     [:ul.list-unstyled
+      (doall
+       (for [[label k] [["/api" :api] ["/api-v2" :api-v2]]]
+         (let [probe (or (get api-status k)
+                         (get api-status (name k))
+                         {})
+               blocked? (probe-blocked? probe)]
+           ^{:key label}
+           [:li
+            [:code label]
+            " — "
+            (if (:available probe)
+              (i18n/t :connection/api-available)
+              (i18n/t :connection/api-unavailable))
+            (when-let [st (:status probe)]
+              (str " (HTTP " st ")"))
+            (when (and (not blocked?)
+                       (or (:error probe) (get probe "error")))
+              [:div [:small.text-muted
+                     (or (:error probe) (get probe "error"))]])])))]]))
+
+(defn- danger-modal-body [response]
+  (let [body (:body response)
+        api-status (when (map? body)
+                     (or (:api-status body)
+                         (get body "api-status")))
+        cloudflare-blocked? (api-status-cloudflare-blocked? api-status)]
+    [:div
+     (when-not cloudflare-blocked?
+       [:div.alert.alert-danger
+        [:p (response-error-message response)]])
+     (api-status-in-modal api-status)]))
+
 (defn modal []
   (when-let [request @current-modal-request]
     (let [bootstrap-status (cond (response-pending? request) :pending
@@ -133,8 +190,7 @@
            (case bootstrap-status
              :success [:p (-> request :response :body)]
              :pending [:p (i18n/t :request/stand-by)]
-             :danger [:div.alert.alert-danger
-                      [:p (response-error-message (:response request))]])]
+             :danger [danger-modal-body (:response request)])]
           [:div.modal-footer
            [:div.clearfix]
            [:button.btn
@@ -142,7 +198,6 @@
              :on-click #(swap! state/client-db
                                update-in [:requests]
                                (fn [rx] (dissoc rx (:id request))))}
-            (i18n/t :request/dismiss)]
-           ]]]]
+            (i18n/t :request/dismiss)]]]]]
        [:div.modal-backdrop {:style {:opacity "0.2"}}]])))
 

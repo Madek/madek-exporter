@@ -6,6 +6,7 @@
    [logbug.catcher :as catcher]
    [logbug.debug :as debug :refer [I> I>>]]
    [logbug.thrown :as thrown]
+   [madek.exporter.request-log :as request-log]
    [madek.exporter.state :as state]
    [madek.exporter.utils :refer [deep-merge]])
 
@@ -27,8 +28,8 @@
 
 (defn meta-data-schema_unmemoized []
   {:vocabularies
-   (->> (-> (roa/get-root (state/connection-entry-point)
-                          :default-conn-opts (state/connection-http-options))
+   (->> (-> (request-log/get-root (state/connection-entry-point)
+                                  :default-conn-opts (state/connection-http-options))
             (roa/relation :vocabularies)
             (roa/get {})
             roa/coll-seq)

@@ -32,7 +32,9 @@
 
 ;### connection params ########################################################
 
-(defn connection-entry-point []
+(defn connection-entry-point
+  "Default Madek API entry-point for the current connection (:api ROA)."
+  []
   (let [url (or (-> @db :connection :url)
                 (throw (ex-info "The connection entry-point is not available at this time." {})))]
     (str url "/api")))

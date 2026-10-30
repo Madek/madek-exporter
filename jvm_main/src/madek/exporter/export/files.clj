@@ -7,6 +7,7 @@
    [logbug.catcher :as catcher]
    [logbug.debug :as debug :refer [identity-with-logging I> I>>]]
    [logbug.thrown :as thrown]
+   [madek.exporter.api :as api]
    [madek.exporter.export.control :as control]
    [madek.exporter.export.progress :as progress]
    [madek.exporter.state :as state]
@@ -82,10 +83,19 @@
               (report! n')
               (recur n'))))))))
 
-(defn- file-overall-progress
+(defn file-overall-progress
   "Map file byte fraction into MediaEntry overall progress 0.15 to 0.80."
   [file-frac]
   (+ 0.15 (* 0.65 (max 0.0 (min 1.0 file-frac)))))
+
+(defn save-http-stream!
+  "Write an HTTP response body (`:as :stream`) to `path`.
+  `on-progress` receives [bytes-read total] when Content-Length is known."
+  [response path on-progress]
+  (io/make-parents path)
+  (with-open [^InputStream in (:body response)
+              out (io/output-stream (io/file path))]
+    (copy-counting! in out (header-content-length response) on-progress)))
 
 ;### DL Previews ##############################################################
 
@@ -172,7 +182,7 @@
 
 (defn download-media-files [target-dir media-entry]
   (catcher/with-logging {}
-    (let [item-id (str (-> media-entry roa/data :id))
+    (let [item-id (api/scoped-item-id (-> media-entry roa/data :id))
           media-files-dir (str target-dir File/separator "media-files")]
       (doseq [media-file [(-> media-entry (roa/relation :media-file) (roa/get {}))]]
         (let [media-file-data (roa/data media-file)
