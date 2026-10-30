@@ -79,7 +79,13 @@ async function launchMadekExporter() {
   const app = await electron.launch({
     executablePath: electronPath,
     // Match README: `npx electron app/dev` from repo root (main.js resolves ./app/dev/...).
-    args: [appDevDir, `--user-data-dir=${userDataDir}`, '--lang=en-US'],
+    args: [
+      appDevDir,
+      `--user-data-dir=${userDataDir}`,
+      '--lang=en-US',
+      // CI containers have no usable setuid chrome-sandbox.
+      ...(process.platform === 'linux' ? ['--no-sandbox'] : []),
+    ],
     cwd: repoRoot,
     env: {
       ...process.env,
@@ -189,6 +195,7 @@ async function gotoConnectionPage(page) {
 module.exports = {
   repoRoot,
   appDevDir: path.join(repoRoot, appDevDir),
+  indexUrl,
   fakeBaseUrl: process.env.FAKE_MADEK_API_TEST_URL || 'http://127.0.0.1:9191',
   fakeToken: process.env.FAKE_MADEK_API_TOKEN || 'test-token',
   fakeLogin: 'fake-user',

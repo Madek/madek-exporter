@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-PORT="${FAKE_MADEK_API_LOGIN_TEST_PORT:-19191}"
-V1_ONLY_PORT="$((PORT + 1))"
+# CI provides lein + Java 21 on PATH (bin/with-java21); locally bin/lein sets up asdf/mise.
+LEIN="${LEIN:-${ROOT}/bin/lein}"
 export FAKE_MADEK_API_TOKEN="${FAKE_MADEK_API_TOKEN:-test-token}"
 
 FAKE_PID=""
@@ -18,6 +18,8 @@ stop_fake() {
 trap stop_fake EXIT INT TERM
 
 cd "$ROOT"
+LOG_DIR="${ROOT}/logs"
+mkdir -p "$LOG_DIR"
 
 run_node() {
   if command -v node >/dev/null 2>&1; then
@@ -28,6 +30,14 @@ run_node() {
     "${ROOT}/bin/with-node22" node "$@"
   fi
 }
+
+# Executors run trials in parallel; never assume a fixed port is free.
+free_port() {
+  run_node -e "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"
+}
+
+PORT="${FAKE_MADEK_API_LOGIN_TEST_PORT:-$(free_port)}"
+V1_ONLY_PORT="$(free_port)"
 
 # start_fake <port> [extra env assignments...]
 # Refuses a busy port: a leftover fake server would silently run old code or
@@ -40,7 +50,7 @@ start_fake() {
     exit 1
   fi
   env FAKE_MADEK_API_PORT="$port" "$@" "$(command -v node || mise which node)" \
-    tests/fake-madek-api/server.mjs &
+    tests/fake-madek-api/server.mjs > "${LOG_DIR}/fake-madek-api-${port}.log" 2>&1 &
   FAKE_PID=$!
   for _ in $(seq 1 50); do
     if curl -s -o /dev/null "http://127.0.0.1:${port}/"; then
@@ -56,11 +66,11 @@ start_fake() {
 
 start_fake "$PORT"
 run_node --test tests/fake-madek-api/login-auth.test.mjs
-"${ROOT}/bin/lein" test :only madek.exporter.connection-test
+$LEIN test :only madek.exporter.connection-test
 stop_fake
 
 start_fake "$V1_ONLY_PORT" FAKE_MADEK_API_V2_DISABLED=1
-"${ROOT}/bin/lein" test :only madek.exporter.connection-v1-only-test
+$LEIN test :only madek.exporter.connection-v1-only-test
 stop_fake
 
 echo "[test-login] OK"

@@ -34,9 +34,9 @@ trap cleanup EXIT
 
 mkdir -p "$STAGE_DIR"
 cp -a "$DEB_ABS" "$STAGE_DIR/$(basename "$DEB_ABS")"
-cat packaging/README.txt packaging/linux/README-deb.txt > "$STAGE_DIR/README.txt"
+cat resources/packaging/README.txt resources/packaging/linux/README-deb.txt > "$STAGE_DIR/README.txt"
 substitute_madek_exporter_version_in_readme "$STAGE_DIR/README.txt"
-cp packaging/linux/delete-app.sh "$STAGE_DIR/delete-app.sh"
+cp resources/packaging/linux/delete-app.sh "$STAGE_DIR/delete-app.sh"
 chmod +x "$STAGE_DIR/delete-app.sh"
 
 mkdir -p "$DIST_DIR"

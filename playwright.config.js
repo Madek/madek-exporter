@@ -35,4 +35,9 @@ module.exports = {
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
+  // One project per scope; login only runs once the app shell itself works.
+  projects: [
+    { name: 'setup', testMatch: /setup\.spec\.js$/ },
+    { name: 'login', testMatch: /login\.spec\.js$/, dependencies: ['setup'] },
+  ],
 };

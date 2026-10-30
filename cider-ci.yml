@@ -63,12 +63,39 @@ jobs:
                   exit "$rc"
                 }
 
-  build:
-    name: Build the App
+  tests:
+    name: All tests
     run_when:
       on any branch:
         type: branch
         include_match: ^.*$
+    context:
+      tasks:
+        fake-api-and-jvm:
+          name: Fake Madek API auth matrix + JVM connect tests
+          include:
+            - cider-ci/test-login-api.yml
+        playwright:
+          name: End2End-Tests
+          include:
+            - cider-ci/test-login-e2e.yml
+
+  build:
+    name: Build the App
+    depends_on: &BUILD_DEPS
+      releases file is up to date:
+        type: job
+        job_key: check-releases-file-is-up-to-date
+        states: [passed]
+      security audit has passed:
+        type: job
+        job_key: security-audit
+        states: [passed]
+      all tests have passed:
+        type: job
+        job_key: tests
+        states: [passed]
+    run_when: *BUILD_DEPS
     context:
       tasks:
         build:

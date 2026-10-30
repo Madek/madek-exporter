@@ -1,5 +1,7 @@
 [settings]
 legacy_version_file = false
+# `.tool-versions` pins `lein` for asdf (bin/env/lein-setup); mise has no tool by that name.
+disable_tools = ["lein"]
 
 [tools]
 java = "temurin-21.0.11+10.0.LTS"
