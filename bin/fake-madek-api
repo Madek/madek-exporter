@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Start the fake Madek API, replacing any stale listener on the port.
+# Stale processes often lack /api-v2/meta-keys/ and break dual export.
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$ROOT"
+
+PORT="${FAKE_MADEK_API_PORT:-${FAKE_MADEK_PORT:-9191}}"
+export FAKE_MADEK_API_PORT="$PORT"
+export FAKE_MADEK_API_TOKEN="${FAKE_MADEK_API_TOKEN:-${FAKE_MADEK_TOKEN:-test-token}}"
+
+node_bin() {
+  if command -v node >/dev/null 2>&1; then
+    command -v node
+  elif command -v mise >/dev/null 2>&1 && mise which node >/dev/null 2>&1; then
+    mise which node
+  else
+    echo node
+  fi
+}
+
+free_port() {
+  local pids
+  pids="$(lsof -tiTCP:"${PORT}" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -n "$pids" ]]; then
+    echo "[fake-madek-api] stopping previous listener(s) on port ${PORT}: ${pids}" >&2
+    # shellcheck disable=SC2086
+    kill $pids 2>/dev/null || true
+    sleep 0.2
+  fi
+}
+
+free_port
+NODE="$(node_bin)"
+if [[ "$NODE" == node ]] && ! command -v node >/dev/null 2>&1; then
+  exec "${ROOT}/bin/with-node22" node tests/fake-madek-api/server.mjs
+fi
+exec "$NODE" tests/fake-madek-api/server.mjs
