@@ -8,6 +8,7 @@
 
     [accountant.core :as accountant]
     [fipp.edn :refer [pprint]]
+    [reagent.core :as reagent]
     [reagent.ratom :as ratom :refer [reaction]]
     [madek.app.front.state :as state]
     [madek.app.front.env]
@@ -131,17 +132,20 @@
 
 (def default-madek-url "https://medienarchiv.zhdk.ch")
 
-(defn- ensure-default-url! []
-  (when-not (presence (:url @form-data))
-    (update-form-data-value :url default-madek-url)))
+(defn- preset-default-url! [e]
+  (.preventDefault e)
+  (update-form-data-value :url default-madek-url))
 
 (defn- select-sign-in-method! [method]
-  (update-form-data-value :sign-in-method method)
-  (ensure-default-url!))
+  (update-form-data-value :sign-in-method method))
 
 (defn base-url-form-component []
   [:div.form-group {:class (if @url-is-valid "" "has-error")}
-   [:label {:for "url"} (i18n/t :connection/base-url)]
+   [:label {:for "url"
+            :style {:cursor "pointer"}
+            :title default-madek-url
+            :on-click preset-default-url!}
+    (i18n/t :connection/base-url)]
    [:input.url.form-control
     {:class (if @url-is-valid "" "has-error")
      :type "url"
@@ -196,7 +200,7 @@
           :aria-hidden "true"}]]]]]))
 
 
-(defn connect-form []
+(defn- connect-form-view []
   [:div.form
    [base-url-form-component]
    [:ul.nav.nav-tabs {:style {:margin-bottom "1em"}}
@@ -342,7 +346,7 @@
    (if-not @connected?*
      [:div
       [:h2 (i18n/t :connection/login-title)]
-      [connect-form]]
+      [connect-form-view]]
      [continue-form])
    [:div.clearfix]
    [debug-component]])

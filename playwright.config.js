@@ -14,8 +14,8 @@ process.env.MADEK_E2E = process.env.MADEK_E2E || '1';
 module.exports = {
   globalSetup: path.join(__dirname, 'tests/e2e/global-setup.js'),
   testDir: path.join(__dirname, 'tests/e2e'),
-  timeout: 90_000,
-  expect: { timeout: 20_000 },
+  timeout: 60_000,
+  expect: { timeout: 5_000 },
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

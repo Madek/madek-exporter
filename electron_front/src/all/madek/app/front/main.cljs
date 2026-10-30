@@ -158,13 +158,14 @@
      [burger-menu]]]])
 
 (defn root-component []
-  [:div
-   [request/modal]
-   [naviagation]
-   [:div.container-fluid
-    [release/update-available-alert-component]
-    (when-let [page @state/current-page]
-      [:div.page [page]])]])
+  (let [_ @i18n/locale*]
+    [:div
+     [request/modal]
+     [naviagation]
+     [:div.container-fluid
+      [release/update-available-alert-component]
+      (when-let [page @state/current-page]
+        [:div.page [page]])]]))
 (defn mount-root []
   (reagent/render [root-component]
                   (.getElementById js/document "app")))

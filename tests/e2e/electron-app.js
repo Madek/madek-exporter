@@ -192,11 +192,18 @@ async function gotoConnectionPage(page) {
   }
 }
 
+/** Fake Madek base URL; read at call time so it matches Playwright’s webServer port. */
+function getFakeBaseUrl() {
+  return process.env.FAKE_MADEK_API_TEST_URL || 'http://127.0.0.1:9191';
+}
+
 module.exports = {
   repoRoot,
   appDevDir: path.join(repoRoot, appDevDir),
   indexUrl,
-  fakeBaseUrl: process.env.FAKE_MADEK_API_TEST_URL || 'http://127.0.0.1:9191',
+  getFakeBaseUrl,
+  /** Matches `default-madek-url` in connection.cljs (label click preset). */
+  defaultMadekPresetUrl: 'https://medienarchiv.zhdk.ch',
   fakeToken: process.env.FAKE_MADEK_API_TOKEN || 'test-token',
   fakeLogin: 'fake-user',
   fakeEmail: 'fake-user@example.test',
