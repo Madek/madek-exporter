@@ -178,3 +178,20 @@
       (is (= 204 (:status out)))
       (is (= media-entry-id (get-in @state/db [:download :entity :uuid]))
           "step1 stores the media-entry id"))))
+
+(deftest prefix-values-lists-title-with-folder-name
+  (connect-fake!)
+  (is (= 204 (:status (web/download-step1
+                       {:body {:entity-id media-entry-id
+                               :entity-type "entry"
+                               :url (str fake-base-url "/entries/" media-entry-id)
+                               :target-directory (System/getProperty "java.io.tmpdir")}}))))
+  (let [{:keys [status body]} (web/prefix-values {})
+        title (some #(when (= "madek_core:title" (:meta_key_id %)) %) (:values body))]
+    (is (= 200 status))
+    (is (= media-entry-id (:entity_id body)))
+    (is (= "Fake export entry" (:value title)))
+    (is (= (str "Fake export entry_" media-entry-id) (:folder_name title)))))
+
+(deftest prefix-values-without-step1
+  (is (= 409 (:status (web/prefix-values {})))))

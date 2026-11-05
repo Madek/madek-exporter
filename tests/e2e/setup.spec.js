@@ -50,6 +50,28 @@ test('menu: nav items available', async ({ page }) => {
   await expect(page.locator('input.url')).toBeVisible();
 });
 
+test('help: toc on the left shows the selected section', async ({ page }) => {
+  await page.getByRole('link', { name: 'Help', exact: true }).click();
+
+  const toc = page.locator('nav.toc');
+  const content = page.locator('.help-content');
+  await expect(toc.getByRole('heading', { name: 'Contents' })).toBeVisible();
+  await expect(toc.getByRole('link', { name: 'Version & supported operating systems' })).toBeVisible();
+  await expect(toc.getByRole('link', { name: 'Supported operating systems', exact: true })).toHaveCount(0);
+  await expect(content.getByRole('heading', { name: 'Version & supported operating systems' })).toBeVisible();
+  await expect(content.getByText('macOS (x64, ARM64)')).toBeVisible();
+
+  await toc.getByRole('link', { name: 'References' }).click();
+  await expect(content.getByRole('heading', { name: 'References' })).toBeVisible();
+  await expect(content.getByRole('heading', { name: 'Version & supported operating systems' })).toHaveCount(0);
+
+  await toc.locator('button.toc-toggle').click();
+  await expect(toc.getByRole('heading', { name: 'Contents' })).toHaveCount(0);
+  await expect(content.getByRole('heading', { name: 'References' })).toBeVisible();
+  await toc.locator('button.toc-toggle').click();
+  await expect(toc.getByRole('heading', { name: 'Contents' })).toBeVisible();
+});
+
 test('menu: burger shows version + contact, no logout before login', async ({ page }) => {
   const burger = burgerMenu(page);
   await burger.locator('a.dropdown-toggle').click();
@@ -60,6 +82,24 @@ test('menu: burger shows version + contact, no logout before login', async ({ pa
 
   await burger.locator('a.dropdown-toggle').click();
   await expect(burger).not.toHaveClass(/\bopen\b/);
+});
+
+test('menu: click outside closes burger and language menus', async ({ page }) => {
+  const outside = page.locator('input.url');
+  const burger = burgerMenu(page);
+  const language = languageMenu(page);
+
+  await burger.locator('a.dropdown-toggle').click();
+  await expect(burger).toHaveClass(/\bopen\b/);
+  await burger.locator('.burger-version').click();
+  await expect(burger).toHaveClass(/\bopen\b/);
+  await outside.click();
+  await expect(burger).not.toHaveClass(/\bopen\b/);
+
+  await language.locator('a.dropdown-toggle').click();
+  await expect(language).toHaveClass(/\bopen\b/);
+  await outside.click();
+  await expect(language).not.toHaveClass(/\bopen\b/);
 });
 
 test('language: switch through all locales and back to EN', async ({ page }) => {

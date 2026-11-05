@@ -27,6 +27,7 @@
    [madek.exporter.export :as export]
    [madek.exporter.export.api-v2 :as export-api-v2]
    [madek.exporter.export.compare :as export-compare]
+   [madek.exporter.export.files :as export-files]
    [madek.exporter.export.meta-data-schema :as export-meta-data-schema]
    [madek.exporter.export.meta-keys :as export-meta-keys]
    [madek.exporter.export.control :as control]
@@ -338,6 +339,33 @@
                         (map roa/data))]
      (response meta-keys))))
 
+(defn prefix-values
+  "Text meta-data of the step-1 entity with the folder name each one would
+  produce as prefix."
+  [_]
+  (catcher/snatch
+   {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
+   (let [{id :uuid entity-type :type} (-> @state/db :download :entity)]
+     (if-not id
+       {:status 409 :body {:message "No export entity selected (step 1)."}}
+       (let [entity (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
+                                      :default-conn-opts (-> @state/db :connection :http-options))
+                        (roa/relation (keyword entity-type))
+                        (roa/get {:id id}))
+             values (->> (-> entity
+                             (roa/relation :meta-data)
+                             (roa/get {})
+                             roa/coll-seq)
+                         (map #(roa/data (roa/get % {})))
+                         (filter #(= "MetaDatum::Text" (:type %)))
+                         (map (fn [{meta-key-id :meta_key_id value :value}]
+                                {:meta_key_id meta-key-id
+                                 :value value
+                                 :folder_name (str (export-files/useableFileName value)
+                                                   "_" id)})))]
+         (response {:entity_id id
+                    :values values}))))))
+
 ;##############################################################################
 
 (defroutes routes
@@ -364,6 +392,8 @@
   (POST "/download/compare" _ #'compare-download-data)
 
   (POST "/download/step1" _ #'download-step1)
+
+  (GET "/download/prefix-values" _ #'prefix-values)
 
   (ANY "/shutdown" _ #'shutdown)
 
