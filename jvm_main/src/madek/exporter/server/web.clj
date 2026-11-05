@@ -7,6 +7,7 @@
    [clj-http.client :as http-client]
    [clj-logging-config.log4j :as logging-config]
    [clojure.data.json :as json]
+   [clojure.string :as string]
 
    [clojure.pprint :refer [pprint]]
    [clojure.tools.logging :as logging]
@@ -313,58 +314,72 @@
 
 ;##############################################################################
 
-(defn vocabularies [_]
-  (catcher/snatch
-   {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
-   (let [http-options (-> @state/db :connection :http-options)
-         vocabularies (->> (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
-                                             :default-conn-opts (-> @state/db :connection :http-options))
-                               (roa/relation :vocabularies)
-                               (roa/get {})
-                               roa/coll-seq)
-                           (map #(roa/get % {}))
-                           (map roa/data))]
-     (response vocabularies))))
+(defn- api-root []
+  (roa/get-root (str (-> @state/db :connection :url) "/api")
+                :default-conn-opts (-> @state/db :connection :http-options)))
 
-(defn meta-keys [vocabulary]
-  (catcher/snatch
-   {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
-   (let [http-options (-> @state/db :connection :http-options)
-         meta-keys (->> (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
-                                          :default-conn-opts (-> @state/db :connection :http-options))
-                            (roa/relation :meta-keys)
-                            (roa/get {:vocabulary vocabulary})
-                            roa/coll-seq)
-                        (map #(roa/get % {}))
-                        (map roa/data))]
-     (response meta-keys))))
+(defn- roa-collection-data
+  ([resource relation-kw]
+   (roa-collection-data resource relation-kw {}))
+  ([resource relation-kw query]
+   (->> (-> resource
+            (roa/relation relation-kw)
+            (roa/get query)
+            roa/coll-seq)
+        (map #(roa/get % {}))
+        (map roa/data))))
 
-(defn prefix-values
-  "Text meta-data of the step-1 entity with the folder name each one would
-  produce as prefix."
+(defn- vocabulary-id-of [meta-key]
+  (or (presence (:vocabulary_id meta-key))
+      (some-> (:id meta-key) str (string/split #":" 2) first)))
+
+(defn- prefix-folder-name [entity-id value]
+  (if-let [v (presence value)]
+    (str (export-files/useableFileName v) "_" entity-id)
+    (str "_" entity-id)))
+
+(defn prefix-options
+  "Text meta-keys from all vocabularies, joined with the step-1 entity's values."
   [_]
   (catcher/snatch
    {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
-   (let [{id :uuid entity-type :type} (-> @state/db :download :entity)]
+   (let [{id :uuid entity-type :type title :title} (-> @state/db :download :entity)]
      (if-not id
        {:status 409 :body {:message "No export entity selected (step 1)."}}
-       (let [entity (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
-                                      :default-conn-opts (-> @state/db :connection :http-options))
-                        (roa/relation (keyword entity-type))
-                        (roa/get {:id id}))
-             values (->> (-> entity
-                             (roa/relation :meta-data)
-                             (roa/get {})
-                             roa/coll-seq)
-                         (map #(roa/data (roa/get % {})))
+       (let [root (api-root)
+             vocabs (->> (roa-collection-data root :vocabularies)
+                         (map (juxt :id identity))
+                         (into {}))
+             values (->> (roa-collection-data
+                          (-> root
+                              (roa/relation (keyword entity-type))
+                              (roa/get {:id id}))
+                          :meta-data)
                          (filter #(= "MetaDatum::Text" (:type %)))
-                         (map (fn [{meta-key-id :meta_key_id value :value}]
-                                {:meta_key_id meta-key-id
-                                 :value value
-                                 :folder_name (str (export-files/useableFileName value)
-                                                   "_" id)})))]
+                         (map (juxt :meta_key_id :value))
+                         (into {}))
+             options (->> (roa-collection-data root :meta-keys)
+                          (filter #(= "MetaDatum::Text" (:meta_datum_object_type %)))
+                          (map (fn [mk]
+                                 (let [vid (vocabulary-id-of mk)
+                                       voc (get vocabs vid)
+                                       value (get values (:id mk))]
+                                   {:vocabulary_id vid
+                                    :vocabulary_label (or (:label voc) vid)
+                                    :vocabulary_position (or (:position voc) 0)
+                                    :meta_key_id (:id mk)
+                                    :meta_key_label (or (:label mk) (:id mk))
+                                    :meta_key_position (or (:position mk) 0)
+                                    :value value
+                                    :folder_name (prefix-folder-name id value)})))
+                          (sort-by (juxt :vocabulary_position
+                                         :meta_key_position
+                                         :vocabulary_label
+                                         :meta_key_label))
+                          vec)]
          (response {:entity_id id
-                    :values values}))))))
+                    :entity_title title
+                    :options options}))))))
 
 ;##############################################################################
 
@@ -393,13 +408,9 @@
 
   (POST "/download/step1" _ #'download-step1)
 
-  (GET "/download/prefix-values" _ #'prefix-values)
+  (GET "/download/prefix-options" _ #'prefix-options)
 
   (ANY "/shutdown" _ #'shutdown)
-
-  (GET "/vocabularies/" _ #'vocabularies)
-  (GET "/vocabularies/:vocabulary/meta-keys/"
-    [vocabulary] (#'meta-keys vocabulary))
 
   (resources "/")
 

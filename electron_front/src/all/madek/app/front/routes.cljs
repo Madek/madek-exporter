@@ -1,5 +1,6 @@
 (ns madek.app.front.routes
   (:require
+    [accountant.core :as accountant]
     [madek.app.front.about]
     [madek.app.front.connection]
     [madek.app.front.debug]
@@ -7,7 +8,6 @@
     [madek.app.front.help]
     [madek.app.front.state]
 
-    [accountant.core :as accountant]
     [secretary.core :as secretary :include-macros true :refer [defroute]]
     ))
 
@@ -20,8 +20,11 @@
   (reset! madek.app.front.state/current-path "/connection"))
 
 (defroute download-page "/download" []
-  (reset! madek.app.front.state/current-page madek.app.front.download/page)
-  (reset! madek.app.front.state/current-path "/download"))
+  (if (madek.app.front.connection/can-access-download?)
+    (do
+      (reset! madek.app.front.state/current-page madek.app.front.download/page)
+      (reset! madek.app.front.state/current-path "/download"))
+    (accountant/navigate! "/connection")))
 
 (defroute debug-page "/debug" []
   (reset! madek.app.front.state/current-page madek.app.front.debug/page)

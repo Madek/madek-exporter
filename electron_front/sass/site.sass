@@ -162,6 +162,22 @@ pre
     .nav-pills > li > a
       padding: 0.45em 0.75em
       white-space: normal
+      color: #000
+      background-color: transparent
+
+      &:hover,
+      &:focus
+        color: #000
+        background-color: transparent
+        outline: none
+
+    .nav-pills > li.active > a
+      &,
+      &:hover,
+      &:focus
+        color: #000
+        background-color: transparent
+        text-decoration: underline
 
   .prefix-example-image
     display: block
@@ -186,6 +202,62 @@ pre
     margin-top: 0
     margin-bottom: 1.25em
 
+.page.connection .connected .panel-success
+  .panel-title
+    margin: 0
+
+.page.connection .api-mode-selection .panel-heading
+  .panel-title
+    margin: 0
+
+  .api-probe-status
+    display: flex
+    flex-wrap: wrap
+    gap: 0.75em 1.25em
+    margin-top: 0.5em
+
+  .api-probe-status-item
+    display: inline-flex
+    align-items: center
+    gap: 0.35em
+
+    .glyphicon.text-success
+      color: #3c763d
+
+    .glyphicon.text-danger
+      color: #a94442
+
+.page.connection .api-mode-picker
+  width: 100%
+
+  .dropdown-toggle
+    display: flex
+    align-items: center
+    gap: 0.5em
+    text-align: left
+    width: 100%
+
+  .api-mode-dropdown-label
+    flex: 1
+    min-width: 0
+    overflow: hidden
+    text-overflow: ellipsis
+    white-space: nowrap
+
+  .dropdown-menu
+    width: 100%
+
+    > li > a
+      display: flex
+      align-items: center
+      gap: 0.5em
+
+  .glyphicon.text-success
+    color: #3c763d
+
+  .glyphicon.text-danger
+    color: #a94442
+
 .page.download
   // First block under the Schritt title — no extra top margin
   .pre-download-check > .form > .form-group:first-child,
@@ -196,26 +268,97 @@ pre
   .summary > p:first-child
     margin-top: 0
 
+  .summary.entity-export-line
+    margin-bottom: 2.5em
+
+    > p:first-child
+      margin-top: 0
+
   .prefix,
-  .skip-files,
-  .export-structure
+  .skip-files
     margin-top: 3em
 
   .prefix-info
     font-size: 0.85em
     text-decoration: none
 
-  .available-prefixes
+  .prefix-picker
+    position: relative
     margin-top: 0.75em
 
-    .available-prefixes-controls
+    .prefix-dropdown-headers
+      display: grid
+      grid-template-columns: minmax(6em, 1.2fr) minmax(7em, 1.4fr) minmax(8em, 1.6fr) 12px
+      gap: 0.75em
+      padding: 0 12px 4px
+      font-size: 12px
+      font-weight: 600
+      color: #777
+
+    .prefix-dropdown-control
+      display: flex
+      align-items: stretch
+      gap: 0.5em
+
+      .prefix-options-status
+        display: flex
+        align-items: center
+        flex: 0 0 1.25em
+        justify-content: center
+
+      .prefix-dropdown-toggle
+        flex: 1
+        min-width: 0
+
+    .prefix-dropdown-toggle
+      display: flex
+      align-items: center
+      gap: 0.75em
+      height: auto
+      min-height: 34px
+      padding: 6px 12px
+      text-align: left
+
+      .caret
+        margin-left: auto
+        flex: 0 0 auto
+
+      .prefix-dropdown-placeholder,
+      .prefix-dropdown-summary
+        flex: 1
+        min-width: 0
+
+      .prefix-dropdown-summary
+        display: grid
+        grid-template-columns: minmax(6em, 1.2fr) minmax(7em, 1.4fr) minmax(8em, 1.6fr)
+        gap: 0.75em
+
+        > span
+          overflow: hidden
+          text-overflow: ellipsis
+          white-space: nowrap
+
+    .prefix-dropdown-menu
+      position: absolute
+      z-index: 20
+      left: 0
+      right: 0
+      margin-top: 2px
+      padding: 0.75em 0.75em 0
+      background: #fff
+      border: 1px solid #ccc
+      border-radius: 4px
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175)
+
+    .prefix-dropdown-controls
       display: flex
       align-items: center
       gap: 1em
+      margin-bottom: 0.5em
 
       > input
         flex: 1
-        max-width: 32em
+        min-width: 0
 
       > .checkbox-inline
         padding-top: 0
@@ -235,17 +378,72 @@ pre
       background: transparent
       word-break: break-all
 
-    .available-prefixes-list
+    .prefix-dropdown-list
       max-height: 24em
       overflow-y: auto
+      margin: 0 -0.75em
       border-top: 1px solid #eee
-      border-bottom: 1px solid #eee
 
       .table
         margin-bottom: 0
 
       tbody tr
         cursor: pointer
+
+    .prefix-example
+      margin-top: 1em
+
+      > p
+        margin-bottom: 0.4em
+
+      .prefix-example-heading
+        .prefix-info
+          margin-left: 0.15em
+
+    .prefix-example-tree
+      margin: 0.4em 0 0.75em
+      padding: 0.75em 1em
+      background: #fafafa
+      border: 1px solid #ddd
+      border-radius: 4px
+
+    .prefix-example-item
+      line-height: 1.7
+      font-size: 12px
+
+      .glyphicon
+        margin-right: 0.35em
+        color: #6ea6dd
+
+      .glyphicon-file
+        color: #999
+
+      code
+        background: transparent
+        color: #333
+        word-break: break-all
+
+      .prefix-part
+        color: #337ab7
+        font-weight: 600
+
+      &.depth-1
+        padding-left: 1.25em
+
+      &.depth-2
+        padding-left: 2.5em
+
+      &.depth-3
+        padding-left: 3.75em
+
+    .prefix-help-toggle
+      margin-top: 0.75em
+
+      .btn-link
+        padding-left: 0
+
+    .prefix-help-details .help-block
+      margin-bottom: 0.35em
 
   .form-group + .form-group
     margin-top: 2em
