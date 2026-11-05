@@ -6,6 +6,7 @@
     [madek.app.front.release :as release]
     [madek.app.front.state :as state]
     [cljs.nodejs :as nodejs]
+    [reagent.core :as reagent]
     ))
 
 (def Electron (nodejs/require "electron"))
@@ -14,9 +15,9 @@
 
 (def prefix-examples-id "prefix-examples")
 
-(defonce selected-section* (atom "help-version"))
+(defonce selected-section* (reagent/atom "help-version"))
 
-(defonce toc-collapsed* (atom false))
+(defonce toc-collapsed* (reagent/atom false))
 
 (defonce scroll-to* (atom nil))
 
@@ -201,15 +202,15 @@
       (when-not collapsed?
         [:h4 (i18n/t :help/toc)])]
      (when-not collapsed?
-       [:ul#help-toc-list.nav.nav-pills.nav-stacked
-        (for [[id label-key] toc-sections]
-          ^{:key id}
-          [:li {:class (when (= id selected) "active")}
-           [:a {:href (str "#" id)
-                :on-click (fn [e]
-                            (.preventDefault e)
-                            (reset! selected-section* id))}
-            (i18n/t label-key)]])])]]))
+       (into [:ul#help-toc-list.nav.nav-pills.nav-stacked]
+             (for [[id label-key] toc-sections]
+               ^{:key id}
+               [:li {:class (when (= id selected) "active")}
+                [:a {:href "#"
+                     :on-click (fn [e]
+                                 (.preventDefault e)
+                                 (reset! selected-section* id))}
+                 (i18n/t label-key)]])))]))
 
 (defn page []
   (consume-requested-section!)
