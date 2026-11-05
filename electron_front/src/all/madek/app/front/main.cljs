@@ -31,6 +31,18 @@
 (defn- close-language-menu []
   (reset! language-menu-open* false))
 
+(defn- event-inside? [event selector]
+  (boolean
+    (when-let [target (.-target event)]
+      (when (.-closest target)
+        (.closest target selector)))))
+
+(defn- dismiss-menus-on-outside-click [event]
+  (when-not (event-inside? event "li.language-menu")
+    (close-language-menu))
+  (when-not (event-inside? event "li.burger-menu")
+    (close-burger-menu)))
+
 (defn- nav-link [path label & [attrs]]
   [:a (merge {:href path
               :on-click (fn [e]
@@ -97,6 +109,11 @@
                             (close-language-menu))}
             (get i18n/LOCALE-LABELS loc)]]))]]))
 
+(defn- burger-session-item [k label value]
+  [:li.dropdown-header.burger-session {:key k}
+   [:span.burger-session-label label]
+   [:span.burger-session-value {:title value} value]])
+
 (defn- burger-menu []
   (let [open? @burger-menu-open*
         connected? @connection/connected?*]
@@ -117,11 +134,13 @@
       (when connected?
         (list
           (when-let [entity @connection/connected-entity*]
-            [:li.dropdown-header.burger-session {:key "session-user"} entity])
+            (burger-session-item "session-user" (i18n/t :nav/signed-in-as) entity))
           (when-let [target @connection/connected-target*]
-            [:li.dropdown-header.burger-session {:key "session-url"} target])))
-      [:li.dropdown-header
+            (burger-session-item "session-url" (i18n/t :nav/connected-to) target))
+          [:li.divider {:key "session-divider" :role "separator"}]))
+      [:li.dropdown-header.burger-version
        (i18n/t :nav/version {:version (or @release/version* "—")})]
+      [:li.divider {:role "separator"}]
       [:li
        [:a {:href "/help"
             :on-click (fn [e]
@@ -138,7 +157,7 @@
                           (connection/disconnect))}
           (i18n/t :nav/logout)]])]]))
 
-(defn naviagation []
+(defn- navigation-render []
   [:nav.navbar.navbar-inverse
    [:div.container-fluid
     [:div.navbar-header
@@ -156,6 +175,16 @@
     [:ul.nav.navbar-nav.navbar-right
      [language-menu]
      [burger-menu]]]])
+
+(defn naviagation []
+  (reagent/create-class
+    {:component-did-mount
+     (fn [_]
+       (.addEventListener js/document "click" dismiss-menus-on-outside-click))
+     :component-will-unmount
+     (fn [_]
+       (.removeEventListener js/document "click" dismiss-menus-on-outside-click))
+     :reagent-render navigation-render}))
 
 (defn root-component []
   (let [_ @i18n/locale*]

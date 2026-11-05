@@ -83,20 +83,94 @@ pre
 
 .navbar-inverse .navbar-nav > li.burger-menu
   > .dropdown-menu
+    min-width: 14em
+
     > .dropdown-header
       white-space: nowrap
 
     > .burger-session
+      display: flex
+      flex-direction: column
       max-width: 28em
-      overflow: hidden
-      text-overflow: ellipsis
+      padding-top: 6px
+      padding-bottom: 6px
+
+      .burger-session-label
+        font-size: 11px
+        text-transform: uppercase
+        letter-spacing: 0.04em
+        color: #999
+
+      .burger-session-value
+        margin-top: 2px
+        font-size: 13px
+        font-weight: 600
+        color: #333
+        overflow: hidden
+        text-overflow: ellipsis
+
+        @media (max-width: $grid-float-breakpoint-max)
+          color: #ddd
+
+    > .burger-version
+      font-size: 11px
+      color: #999
 
 .help
-  > .version,
-  > .supported-os,
-  > .login-variants,
-  > .references
-    margin-bottom: 2em
+  .help-layout
+    display: flex
+    align-items: flex-start
+    gap: 2em
+
+    > .toc
+      flex: 0 0 22em
+      max-width: 22em
+      padding-right: 1em
+      border-right: 1px solid #eee
+
+    > .help-content
+      flex: 1 1 auto
+      min-width: 0
+
+      > * > h4:first-child
+        margin-top: 0
+
+    &.toc-collapsed > .toc
+      flex: 0 0 auto
+      max-width: none
+      padding-right: 0
+      border-right: none
+
+  .toc
+    position: sticky
+    top: 1em
+
+    .toc-header
+      display: flex
+      align-items: center
+      gap: 0.5em
+      margin-bottom: 0.75em
+
+      h4
+        margin: 0
+        font-size: 1em
+        font-weight: 600
+
+    .toc-toggle
+      flex: 0 0 auto
+
+    .nav-pills > li > a
+      padding: 0.45em 0.75em
+      white-space: normal
+
+  .prefix-example-image
+    display: block
+    width: 100%
+    max-width: 640px
+    height: auto
+    margin: 0.5em 0
+    border: 1px solid #ddd
+    border-radius: 4px
 
 .page
   padding-top: 1em
@@ -126,6 +200,52 @@ pre
   .skip-files,
   .export-structure
     margin-top: 3em
+
+  .prefix-info
+    font-size: 0.85em
+    text-decoration: none
+
+  .available-prefixes
+    margin-top: 0.75em
+
+    .available-prefixes-controls
+      display: flex
+      align-items: center
+      gap: 1em
+
+      > input
+        flex: 1
+        max-width: 32em
+
+      > .checkbox-inline
+        padding-top: 0
+        white-space: nowrap
+
+    .meta-key-id
+      font-size: 0.8em
+
+    .prefix-value
+      max-width: 20em
+      overflow: hidden
+      text-overflow: ellipsis
+      white-space: nowrap
+
+    .folder-name code
+      color: #337ab7
+      background: transparent
+      word-break: break-all
+
+    .available-prefixes-list
+      max-height: 24em
+      overflow-y: auto
+      border-top: 1px solid #eee
+      border-bottom: 1px solid #eee
+
+      .table
+        margin-bottom: 0
+
+      tbody tr
+        cursor: pointer
 
   .form-group + .form-group
     margin-top: 2em
