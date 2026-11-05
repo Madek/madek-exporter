@@ -4,6 +4,7 @@
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.utils.form :as form-utils]
     [madek.app.front.i18n :as i18n]
+    [madek.app.front.download.download :refer [entity-export-line-component]]
     [madek.app.front.request :as request]
 
     [reagent.core :as reagent]
@@ -136,6 +137,7 @@
      :render (fn []
                [:section.pre-download-check
                 [:h2 (i18n/t :download/step1-title)]
+                [entity-export-line-component]
                 [:section.form
                  [url-input-component]
                  [target-dir-input-component]

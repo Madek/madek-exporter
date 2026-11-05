@@ -211,4 +211,8 @@
              }}
 :figwheel {:http-server-root "public"
            :ring-handler madek.app.front.figwheel-middleware/app
-           :server-port 8384})
+           :server-port 8384
+           ;; Hawk defaults to barbary on macOS, which loads JNA 3.2.2.
+           ;; That native lib is i386/x86_64 only, so arm64 fails with
+           ;; UnsatisfiedLinkError. Polling skips it; Figwheel uses :high.
+           :hawk-options {:watcher :polling}})
