@@ -56,7 +56,7 @@
    [nav-link path label]])
 
 (defn- export-nav-item []
-  (if @connection/connected?*
+  (if @connection/export-ready?*
     [nav-item "/download" (i18n/t :nav/export)]
     [:li.disabled
      [:a {:href "#"

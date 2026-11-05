@@ -20,6 +20,26 @@
 
 (def download* (reaction (-> @state/jvm-main-db :download)))
 
+(defn- entity-type-label [entity-type]
+  (case entity-type
+    :collection (i18n/t :download/entity-set)
+    :media-entry (i18n/t :download/entity-media-entry)
+    (i18n/t :download/entity-unknown)))
+
+(defn entity-export-line-component []
+  (when-let [entity (:entity @download*)]
+    (when-let [title (presence (:title entity))]
+      [:div.summary.entity-export-line
+       [:p
+        (i18n/t :download/export-the)
+        (entity-type-label (:type entity)) " "
+        [:a {:href "#"
+             :on-click (fn [e]
+                         (.preventDefault e)
+                         (when-let [url (:url entity)]
+                           (.openExternal shell url)))}
+         [:em title]]]])))
+
 (defn item-medienarchiv-url [item]
   (when-let [base (-> @state/jvm-main-db :connection :url presence)]
     (when-let [path (case (:type item)
@@ -503,6 +523,7 @@
 (defn downloading-component []
   [:div
    [:h2 (i18n/t :download/downloading-now)]
+   [entity-export-line-component]
    [progress-detail-component]
    [logs-component]
    [open-folder-component]
@@ -531,6 +552,7 @@
    [:h2 (if (:download-cancelled @download*)
           (i18n/t :download/cancelled)
           (i18n/t :download/finished))]
+   [entity-export-line-component]
    [progress-detail-component]
    [logs-component]
    [open-folder-component]

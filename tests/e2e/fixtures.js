@@ -170,8 +170,10 @@ async function runExportWizard(page, { entityUrl, targetDir, skipMediaFiles, ski
     timeout: 30_000,
   });
 
-  await expect(page.locator('.meta-key select')).toBeVisible({ timeout: 30_000 });
-  await page.locator('.meta-key select').selectOption('');
+  const picker = page.locator('.prefix-picker');
+  const toggle = picker.locator('.prefix-dropdown-toggle');
+  await expect(toggle).toBeEnabled({ timeout: 30_000 });
+  await expect(toggle).toContainText(/NO META-KEY PREFIX/i);
 
   if (skipMediaFiles) {
     await page.locator('.skip-files input[type="checkbox"]').check();

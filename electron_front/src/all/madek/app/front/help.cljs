@@ -92,13 +92,30 @@
           :fill "#fff"
           :stroke "#999"}])
 
-(defn- select-mock [x label value]
-  [:g {:transform (str "translate(" x ",0)")}
-   [:text {:x 0 :y 20 :font-size 13 :font-weight "bold" :fill "#333"} label]
-   [:rect {:x 0.5 :y 30.5 :width 292 :height 30 :rx 4
-           :fill "#fff" :stroke "#ccc"}]
-   [:text {:x 10 :y 50 :font-size 13 :fill "#555"} value]
-   [:path {:d "M272 43l5 5l5-5" :fill "none" :stroke "#555" :stroke-width 1.5}]])
+(defn- column-label [k]
+  (string/replace (i18n/t k) #"\s*[:：]\s*$" ""))
+
+(defn- select-mock-columns [values]
+  (let [headers [(column-label :download/vocabulary)
+                 (column-label :download/meta-key)
+                 (i18n/t :download/available-prefixes-value)]
+        col-w 196]
+    [:g
+     (map-indexed
+       (fn [i header]
+         ^{:key i}
+         [:text {:x (* i col-w) :y 20 :font-size 12 :font-weight "bold" :fill "#777"}
+          header])
+       headers)
+     [:rect {:x 0.5 :y 30.5 :width 607 :height 30 :rx 4
+             :fill "#fff" :stroke "#ccc"}]
+     (map-indexed
+       (fn [i value]
+         ^{:key i}
+         [:text {:x (+ 10 (* i col-w)) :y 50 :font-size 13 :fill "#555"}
+          (or value "")])
+       values)
+     [:path {:d "M588 43l5 5l5-5" :fill "none" :stroke "#555" :stroke-width 1.5}]]))
 
 (defn- tree-row [i [depth kind prefix suffix]]
   [:g {:transform (str "translate(" (+ 16 (* depth 20)) ","
@@ -133,8 +150,9 @@
       :aria-label meta-key-label}
      [:rect {:x 0 :y 0 :width image-width :height height :fill "#fafafa"}]
      [:g {:transform "translate(16,0)"}
-      [select-mock 0 (i18n/t :download/vocabulary) "Madek Core"]
-      [select-mock 316 (i18n/t :download/meta-key) meta-key-label]]
+      [select-mock-columns (if (= meta-key-label (i18n/t :download/no-meta-key-prefix))
+                             [meta-key-label "" ""]
+                             ["Madek Core" meta-key-label "Diplom 2026"])]]
      [:line {:x1 16 :y1 78.5 :x2 (- image-width 16) :y2 78.5
              :stroke "#ddd" :stroke-dasharray "4 3"}]
      (map-indexed (fn [i row] ^{:key i} [tree-row i row]) rows)]))
@@ -145,6 +163,7 @@
     [:div.prefix-examples {:id prefix-examples-id}
      [:h4 (i18n/t :help/prefix-examples)]
      [:p (i18n/t :help/prefix-examples-intro)]
+     [:p (i18n/t :help/prefix-steps)]
      [:h5 (i18n/t :help/prefix-example-with {:title title})]
      [prefix-example-image title (example-tree "Diplom 2026_" "Poster_")]
      [:p.help-block (i18n/t :help/prefix-example-with-help)]

@@ -12,25 +12,18 @@
     [reagent.ratom :as ratom :refer [reaction]]
     [madek.app.front.state :as state]
     [madek.app.front.help :as help]
+    [madek.app.front.download.download :refer [entity-export-line-component]]
     [madek.app.front.env]
     [accountant.core :as accountant]
-    [cljs.nodejs :as nodejs]
     [inflections.core :as inflections]
     )
   (:import
     [goog Uri]
     ))
 
-(def Electron (nodejs/require "electron"))
-
-(def shell (.-shell Electron))
-
 (def form-data* (reaction (-> @state/client-db :download :download-form)))
 
 (def download* (reaction (-> @state/jvm-main-db :download)))
-
-(def vocabulary* (reaction
-                   (-> @form-data* :vocabulary presence)))
 
 (def set-value
   (form-utils/create-update-form-data-setter
@@ -83,186 +76,137 @@
     [:p.help-block (i18n/t :download/skip-files-help)]]])
 
 
-;;; prefix meta-key ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; prefix picker ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defonce loading-vocabularies* (reagent/atom #{}))
+(defonce prefix-dropdown-open* (reagent/atom false))
 
-(defonce failed-vocabularies* (reagent/atom #{}))
+(defonce prefix-options-filter* (reagent/atom ""))
 
-(defn load-meta-keys [vocabulary]
-  (when-not (or (-> @form-data* (get vocabulary nil))
-                (contains? @loading-vocabularies* vocabulary))
-    (swap! loading-vocabularies* conj vocabulary)
-    (swap! failed-vocabularies* disj vocabulary)
-    (request/send-off
-      {:method :get
-       :path (str "/vocabularies/" vocabulary "/meta-keys/")}
-      {:title (i18n/t :download/fetch-metakeys {:vocabulary vocabulary})}
-      :callback (fn [resp]
-                  (swap! loading-vocabularies* disj vocabulary)
-                  (if (:success resp)
-                    (set-value vocabulary
-                               (conj (->> (:body resp)
-                                          (filter #(= (:meta_datum_object_type %)
-                                                      "MetaDatum::Text"))
-                                          (map #(assoc % :key (:id %)))
-                                          (sort-by :label)
-                                          (into []))
-                                     {:label ""
-                                      :id ""
-                                      :key ""
-                                      :vocabulary_id vocabulary
-                                      :meta_datum_object_type "MetaDatum::Text"
-                                      }))
-                    (swap! failed-vocabularies* conj vocabulary))))))
+(defonce only-with-value* (reagent/atom true))
 
-(add-watch vocabulary* :lazy-load-meta-keys-watch
-           (fn [_ _ _ vocabulary]
-             (when vocabulary
-               (load-meta-keys vocabulary))))
+(defonce prefix-help-expanded* (reagent/atom false))
 
-(defn- meta-key-option-label [option]
-  (if (or (nil? (:id option)) (= "" (:id option)))
-    (i18n/t :download/no-meta-key-prefix)
-    (:label option)))
-
-(defn prefix-meta-key-component []
-  (when-let [meta-keys-options (-> @form-data* (get @vocabulary* nil))]
-    [:div.form-group.meta-key
-     [:label (i18n/t :download/meta-key)]
-     [:select.form-control
-      {:on-change #(set-value :prefix_meta_key (.. % -target -value))
-       :value (-> @form-data* :prefix_meta_key)}
-      (for [option meta-keys-options]
-        [:option
-         {:key (:id option)
-          :value (:id option)}
-         (meta-key-option-label option)])]
-     [:p.help-block
-      (i18n/t :download/meta-key-help-1-before)
-      [:code (i18n/t :download/no-meta-key-prefix)]
-      (i18n/t :download/meta-key-help-1-after)]
-     [:p.help-block
-      (i18n/t :download/meta-key-help-2)]]))
-
-
-;;; available prefixes ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defonce show-available-prefixes* (reagent/atom false))
-
-(defonce available-prefixes-filter* (reagent/atom ""))
-
-(defonce only-with-value* (reagent/atom false))
-
-;; {:entity-id "…" :status :loading|:loaded|:failed :values {meta-key-id {…}}}
-(defonce prefix-values* (reagent/atom nil))
+;; {:entity-id "…" :status :idle|:loading|:loaded|:failed :options […] :entity-title "…"}
+(defonce prefix-options* (reagent/atom {:status :idle}))
 
 (defn- entity-id []
   (-> @download* :entity :uuid))
 
-(defn- load-prefix-values []
+(defn- load-prefix-options []
   (let [id (entity-id)]
-    (when-not (and (= id (:entity-id @prefix-values*))
-                   (#{:loading :loaded} (:status @prefix-values*)))
-      (reset! prefix-values* {:entity-id id :status :loading})
+    (when-not (and (= id (:entity-id @prefix-options*))
+                   (#{:loading :loaded} (:status @prefix-options*)))
+      (reset! prefix-options* {:entity-id id :status :loading})
+      (reset! prefix-dropdown-open* false)
       (request/send-off
         {:method :get
-         :path "/download/prefix-values"}
-        {:title (i18n/t :download/fetch-prefix-values)}
+         :path "/download/prefix-options"}
+        {:title (i18n/t :download/fetch-prefix-options)}
         :callback (fn [resp]
-                    (when (= id (:entity-id @prefix-values*))
-                      (reset! prefix-values*
+                    (when (= id (:entity-id @prefix-options*))
+                      (reset! prefix-options*
                               (if (:success resp)
                                 {:entity-id id
                                  :status :loaded
-                                 :values (->> (-> resp :body :values)
-                                              (map (juxt :meta_key_id identity))
-                                              (into {}))}
+                                 :entity-title (-> resp :body :entity_title)
+                                 :options (vec (or (-> resp :body :options) []))}
                                 {:entity-id id :status :failed}))))))))
 
-(defn- toggle-available-prefixes []
-  (when (swap! show-available-prefixes* not)
-    (load-prefix-values)
-    (doseq [vocabulary (:vocabularies @form-data*)]
-      (load-meta-keys (:id vocabulary)))))
+(defn- choose-prefix [meta-key-id]
+  (set-value :prefix_meta_key (or meta-key-id ""))
+  (reset! prefix-dropdown-open* false))
 
-(defn- choose-prefix [vocabulary-id meta-key-id]
-  (set-value :vocabulary vocabulary-id)
-  (set-value :prefix_meta_key meta-key-id))
-
-(defn- available-prefix-rows []
-  (let [values (:values @prefix-values*)
-        id (entity-id)]
-    (for [vocabulary (:vocabularies @form-data*)
-          meta-key (get @form-data* (:id vocabulary))
-          :when (presence (:id meta-key))
-          :let [value (get values (:id meta-key))]]
-      {:vocabulary-id (:id vocabulary)
-       :vocabulary-label (:label vocabulary)
-       :meta-key-id (:id meta-key)
-       :meta-key-label (:label meta-key)
-       :value (presence (:value value))
-       :folder-name (or (:folder_name value) (str "_" id))})))
-
-(defn- matches-filter? [term row]
-  (or (empty? term)
-      (some #(clojure.string/includes? (clojure.string/lower-case (str %)) term)
-            ((juxt :vocabulary-label :meta-key-label :meta-key-id :value) row))))
+(defn- selected-option []
+  (let [selected (presence (-> @form-data* :prefix_meta_key))]
+    (when selected
+      (some #(when (= selected (:meta_key_id %)) %)
+            (:options @prefix-options*)))))
 
 (defn- column-label [k]
   (clojure.string/replace (i18n/t k) #"\s*[:：]\s*$" ""))
 
-(defn- available-prefix-row [row selected?]
-  [:tr {:class (when selected? "info")
-        :on-click #(choose-prefix (:vocabulary-id row) (:meta-key-id row))}
-   [:td (:vocabulary-label row)]
-   [:td
-    (:meta-key-label row)
-    [:br]
-    [:code.meta-key-id (:meta-key-id row)]]
-   [:td.prefix-value {:title (:value row)}
-    (or (:value row)
-        [:span.text-muted (i18n/t :download/available-prefixes-no-value)])]
-   [:td.folder-name [:code (:folder-name row)]]])
+(defn- matches-filter? [term option]
+  (or (empty? term)
+      (some #(clojure.string/includes? (clojure.string/lower-case (str %)) term)
+            ((juxt :vocabulary_label :meta_key_label :meta_key_id :value) option))))
 
-(defn- prefix-values-status []
-  (case (:status @prefix-values*)
-    :loading [:span " " (i18n/t :download/available-prefixes-values-loading)]
-    :failed [:span.text-warning " " (i18n/t :download/available-prefixes-values-failed)]
+(defn- filtered-options []
+  (let [term (clojure.string/lower-case (clojure.string/trim @prefix-options-filter*))]
+    (cond->> (filter (partial matches-filter? term) (:options @prefix-options*))
+      @only-with-value* (filter #(presence (:value %))))))
+
+(defn- prefix-option-row [option selected?]
+  [:tr {:class (when selected? "info")
+        :role "option"
+        :aria-selected selected?
+        :on-click #(choose-prefix (:meta_key_id option))}
+   [:td (:vocabulary_label option)]
+   [:td
+    (:meta_key_label option)
+    [:br]
+    [:code.meta-key-id (:meta_key_id option)]]
+   [:td.prefix-value {:title (:value option)}
+    (or (:value option)
+        [:span.text-muted (i18n/t :download/available-prefixes-no-value)])]
+   [:td.folder-name [:code (:folder_name option)]]])
+
+(defn- prefix-options-status-icon [status]
+  (case status
+    :loading
+    [:span.prefix-options-status {:aria-hidden "true"}
+     [:span.glyphicon.glyphicon-refresh.spinning]]
+    :loaded
+    [:span.prefix-options-status {:aria-hidden "true"}
+     [:span.glyphicon.glyphicon-ok.text-success]]
+    :failed
+    [:span.prefix-options-status {:aria-hidden "true"}
+     [:span.glyphicon.glyphicon-remove-circle.text-warning]]
     nil))
 
-(defn- available-prefixes-table []
-  (let [term (clojure.string/lower-case (clojure.string/trim @available-prefixes-filter*))
-        rows (cond->> (filter (partial matches-filter? term) (available-prefix-rows))
-               @only-with-value* (filter :value))
-        selected (-> @form-data* :prefix_meta_key)
-        loading (count @loading-vocabularies*)
-        failed @failed-vocabularies*]
-    [:div.available-prefixes
-     [:p (i18n/t :download/available-prefixes-entity
-                 {:title (or (-> @download* :entity :title presence)
-                             (entity-id))})]
-     [:div.available-prefixes-controls
+(defn- prefix-dropdown-summary []
+  (let [status (:status @prefix-options*)
+        none (i18n/t :download/no-meta-key-prefix)]
+    (cond
+      (= :failed status)
+      [:span.prefix-dropdown-placeholder.text-warning
+       (i18n/t :download/prefix-options-failed)]
+      (or (= :loading status)
+          (not (presence (-> @form-data* :prefix_meta_key))))
+      [:span.prefix-dropdown-placeholder [:em none]]
+      :else
+      (if-let [option (selected-option)]
+        [:span.prefix-dropdown-summary
+         [:span {:title (:vocabulary_label option)} (:vocabulary_label option)]
+         [:span {:title (:meta_key_label option)} (:meta_key_label option)]
+         [:span {:title (:value option)}
+          (or (:value option)
+              (i18n/t :download/available-prefixes-no-value))]]
+        [:span.prefix-dropdown-placeholder
+         [:code (-> @form-data* :prefix_meta_key)]]))))
+
+(defn- prefix-dropdown-menu []
+  (let [term (clojure.string/lower-case (clojure.string/trim @prefix-options-filter*))
+        rows (filtered-options)
+        selected (presence (-> @form-data* :prefix_meta_key))
+        title (or (:entity-title @prefix-options*)
+                  (-> @download* :entity :title presence)
+                  (entity-id))]
+    [:div.prefix-dropdown-menu {:role "listbox"}
+     [:p (i18n/t :download/available-prefixes-entity {:title title})]
+     [:div.prefix-dropdown-controls
       [:input.form-control.input-sm
        {:type :search
         :placeholder (i18n/t :download/available-prefixes-filter)
-        :value @available-prefixes-filter*
-        :on-change #(reset! available-prefixes-filter* (.. % -target -value))}]
+        :value @prefix-options-filter*
+        :on-change #(reset! prefix-options-filter* (.. % -target -value))}]
       [:label.checkbox-inline
        [:input {:type :checkbox
                 :checked @only-with-value*
                 :on-change #(swap! only-with-value* not)}]
        " " (i18n/t :download/available-prefixes-only-with-value)]]
      [:p.help-block
-      (i18n/t :download/available-prefixes-help {:count (count rows)})
-      (when (pos? loading)
-        [:span " " (i18n/t :download/available-prefixes-loading {:count loading})])
-      [prefix-values-status]]
-     (when (seq failed)
-       [:p.text-warning
-        (i18n/t :download/available-prefixes-failed
-                {:vocabularies (clojure.string/join ", " (sort failed))})])
-     [:div.available-prefixes-list
+      (i18n/t :download/available-prefixes-help {:count (count rows)})]
+     [:div.prefix-dropdown-list
       [:table.table.table-condensed.table-hover
        [:thead
         [:tr
@@ -272,73 +216,92 @@
          [:th (i18n/t :download/available-prefixes-folder-name)]]]
        [:tbody
         (when (and (empty? term) (not @only-with-value*))
-          [:tr {:class (when-not (presence selected) "info")
-                :on-click #(set-value :prefix_meta_key "")}
+          [:tr.no-prefix {:class (when-not selected "info")
+                          :role "option"
+                          :aria-selected (not selected)
+                          :on-click #(choose-prefix "")}
            [:td {:col-span 3} [:em (i18n/t :download/no-meta-key-prefix)]]
            [:td.folder-name [:code (entity-id)]]])
-        (for [row rows]
-          ^{:key (:meta-key-id row)}
-          [available-prefix-row row (= selected (:meta-key-id row))])]]]]))
+        (for [option rows]
+          ^{:key (:meta_key_id option)}
+          [prefix-option-row option (= selected (:meta_key_id option))])]]]]))
 
-(defn available-prefixes-component []
-  [:div.form-group.available-prefixes-toggle
-   [:button.btn.btn-default.btn-sm
-    {:type :button
-     :on-click toggle-available-prefixes}
-    [:span.glyphicon
-     {:class (if @show-available-prefixes*
-               "glyphicon-chevron-down"
-               "glyphicon-chevron-right")
-      :aria-hidden "true"}]
-    " "
-    (i18n/t (if @show-available-prefixes*
-              :download/available-prefixes-hide
-              :download/available-prefixes-show))]
-   (when @show-available-prefixes*
-     [available-prefixes-table])])
+(defn- usable-file-name [s]
+  "Same rule as JVM useableFileName: keep a–z A–Z 0–9 and spaces."
+  (clojure.string/replace (str s) #"[^a-zA-Z0-9 ]" ""))
 
+(defn- selected-folder-name []
+  (if-let [option (selected-option)]
+    (or (:folder_name option) (str "_" (entity-id)))
+    (entity-id)))
 
-;;; prefix vocabulary ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn- name-with-prefix [folder-name]
+  (let [id (str (entity-id))]
+    (if (and (presence folder-name)
+             (presence id)
+             (clojure.string/ends-with? folder-name id)
+             (not= folder-name id))
+      (let [prefix (subs folder-name 0 (- (count folder-name) (count id)))]
+        [:span [:span.prefix-part prefix] id])
+      folder-name)))
 
-(defn load-vocabularies []
-  (when-not (-> @form-data* :vocabularies)
-    (request/send-off
-      {:method :get
-       :path "/vocabularies/"}
-      {:title (i18n/t :download/fetch-vocabularies)}
-      :callback (fn [req]
-                  (set-value :vocabularies
-                             (->> (:body req)
-                                  (map #(assoc % :key (:id %)))
-                                  (sort-by :label)))
-                  (when @show-available-prefixes*
-                    (doseq [vocabulary (:vocabularies @form-data*)]
-                      (load-meta-keys (:id vocabulary))))))))
+(defn- export-root-name []
+  (or (some-> @download* :target-directory
+              (clojure.string/split #"[\\/]")
+              last
+              presence)
+      "export"))
 
-(defn vocabulary-form-group-component []
-  [:div.form-group.vocabulary
-   [:label (i18n/t :download/vocabulary)]
-   [:select.form-control
-    {:on-change #(let [voc (.. % -target -value)]
-                   (when-not (= voc (-> @form-data* :vocabulary))
-                     (set-value :prefix_meta_key ""))
-                   (set-value :vocabulary voc))
-     :value (-> @form-data* :vocabulary)}
-    (for [option (or (-> @form-data* :vocabularies) {})]
-      [:option
-       {:key (:id option)
-        :value (:id option)
-        :data-id (:id option)
-        :data-label (:label option)}
-       (:label option)])]])
+(defn- example-item [depth kind content]
+  [:div.prefix-example-item {:class (str "depth-" depth)}
+   [:span.glyphicon
+    {:class (if (= kind :folder) "glyphicon-folder-close" "glyphicon-file")
+     :aria-hidden "true"}]
+   " "
+   [:code content]])
 
-(defn prefix-vocabulary-component []
-  (reagent/create-class
-    {:component-did-mount load-vocabularies
-     :render vocabulary-form-group-component}))
+(defn- prefix-example-tree []
+  (let [folder (selected-folder-name)
+        labeled (name-with-prefix folder)
+        skip-files? (-> @form-data* :skip_media_files)
+        collection? (= :collection (-> @download* :entity :type))]
+    [:div.prefix-example-tree
+     [example-item 0 :folder (str (export-root-name) "/")]
+     [example-item 1 :file "meta-data_schema.json"]
+     [example-item 1 :folder [:span labeled "/"]]
+     [example-item 2 :file "index.html"]
+     [example-item 2 :file "meta-data.json"]
+     [example-item 2 :file [:span labeled "_meta-data.json"]]
+     (when collection?
+       [example-item 2 :folder (i18n/t :download/prefix-example-descendants)])
+     (when-not skip-files?
+       [example-item (if collection? 3 2) :folder "media-files/"])]))
 
+(defn- prefix-help-details []
+  (let [value (presence (:value (selected-option)))
+        cleaned (when value (usable-file-name value))]
+    [:div.prefix-help-details
+     [:p.help-block (i18n/t :download/prefix-sanitize-help)]
+     (when (and value (not= value cleaned))
+       [:p.help-block
+        [:code value] " → " [:code cleaned]])
+     [:p.help-block
+      (i18n/t :download/meta-key-help-1-before)
+      [:code (i18n/t :download/no-meta-key-prefix)]
+      (i18n/t :download/meta-key-help-1-after)]
+     [:p.help-block (i18n/t :download/meta-key-help-2)]]))
 
-;;; prefix ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn- prefix-help-toggle []
+  (let [expanded? @prefix-help-expanded*
+        label (i18n/t (if expanded? :download/prefix-help-less :download/prefix-help-more))]
+    [:div.prefix-help-toggle
+     [:button.btn.btn-link.btn-sm
+      {:type :button
+       :aria-expanded expanded?
+       :on-click #(swap! prefix-help-expanded* not)}
+      label]
+     (when expanded?
+       [prefix-help-details])]))
 
 (defn- prefix-info-link []
   (let [label (i18n/t :download/prefix-info)]
@@ -352,13 +315,76 @@
      [:span.glyphicon.glyphicon-info-sign {:aria-hidden "true"}]
      [:span.sr-only label]]))
 
+(defn- prefix-example-component []
+  (when (= :loaded (:status @prefix-options*))
+    (let [title (or (:entity-title @prefix-options*)
+                    (-> @download* :entity :title presence)
+                    (entity-id))]
+      [:div.prefix-example
+       [:p.prefix-example-heading
+        (i18n/t :download/prefix-example-title {:title title})]
+       [prefix-example-tree]])))
+
+(defn- close-prefix-dropdown-on-outside-click [e]
+  (when-let [el (.querySelector js/document ".prefix-picker")]
+    (when-not (.contains el (.-target e))
+      (reset! prefix-dropdown-open* false))))
+
+(defn- close-prefix-dropdown-on-escape [e]
+  (when (= "Escape" (.-key e))
+    (reset! prefix-dropdown-open* false)))
+
+(defn- prefix-picker-render []
+  (let [status (:status @prefix-options*)
+        loaded? (= :loaded status)
+        open? (and loaded? @prefix-dropdown-open*)]
+    [:div.form-group.prefix-picker
+     {:class (when open? "open")}
+     [:div.prefix-dropdown-headers
+      [:span (column-label :download/vocabulary)]
+      [:span (column-label :download/meta-key)]
+      [:span (i18n/t :download/available-prefixes-value)]]
+     [:div.prefix-dropdown-control
+      [prefix-options-status-icon status]
+      [:button.btn.btn-default.form-control.prefix-dropdown-toggle
+       {:type :button
+        :aria-label (i18n/t :download/prefix)
+        :aria-haspopup "listbox"
+        :aria-expanded (boolean open?)
+        :disabled (= :loading status)
+        :on-click (fn [e]
+                    (.stopPropagation e)
+                    (cond
+                      loaded? (swap! prefix-dropdown-open* not)
+                      (= :failed status) (load-prefix-options)))}
+       [prefix-dropdown-summary]
+       [:span.caret]]]
+     (when open?
+       [prefix-dropdown-menu])
+     [prefix-example-component]
+     [prefix-help-toggle]]))
+
+(defn prefix-picker-component []
+  (reagent/create-class
+    {:component-did-mount
+     (fn [_]
+       (load-prefix-options)
+       (.addEventListener js/document "click" close-prefix-dropdown-on-outside-click)
+       (.addEventListener js/document "keydown" close-prefix-dropdown-on-escape))
+     :component-will-unmount
+     (fn [_]
+       (.removeEventListener js/document "click" close-prefix-dropdown-on-outside-click)
+       (.removeEventListener js/document "keydown" close-prefix-dropdown-on-escape))
+     :reagent-render prefix-picker-render}))
+
+
+;;; prefix ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn prefix-component []
   [:div.prefix
    [:h4 (i18n/t :download/prefix) " " [prefix-info-link]]
    [:p (i18n/t :download/prefix-help)]
-   [prefix-vocabulary-component]
-   [prefix-meta-key-component]
-   [available-prefixes-component]
+   [prefix-picker-component]
    ])
 
 
@@ -391,19 +417,16 @@
 (defn main-component []
   [:div.download-form
    [:h2 (i18n/t :download/step2-title)]
+   [entity-export-line-component]
    [form-component]
    [debug-component]])
 
 (defn initialize-form-data []
-  (when-not (:vocabulary @form-data*)
-    (set-value :vocabulary "madek_core"))
-  (when-not (:prefix_meta_key @form-data*)
-    (set-value :prefix_meta_key "madek_core:title"))
-  (when @show-available-prefixes*
-    (load-prefix-values)))
+  (when-not (contains? @form-data* :prefix_meta_key)
+    (set-value :prefix_meta_key ""))
+  (load-prefix-options))
 
 (defn component []
   (reagent/create-class
-    {;:component-will-mount #(swap! state/client-db assoc-in [:download :download-form] {})
-     :component-did-mount initialize-form-data
+    {:component-did-mount initialize-form-data
      :render main-component }))
