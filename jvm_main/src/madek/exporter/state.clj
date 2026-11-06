@@ -113,10 +113,13 @@
 (defn broadcast-download-logs!
   "Push log lines via :madek/patch (same channel as export progress)."
   []
-  (let [lines (vec (download-log-lines/lines))]
+  (let [lines (vec (download-log-lines/lines))
+        n (download-log-lines/request-count)]
     (doseq [client-id (keys @clients)]
       (when-let [prev (get @last-client-pushes client-id)]
-        (let [data (assoc-in prev [:download :logs] lines)
+        (let [data (-> prev
+                       (assoc-in [:download :logs] lines)
+                       (assoc-in [:download :request-count] n))
               d (diff prev data)]
           (when (seq d)
             (chsk-send! client-id [(keyword "madek" "patch")

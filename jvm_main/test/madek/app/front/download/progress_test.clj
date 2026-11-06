@@ -63,6 +63,54 @@
                [(collection set-id)
                 (entry entry-id :file-progress 0.5)])))))
 
+(deftest progress-percent-moves-half-a-point-per-request
+  (testing "the first request is visible before any media file exists"
+    (is (= 1 (progress/progress-percent
+              {:download-started true :request-count 1}
+              [(collection set-id)])))
+    (is (integer? (progress/progress-percent
+                   {:download-started true :request-count 1}
+                   []))))
+  (testing "half points round to a whole percent"
+    (is (= 2 (progress/progress-percent
+              {:download-started true :request-count 3}
+              []))))
+  (testing "file bytes take over once they are at least 1%, so the bar cannot sit on the request cycle"
+    (is (= 4 (progress/progress-percent
+              {:download-started true :request-count 199}
+              [(entry entry-id :file-progress 0.04)])))
+    (is (= 46 (progress/progress-percent
+               {:download-started true :request-count 198}
+               [(entry entry-id :file-progress 0.38)
+                (entry "00000000-0000-4000-8000-000000000021" :file-progress 0.48)
+                (entry "00000000-0000-4000-8000-000000000022" :file-progress 0.40)
+                (entry "00000000-0000-4000-8000-000000000023" :file-progress 0.57)]))))
+  (testing "requests still drive the bar before a file has visible bytes"
+    (is (= 100 (progress/progress-percent
+                {:download-started true :request-count 199}
+                [(entry entry-id :file-progress 0.0)]))))
+  (testing "the top of a cycle resets on the next request instead of sticking"
+    (is (= 100 (progress/progress-percent
+                {:download-started true :request-count 199}
+                [])))
+    (is (= 1 (progress/progress-percent
+              {:download-started true :request-count 200}
+              [])))
+    (is (= 1 (progress/progress-percent
+              {:download-started true :request-count 201}
+              [])))
+    (is (= 100 (progress/progress-percent
+                {:download-started true :request-count 398}
+                [])))
+    (is (= 1 (progress/progress-percent
+              {:download-started true :request-count 399}
+              []))))
+  (testing "logged lines count when no request counter is present"
+    (is (= 1 (progress/progress-percent
+                {:download-started true
+                 :logs ["GET /a 200" "GET /b 200"]}
+                [])))))
+
 (deftest progress-percent-finished-and-cancelled
   (is (= 100 (progress/progress-percent
               {:download-started true :download-finished true}
