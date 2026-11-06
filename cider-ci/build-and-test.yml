@@ -145,6 +145,21 @@ scripts:
         script_key: build-mac-os-arm64
       build-windows has passed:
         script_key: build-windows
+  # Same fake-server + JVM checks as the `tests` job (`cider-ci/test-login-api.yml`);
+  # keep them in the build trial so packaged apps are still exercised against the stub API.
+  fake-madek-api-tests:
+    timeout: 20 Minutes
+    body: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      LEIN=lein ./bin/with-java21 ./bin/with-node22 ./bin/test-login
+    start_when:
+      node toolchain is ready:
+        script_key: check-node-toolchain
+      java toolchain is ready:
+        script_key: check-java-toolchain
+      artifacts are valid:
+        script_key: validate-build-artifacts
   smoke-main-process:
     body: |
       set -euo pipefail
@@ -163,6 +178,8 @@ scripts:
     start_when:
       smoke has passed:
         script_key: smoke-main-process
+      fake Madek API tests have passed:
+        script_key: fake-madek-api-tests
     body: |
       #!/usr/bin/env bash
       set -eux
