@@ -15,7 +15,7 @@ const LOCALES = [
 
 /** @param {import('@playwright/test').Page} page */
 function mainNav(page) {
-  return page.locator('nav.navbar ul.navbar-nav').first();
+  return page.locator('nav.navbar ul.navbar-pages');
 }
 
 /** @param {import('@playwright/test').Page} page */
@@ -70,6 +70,17 @@ test('help: toc on the left shows the selected section', async ({ page }) => {
   await expect(content.getByRole('heading', { name: 'References' })).toBeVisible();
   await toc.locator('button.toc-toggle').click();
   await expect(toc.getByRole('heading', { name: 'Contents' })).toBeVisible();
+
+  const sideToc = await toc.boundingBox();
+  const sideContent = await content.boundingBox();
+  expect(sideContent.x).toBeGreaterThan(sideToc.x + 40);
+
+  await page.setViewportSize({ width: 680, height: 800 });
+  const stackedToc = await toc.boundingBox();
+  const stackedContent = await content.boundingBox();
+  expect(stackedContent.y).toBeGreaterThan(stackedToc.y + stackedToc.height - 8);
+  expect(stackedToc.width).toBeGreaterThan(stackedContent.width * 0.85);
+  await page.setViewportSize({ width: 800, height: 600 });
 });
 
 test('menu: burger shows version + contact, no logout before login', async ({ page }) => {
@@ -127,6 +138,63 @@ test('language: switch through all locales and back to EN', async ({ page }) => 
     // Keep later tests (which match English texts) independent of this one.
     await page.evaluate((k) => localStorage.setItem(k, 'en'), LOCALE_KEY);
   }
+});
+
+test('menu: narrow width uses two rows', async ({ page }) => {
+  const brand = page.locator('.navbar-header');
+  const appName = page.getByRole('link', { name: 'Madek-Exporter', exact: true });
+  const pages = page.locator('ul.navbar-pages');
+  const burger = page.locator('li.burger-menu');
+  const status = page.locator('li.connection-status');
+  const language = page.locator('li.language-menu');
+
+  await page.setViewportSize({ width: 900, height: 640 });
+  const wideBrand = await brand.boundingBox();
+  const widePages = await pages.boundingBox();
+  const wideLanguage = await language.boundingBox();
+  const wideBurger = await burger.boundingBox();
+  expect(Math.abs(wideBrand.y - widePages.y)).toBeLessThan(20);
+  await expect(appName).toBeVisible();
+  expect(Math.abs(wideLanguage.y - wideBurger.y)).toBeLessThan(20);
+  expect(wideBurger.x).toBeGreaterThan(wideLanguage.x);
+
+  await page.setViewportSize({ width: 420, height: 640 });
+  const help = pages.getByRole('link', { name: 'Help', exact: true });
+  await expect.poll(async () => {
+    const brandBox = await brand.boundingBox();
+    const pagesBox = await pages.boundingBox();
+    return pagesBox.y > brandBox.y + brandBox.height - 8;
+  }).toBe(true);
+
+  const boxes = {
+    brand: await brand.boundingBox(),
+    status: await status.boundingBox(),
+    burger: await burger.boundingBox(),
+    pages: await pages.boundingBox(),
+    language: await language.boundingBox(),
+    help: await help.boundingBox(),
+  };
+  expect(Math.abs(boxes.brand.y - boxes.burger.y)).toBeLessThan(24);
+  expect(Math.abs(boxes.brand.y - boxes.language.y)).toBeLessThan(24);
+  expect(Math.abs(boxes.brand.y - boxes.status.y)).toBeLessThan(24);
+  expect(boxes.status.x).toBeGreaterThan(boxes.brand.x);
+  expect(boxes.language.x).toBeGreaterThan(boxes.status.x);
+  expect(boxes.burger.x).toBeGreaterThan(boxes.language.x);
+  expect(boxes.pages.y).toBeGreaterThan(boxes.brand.y + boxes.brand.height - 8);
+  await expect(appName).toBeVisible();
+  expect(boxes.help.y).toBeGreaterThan(boxes.language.y);
+
+  await page.setViewportSize({ width: 360, height: 640 });
+  await expect(pages).toBeHidden();
+  await expect(appName).toBeHidden();
+  await expect(language).toBeVisible();
+  await burger.locator('a.dropdown-toggle').click();
+  const menu = burger.locator('ul.dropdown-menu');
+  for (const name of ['Connection', 'Export', 'Debug', 'Help']) {
+    await expect(menu.getByRole('link', { name, exact: true })).toBeVisible();
+  }
+  await burger.locator('a.dropdown-toggle').click();
+  await page.setViewportSize({ width: 800, height: 600 });
 });
 
 test('language: choice survives a reload', async ({ page }) => {
