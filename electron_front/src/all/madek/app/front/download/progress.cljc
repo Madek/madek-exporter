@@ -48,18 +48,48 @@
      :done done
      :fraction (if (pos? total) (/ sum total) 0.0)}))
 
-(defn- round-percent [fraction]
-  (long (#?(:clj Math/round :cljs js/Math.round) (* 100.0 fraction))))
+(def percent-per-request
+  "Points added to the bar for each completed Madek HTTP request."
+  0.5)
+
+(def ^:private requests-per-cycle
+  "Requests in one pass: 0.5 points each, then the bar starts over.
+  199 requests reach 99.5; the next request is 0.5 again."
+  199)
+
+(defn- round-percent
+  "Nearest whole percent."
+  [percent]
+  (long (#?(:clj Math/round :cljs js/Math.round) (double percent))))
+
+(defn request-progress-percent
+  "0.5 points per completed request. After 99.5 the next request starts
+  again at 0.5, so an open download does not sit at the end of the bar."
+  [requests]
+  (let [n (long (or requests 0))]
+    (if (pos? n)
+      (let [steps (mod (dec n) requests-per-cycle)]
+        (/ (inc steps) 2.0))
+      0)))
 
 (defn progress-percent
-  "0–100 for the download bar from media-file progress only.
-  `download` is the :download map; `items` is a sequence of item maps.
-  A finished export with no media files is 100. Otherwise a file that is
-  only partly downloaded shows that fraction, including the first bytes."
+  "Whole number 0–100 for the download bar.
+  Before any file has a visible percent, each completed request
+  (`:request-count` on `download`) adds 0.5 points, rounded to the nearest
+  percent. After 199 requests (100) the next request resets that cycle to 1.
+  Once media-file bytes round to at least 1%, the bar follows those bytes
+  so it does not sit at the top of the request cycle during a transfer.
+  A finished export with no media files is 100."
   [download items]
   (let [finished? (:download-finished download)
-        {:keys [total fraction]} (file-progress-stats items)]
+        {:keys [total fraction]} (file-progress-stats items)
+        file-pct (round-percent (if (pos? total) (* 100.0 fraction) 0.0))
+        requests (long (if (some? (:request-count download))
+                         (:request-count download)
+                         (count (or (:logs download) []))))]
     (cond
       (and finished? (zero? total)) 100
-      (zero? total) 0
-      :else (round-percent fraction))))
+      finished? file-pct
+      (pos? file-pct) file-pct
+      (pos? requests) (round-percent (request-progress-percent requests))
+      :else 0)))

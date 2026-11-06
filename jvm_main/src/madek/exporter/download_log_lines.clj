@@ -2,12 +2,17 @@
   "In-memory HTTP log lines for the export UI (no dependency on state).")
 
 (defonce ^:private log-lines (atom []))
+(defonce ^:private request-count (atom 0))
 
 (defn lines []
   @log-lines)
 
+(defn request-count []
+  @request-count)
+
 (defn append!
   [line & {:keys [max-logs] :or {max-logs 2000}}]
+  (swap! request-count inc)
   (swap! log-lines
          (fn [logs]
            (let [v (conj (vec logs) line)]
@@ -16,7 +21,10 @@
                v)))))
 
 (defn clear! []
-  (reset! log-lines []))
+  (reset! log-lines [])
+  (reset! request-count 0))
 
 (defn attach-to-db [db]
-  (assoc-in db [:download :logs] (vec @log-lines)))
+  (-> db
+      (assoc-in [:download :logs] (vec @log-lines))
+      (assoc-in [:download :request-count] @request-count)))
