@@ -2,17 +2,19 @@
   "In-memory HTTP log lines for the export UI (no dependency on state).")
 
 (defonce ^:private log-lines (atom []))
-(defonce ^:private request-count (atom 0))
+;; Must not be named `request-count`: `defn request-count` would replace this Var
+;; and break `swap!` / `@` (see ClassCastException in attach-to-db).
+(defonce ^:private request-count* (atom 0))
 
 (defn lines []
   @log-lines)
 
 (defn request-count []
-  @request-count)
+  @request-count*)
 
 (defn append!
   [line & {:keys [max-logs] :or {max-logs 2000}}]
-  (swap! request-count inc)
+  (swap! request-count* inc)
   (swap! log-lines
          (fn [logs]
            (let [v (conj (vec logs) line)]
@@ -22,9 +24,9 @@
 
 (defn clear! []
   (reset! log-lines [])
-  (reset! request-count 0))
+  (reset! request-count* 0))
 
 (defn attach-to-db [db]
   (-> db
       (assoc-in [:download :logs] (vec @log-lines))
-      (assoc-in [:download :request-count] @request-count)))
+      (assoc-in [:download :request-count] @request-count*)))

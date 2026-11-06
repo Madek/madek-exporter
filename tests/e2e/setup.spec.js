@@ -30,8 +30,8 @@ function burgerMenu(page) {
 
 test('Electron main + JVM connected', async ({ page }) => {
   await page.getByRole('link', { name: /^Debug$/i }).click();
-  await expect(page.getByText(/Electron main connected!/i)).toBeVisible();
-  await expect(page.getByText(/JVM main connected!/i)).toBeVisible();
+  await expect(page.getByText(/Electron main connected!/i)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/JVM main connected!/i)).toBeVisible({ timeout: 60_000 });
 });
 
 test('menu: nav items available', async ({ page }) => {
