@@ -11,7 +11,7 @@
 
     [cljs-http.client :as http]
     [cljs-uuid-utils.core :as uuid]
-    [cljs.core.async :refer [timeout]]
+    [cljs.core.async :refer [put! timeout]]
     [goog.string :as gstring]
     [goog.string.format]
     [reagent.core :as r]
@@ -98,6 +98,15 @@
             (autoremove id meta-req))
           (when callback (callback resp))))
     id))
+
+(defn abort!
+  "Drop a pending request and abort its XHR. `cancel` is the channel passed
+  as `:cancel` on that request; putting true closes the underlying XhrIo."
+  [id cancel]
+  (when id
+    (swap! state/client-db update :requests dissoc id))
+  (when cancel
+    (put! cancel true)))
 
 (defn response-pending? [request]
   (empty? (:response request)))

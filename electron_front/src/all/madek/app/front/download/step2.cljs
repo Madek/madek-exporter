@@ -7,6 +7,7 @@
     [madek.app.front.request :as request]
 
     [clojure.string]
+    [cljs.core.async :refer [chan]]
     [reagent.core :as reagent]
     [fipp.edn :refer [pprint]]
     [reagent.ratom :as ratom :refer [reaction]]
@@ -30,7 +31,10 @@
     state/client-db
     [:download :download-form]))
 
+(declare abort-prefix-options-request!)
+
 (defn back []
+  (abort-prefix-options-request! :idle)
   (let [req {:method :patch
              :json-params {:step1-completed false}
              :path "/download"}]
@@ -38,6 +42,7 @@
       req {:title (i18n/t :download/back-step1-req)})))
 
 (defn submit []
+  (abort-prefix-options-request! :continued)
   (let [req {:method :patch
              :json-params (assoc
                             (select-keys
@@ -86,31 +91,83 @@
 
 (defonce prefix-help-expanded* (reagent/atom false))
 
-;; {:entity-id "…" :status :idle|:loading|:loaded|:failed :options […] :entity-title "…"}
+;; {:entity-id "…" :status :idle|:loading|:loaded|:failed|:continued
+;;  :fetched true once a load has succeeded :options […] :entity-title "…"}
 (defonce prefix-options* (reagent/atom {:status :idle}))
+
+;; Bumped whenever the in-flight prefix-options request is aborted, so a late
+;; response cannot overwrite a newer load or a step the user already left.
+(defonce prefix-load-gen* (atom 0))
+
+;; {:id request-id :cancel chan} for the XHR currently loading prefix options.
+(defonce prefix-request* (atom nil))
 
 (defn- entity-id []
   (-> @download* :entity :uuid))
 
-(defn- load-prefix-options []
-  (let [id (entity-id)]
-    (when-not (and (= id (:entity-id @prefix-options*))
-                   (#{:loading :loaded} (:status @prefix-options*)))
-      (reset! prefix-options* {:entity-id id :status :loading})
-      (reset! prefix-dropdown-open* false)
-      (request/send-off
-        {:method :get
-         :path "/download/prefix-options"}
-        {:title (i18n/t :download/fetch-prefix-options)}
-        :callback (fn [resp]
-                    (when (= id (:entity-id @prefix-options*))
-                      (reset! prefix-options*
-                              (if (:success resp)
-                                {:entity-id id
-                                 :status :loaded
-                                 :entity-title (-> resp :body :entity_title)
-                                 :options (vec (or (-> resp :body :options) []))}
-                                {:entity-id id :status :failed}))))))))
+(defn abort-prefix-options-request!
+  "Abort the browser request for prefix options. The server stops the Madek
+  walk when this generation is superseded or step 2 is left.
+  `status` replaces :loading so the spinner does not keep running."
+  ([] (abort-prefix-options-request! nil))
+  ([status]
+   (swap! prefix-load-gen* inc)
+   (when-let [{:keys [id cancel]} @prefix-request*]
+     (reset! prefix-request* nil)
+     (request/abort! id cancel))
+   (when status
+     (swap! prefix-options* assoc :status status)
+     (reset! prefix-dropdown-open* false))))
+
+(defn- prefix-options-fetched?
+  "True after one successful load for this entity. Returning from step 3
+  must not start another automatic request."
+  [id]
+  (let [state @prefix-options*]
+    (and (= id (:entity-id state))
+         (true? (:fetched state)))))
+
+(defn- load-prefix-options
+  ([] (load-prefix-options false))
+  ([force?]
+   (let [id (entity-id)]
+     (cond
+       (not id) nil
+
+       (and (not force?) (prefix-options-fetched? id))
+       (when-not (#{:loading :loaded} (:status @prefix-options*))
+         (swap! prefix-options* assoc :status :loaded))
+
+       (and (not force?)
+            (= id (:entity-id @prefix-options*))
+            (= :loading (:status @prefix-options*)))
+       nil
+
+       :else
+       (do
+         (abort-prefix-options-request!)
+         (let [gen @prefix-load-gen*
+               cancel (chan)]
+           (reset! prefix-options* {:entity-id id :status :loading})
+           (reset! prefix-dropdown-open* false)
+           (reset! prefix-request*
+                   {:cancel cancel
+                    :id (request/send-off
+                          {:method :get
+                           :path "/download/prefix-options"
+                           :cancel cancel}
+                          {:title (i18n/t :download/fetch-prefix-options)}
+                          :callback (fn [resp]
+                                      (when (= gen @prefix-load-gen*)
+                                        (reset! prefix-request* nil)
+                                        (reset! prefix-options*
+                                                (if (:success resp)
+                                                  {:entity-id id
+                                                   :status :loaded
+                                                   :fetched true
+                                                   :entity-title (-> resp :body :entity_title)
+                                                   :options (vec (or (-> resp :body :options) []))}
+                                                  {:entity-id id :status :failed})))))})))))))
 
 (defn- choose-prefix [meta-key-id]
   (set-value :prefix_meta_key (or meta-key-id ""))
@@ -158,6 +215,9 @@
     :loaded
     [:span.prefix-options-status {:aria-hidden "true"}
      [:span.glyphicon.glyphicon-ok.text-success]]
+    :continued
+    [:span.prefix-options-status {:aria-hidden "true"}
+     [:span.glyphicon.glyphicon-ok.prefix-options-continued]]
     :failed
     [:span.prefix-options-status {:aria-hidden "true"}
      [:span.glyphicon.glyphicon-remove-circle.text-warning]]
@@ -358,7 +418,27 @@
                       loaded? (swap! prefix-dropdown-open* not)
                       (= :failed status) (load-prefix-options)))}
        [prefix-dropdown-summary]
-       [:span.caret]]]
+       [:span.caret]]
+      [:button.btn.btn-default.prefix-refresh
+       {:type :button
+        :title (if (= :loading status)
+                 (i18n/t :download/prefix-pause)
+                 (i18n/t :download/prefix-refresh))
+        :aria-label (if (= :loading status)
+                      (i18n/t :download/prefix-pause)
+                      (i18n/t :download/prefix-refresh))
+        :on-click (fn [e]
+                    (.preventDefault e)
+                    (.stopPropagation e)
+                    (if (= :loading (:status @prefix-options*))
+                      (abort-prefix-options-request!
+                       (if (seq (:options @prefix-options*)) :loaded :idle))
+                      (load-prefix-options true)))}
+       [:span.glyphicon
+        {:class (if (= :loading status)
+                  "glyphicon-pause"
+                  "glyphicon-refresh")
+         :aria-hidden "true"}]]]
      (when open?
        [prefix-dropdown-menu])
      [prefix-example-component]
@@ -373,6 +453,7 @@
        (.addEventListener js/document "keydown" close-prefix-dropdown-on-escape))
      :component-will-unmount
      (fn [_]
+       (abort-prefix-options-request!)
        (.removeEventListener js/document "click" close-prefix-dropdown-on-outside-click)
        (.removeEventListener js/document "keydown" close-prefix-dropdown-on-escape))
      :reagent-render prefix-picker-render}))
