@@ -38,10 +38,14 @@ module.exports = {
   // One project per scope; login only runs once the app shell itself works.
   projects: [
     { name: 'setup', testMatch: /setup\.spec\.js$/ },
-    { name: 'login', testMatch: /login\.spec\.js$/, dependencies: ['setup'] },
+    {
+      name: 'login',
+      testMatch: /login\.spec\.js$|connected\.spec\.js$/,
+      dependencies: ['setup'],
+    },
     {
       name: 'export-from-api',
-      testMatch: /export-from-api\.spec\.js$/,
+      testMatch: /export-from-api\.spec\.js$|prefix\.spec\.js$/,
       dependencies: ['setup'],
       timeout: 120_000,
     },

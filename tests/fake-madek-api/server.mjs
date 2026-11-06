@@ -25,11 +25,12 @@ import {
   vocabularyMadekCore,
   vocabularyMetaKeysCollection,
   metaKeysCollection,
-  metaKeyTitle,
+  findMetaKey,
 } from './export-fixtures.mjs';
 import {
   vocabularyMadekCoreV2,
   metaKeyTitleV2,
+  metaKeySubtitleV2,
   mediaEntryV2,
   metaDataRelatedForMediaEntry,
   listBody,
@@ -224,7 +225,8 @@ function handleApiV1(req, res, path) {
       return true;
     }
     if (sub === 'meta-data') {
-      sendJson(res, 200, metaDataCollectionForEntry(BASE, entry), CT_JSON_ROA);
+      const metaKeys = new URL(req.url ?? '/', BASE).searchParams.get('meta_keys');
+      sendJson(res, 200, metaDataCollectionForEntry(BASE, entry, metaKeys), CT_JSON_ROA);
       return true;
     }
     if (sub === 'media-file') {
@@ -251,7 +253,8 @@ function handleApiV1(req, res, path) {
       return true;
     }
     if (sub === 'meta-data') {
-      sendJson(res, 200, collectionMetaDataCollection(BASE), CT_JSON_ROA);
+      const metaKeys = new URL(req.url ?? '/', BASE).searchParams.get('meta_keys');
+      sendJson(res, 200, collectionMetaDataCollection(BASE, metaKeys), CT_JSON_ROA);
       return true;
     }
     if (sub === 'collections') {
@@ -318,13 +321,19 @@ function handleApiV1(req, res, path) {
     return true;
   }
 
-  if (req.method === 'GET' && path === '/api/meta-keys/madek_core:title/') {
+  const metaKeyMatch = path.match(/^\/api\/meta-keys\/([^/]+)\/$/);
+  if (req.method === 'GET' && metaKeyMatch) {
     const auth = authenticateV1(req);
     if (!auth.ok) {
       sendJson(res, 401, { message: auth.message }, CT_JSON_ROA);
       return true;
     }
-    sendJson(res, 200, metaKeyTitle(BASE), CT_JSON_ROA);
+    const metaKey = findMetaKey(decodeURIComponent(metaKeyMatch[1]));
+    if (!metaKey) {
+      sendJson(res, 404, { message: 'Meta-key not found' }, CT_JSON_ROA);
+      return true;
+    }
+    sendJson(res, 200, metaKey, CT_JSON_ROA);
     return true;
   }
 
@@ -402,7 +411,7 @@ function handleApiV2(req, res, path) {
   }
 
   if (req.method === 'GET' && isV2ListPath(path, 'meta-keys')) {
-    sendJson(res, 200, listBody('meta-keys', [metaKeyTitleV2()], req));
+    sendJson(res, 200, listBody('meta-keys', [metaKeyTitleV2(), metaKeySubtitleV2()], req));
     return true;
   }
 
