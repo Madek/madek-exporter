@@ -1,6 +1,13 @@
 const fs = require('fs');
 const path = require('path');
-const { test, expect, exportFakeMediaEntry, expectExportDownloadLogCount } = require('./fixtures');
+const {
+  test,
+  expect,
+  exportFakeMediaEntry,
+  expectExportDownloadLogCount,
+  expectDownloadFileProgress,
+  expectMedienarchivItemLink,
+} = require('./fixtures');
 const { fakeExportLogCounts } = require('./electron-app');
 
 test.describe.configure({ timeout: 120_000 });
@@ -19,4 +26,6 @@ test('login and export media-entry with both api and api-v2', async ({ page }) =
   await expectExportDownloadLogCount(page, {
     count: fakeExportLogCounts.mediaEntryBothApis,
   });
+  await expectDownloadFileProgress(page, { done: 2, total: 2 });
+  await expectMedienarchivItemLink(page, entryId, { kind: 'entries', count: 2 });
 });

@@ -76,10 +76,29 @@
 
 ;### set options ##############################################################
 
+(defonce prefix-options-generation (atom 0))
+
+(defn abort-prefix-options!
+  "Invalidate an in-flight prefix-options walk so it stops calling Madek.
+  Returns the new generation."
+  []
+  (swap! prefix-options-generation inc))
+
+(defn prefix-options-aborted?
+  [gen]
+  (not= gen @prefix-options-generation))
+
+(defn- throw-unless-prefix-options-current! [gen]
+  (when (prefix-options-aborted? gen)
+    (throw (ex-info "Prefix options aborted" {:type :prefix-options-aborted}))))
+
 (defn patch-download [request]
   (catcher/snatch
    {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
    (let [body (:body request)]
+     (when (or (true? (:step2-completed body))
+               (false? (:step1-completed body)))
+       (abort-prefix-options!))
      (when (nil? (:logs body))
        (request-log/clear!))
      (swap! state/db
@@ -319,15 +338,19 @@
                 :default-conn-opts (-> @state/db :connection :http-options)))
 
 (defn- roa-collection-data
-  ([resource relation-kw]
-   (roa-collection-data resource relation-kw {}))
-  ([resource relation-kw query]
+  ([gen resource relation-kw]
+   (roa-collection-data gen resource relation-kw {}))
+  ([gen resource relation-kw query]
+   (throw-unless-prefix-options-current! gen)
    (->> (-> resource
             (roa/relation relation-kw)
             (roa/get query)
             roa/coll-seq)
-        (map #(roa/get % {}))
-        (map roa/data))))
+        (map (fn [rel]
+               (throw-unless-prefix-options-current! gen)
+               (roa/get rel {})))
+        (map roa/data)
+        doall)))
 
 (defn- vocabulary-id-of [meta-key]
   (or (presence (:vocabulary_id meta-key))
@@ -342,23 +365,27 @@
   "Text meta-keys from all vocabularies, joined with the step-1 entity's values."
   [_]
   (catcher/snatch
-   {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
+   {:return-fn (fn [e]
+                 (if (= :prefix-options-aborted (:type (ex-data e)))
+                   {:status 499 :body {:aborted true}}
+                   {:status 500 :body (thrown/stringify e)}))}
    (let [{id :uuid entity-type :type title :title} (-> @state/db :download :entity)]
      (if-not id
        {:status 409 :body {:message "No export entity selected (step 1)."}}
-       (let [root (api-root)
-             vocabs (->> (roa-collection-data root :vocabularies)
+       (let [gen (abort-prefix-options!)
+             root (api-root)
+             vocabs (->> (roa-collection-data gen root :vocabularies)
                          (map (juxt :id identity))
                          (into {}))
-             values (->> (roa-collection-data
-                          (-> root
-                              (roa/relation (keyword entity-type))
-                              (roa/get {:id id}))
-                          :meta-data)
+             entity (do (throw-unless-prefix-options-current! gen)
+                        (-> root
+                            (roa/relation (keyword entity-type))
+                            (roa/get {:id id})))
+             values (->> (roa-collection-data gen entity :meta-data)
                          (filter #(= "MetaDatum::Text" (:type %)))
                          (map (juxt :meta_key_id :value))
                          (into {}))
-             options (->> (roa-collection-data root :meta-keys)
+             options (->> (roa-collection-data gen root :meta-keys)
                           (filter #(= "MetaDatum::Text" (:meta_datum_object_type %)))
                           (map (fn [mk]
                                  (let [vid (vocabulary-id-of mk)
@@ -377,6 +404,7 @@
                                          :vocabulary_label
                                          :meta_key_label))
                           vec)]
+         (throw-unless-prefix-options-current! gen)
          (response {:entity_id id
                     :entity_title title
                     :options options}))))))

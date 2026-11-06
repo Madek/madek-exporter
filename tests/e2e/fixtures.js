@@ -312,6 +312,32 @@ async function expectExportDownloadLogCount(page, opts) {
   return count;
 }
 
+/**
+ * Finished download bar counts media files, not sets or entries as items.
+ * @param {import('@playwright/test').Page} page
+ * @param {{ done: number, total: number }} opts
+ */
+async function expectDownloadFileProgress(page, { done, total }) {
+  const bar = page.locator('.progress-bar');
+  await expect(bar).toContainText(`${done} / ${total} files`);
+  await expect(bar).toContainText('100%');
+}
+
+/**
+ * Einträge links open the Madek id, without an api: / api-v2: prefix.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} id
+ * @param {{ kind: 'entries' | 'sets', count?: number }} opts
+ */
+async function expectMedienarchivItemLink(page, id, { kind, count = 1 }) {
+  const links = page.getByRole('link', { name: id, exact: true });
+  await expect(links).toHaveCount(count);
+  const href = `${getFakeBaseUrl()}/${kind}/${id}`;
+  for (const link of await links.all()) {
+    await expect(link).toHaveAttribute('href', href);
+  }
+}
+
 module.exports = {
   test,
   expect,
@@ -330,6 +356,8 @@ module.exports = {
   exportFakeMediaEntry,
   exportFakeSet,
   expectExportDownloadLogCount,
+  expectDownloadFileProgress,
+  expectMedienarchivItemLink,
   setExportApiMode,
   openApiModeMenu,
   apiModeOption,

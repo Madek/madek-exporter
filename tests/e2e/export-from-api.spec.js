@@ -6,6 +6,8 @@ const {
   exportFakeMediaEntry,
   exportFakeSet,
   expectExportDownloadLogCount,
+  expectDownloadFileProgress,
+  expectMedienarchivItemLink,
 } = require('./fixtures');
 const { fakeMediaEntryTitle, fakeExportLogCounts } = require('./electron-app');
 
@@ -67,4 +69,9 @@ test('login and export set with three media entries (metadata)', async ({ page }
     expect(entryMeta.some((m) => m.meta_key_id === 'madek_core:title')).toBe(true);
   }
   await expectExportDownloadLogCount(page, { count: fakeExportLogCounts.setMetadata });
+  await expectDownloadFileProgress(page, { done: 3, total: 3 });
+  await expectMedienarchivItemLink(page, setId, { kind: 'sets' });
+  for (const entryId of entryIds) {
+    await expectMedienarchivItemLink(page, entryId, { kind: 'entries' });
+  }
 });
