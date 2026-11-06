@@ -3,13 +3,13 @@
 - version_major: 0
   version_minor: 11
   version_patch: 2
-  version_pre: 1
+  version_pre: 2
   version_build: NULL
   name: NULL
 
   description: |
 
-    Fixes and Features
+    Fixes and Features 
     ------------------
 
     * Export through `/api`, `/api-v2`, or both. Mode “both” writes into `api/` and `api-v2/` subfolders.
