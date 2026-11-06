@@ -57,8 +57,7 @@ jobs:
                 ./bin/security-audit || {
                   rc=$?
                   if [[ "$rc" -eq 1 ]]; then
-                    echo "Vulnerabilities found (non-blocking)."
-                    exit 0
+                    echo "Vulnerabilities found (security-audit job fails; build is not blocked — see job dependency states)."
                   fi
                   exit "$rc"
                 }
@@ -87,10 +86,10 @@ jobs:
         type: job
         job_key: check-releases-file-is-up-to-date
         states: [passed]
-      security audit has passed:
+      security audit finished (loose: pass or fail; does not block build):
         type: job
         job_key: security-audit
-        states: [passed]
+        states: [passed, failed]
       all tests have passed:
         type: job
         job_key: tests
