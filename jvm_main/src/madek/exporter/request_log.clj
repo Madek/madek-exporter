@@ -11,11 +11,16 @@
 
 (defn lines [] (download-log-lines/lines))
 
+(defn- publish-logs! [db]
+  (-> db
+      (assoc-in [:download :logs] (download-log-lines/lines))
+      (assoc-in [:download :request-count] (download-log-lines/request-count))))
+
 (defn clear!
   "Reset request logs for a new download run."
   []
   (download-log-lines/clear!)
-  (swap! state/db assoc-in [:download :logs] [])
+  (swap! state/db publish-logs!)
   (state/broadcast-download-logs!))
 
 (defn- logging-enabled? []
@@ -40,7 +45,7 @@
     (let [line (str (string/upper-case (name (or method :get)))
                     " " url " " (status-label status))]
       (download-log-lines/append! line :max-logs max-logs)
-      (swap! state/db assoc-in [:download :logs] (download-log-lines/lines))
+      (swap! state/db publish-logs!)
       (state/broadcast-download-logs!))))
 
 (defn- log-from-exception! [req e]
