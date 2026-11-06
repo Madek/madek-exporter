@@ -76,6 +76,31 @@ describe('fake-madek-api export fixtures', () => {
     assert.equal(parsed.value, FAKE_MEDIA_ENTRY_TITLE);
   });
 
+  it('filters meta-data by meta_keys for prefix lookup', async () => {
+    const entryMeta = `/api/media-entries/${FAKE_MEDIA_ENTRY_ID}/meta-data/`;
+    const titleQuery = encodeURIComponent(JSON.stringify(['madek_core:title']));
+    const subtitleQuery = encodeURIComponent(JSON.stringify(['madek_core:subtitle']));
+
+    const unfiltered = await get(entryMeta);
+    assert.equal(unfiltered.status, 200);
+    assert.match(unfiltered.body, /00000000-0000-4000-8000-000000000012/);
+
+    const withPrefix = await get(`${entryMeta}?meta_keys=${titleQuery}`);
+    assert.equal(withPrefix.status, 200);
+    assert.match(withPrefix.body, /00000000-0000-4000-8000-000000000012/);
+
+    const withoutValue = await get(`${entryMeta}?meta_keys=${subtitleQuery}`);
+    assert.equal(withoutValue.status, 200);
+    const empty = JSON.parse(withoutValue.body);
+    assert.deepEqual(empty['_json-roa'].collection.relations, {});
+
+    const subtitleKey = await get('/api/meta-keys/madek_core:subtitle/');
+    assert.equal(subtitleKey.status, 200);
+    const key = JSON.parse(subtitleKey.body);
+    assert.equal(key.id, 'madek_core:subtitle');
+    assert.equal(key.meta_datum_object_type, 'MetaDatum::Text');
+  });
+
   it('serves vocabularies and meta-keys for schema export', async () => {
     const voc = await get('/api/vocabularies/');
     assert.equal(voc.status, 200);

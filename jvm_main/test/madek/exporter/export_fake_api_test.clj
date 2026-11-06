@@ -22,10 +22,10 @@
 
 ;; Keep in sync with fakeExportLogCounts in tests/e2e/electron-app.js
 (def ^:private expected-log-counts
-  {:media-entry-metadata 12
-   :media-entry-with-file 14
-   :set-metadata 23
-   :media-entry-both-apis 17})
+  {:media-entry-metadata 14
+   :media-entry-with-file 16
+   :set-metadata 25
+   :media-entry-both-apis 19})
 
 (defn- require-fake! []
   (when-not fake-base-url
@@ -56,7 +56,7 @@
 (defn- web-export-wait!
   "POST /download flow; returns HTTP log lines when the export future completes."
   [entity-id entity-type url-suffix target-dir skip-media-files?
-   & {:keys [api-mode] :or {api-mode :api}}]
+   & {:keys [api-mode prefix-meta-key] :or {api-mode :api}}]
   (let [target-dir (doto target-dir (.mkdirs) (.deleteOnExit))]
     (connect-fake! :api-mode api-mode)
     (is (= 204 (:status (web/download-step1
@@ -65,9 +65,11 @@
                                  :url (str fake-base-url url-suffix)
                                  :target-directory (.getAbsolutePath target-dir)}}))))
     (is (= 204 (:status (web/patch-download
-                         {:body {:step2-completed true
-                                 :skip_media_files skip-media-files?
-                                 :recursive false}}))))
+                         {:body (cond-> {:step2-completed true
+                                         :skip_media_files skip-media-files?
+                                         :recursive false}
+                                  (some? prefix-meta-key)
+                                  (assoc :prefix_meta_key prefix-meta-key))}))))
     (is (= 202 (:status (web/download {}))))
     (loop [n 0]
       (cond
@@ -179,6 +181,33 @@
       (is (= media-entry-id (get-in @state/db [:download :entity :uuid]))
           "step1 stores the media-entry id"))))
 
+(defn- export-entry-folder! [prefix-meta-key]
+  (let [target-dir (io/file (System/getProperty "java.io.tmpdir")
+                            (str "madek-web-entry-prefix-" (System/nanoTime)))]
+    (web-export-wait! media-entry-id "entry"
+                      (str "/entries/" media-entry-id)
+                      target-dir true
+                      :prefix-meta-key prefix-meta-key)
+    target-dir))
+
+(deftest web-download-prefix-with-value-uses-title
+  (let [target-dir (export-entry-folder! "madek_core:title")
+        folder (str "Fake export entry_" media-entry-id)]
+    (is (.exists (io/file target-dir folder "meta-data.json")))
+    (is (not (.exists (io/file target-dir media-entry-id))))))
+
+(deftest web-download-prefix-without-value-uses-underscore
+  (let [target-dir (export-entry-folder! "madek_core:subtitle")
+        folder (str "_" media-entry-id)]
+    (is (.exists (io/file target-dir folder "meta-data.json")))
+    (is (not (.exists (io/file target-dir media-entry-id))))))
+
+(deftest web-download-no-prefix-uses-bare-id
+  (let [target-dir (export-entry-folder! "")]
+    (is (.exists (io/file target-dir media-entry-id "meta-data.json")))
+    (is (not (.exists (io/file target-dir (str "Fake export entry_" media-entry-id)))))
+    (is (not (.exists (io/file target-dir (str "_" media-entry-id)))))))
+
 (deftest prefix-options-lists-title-with-folder-name
   (connect-fake!)
   (is (= 204 (:status (web/download-step1
@@ -187,13 +216,16 @@
                                :url (str fake-base-url "/entries/" media-entry-id)
                                :target-directory (System/getProperty "java.io.tmpdir")}}))))
   (let [{:keys [status body]} (web/prefix-options {})
-        title (some #(when (= "madek_core:title" (:meta_key_id %)) %) (:options body))]
+        title (some #(when (= "madek_core:title" (:meta_key_id %)) %) (:options body))
+        subtitle (some #(when (= "madek_core:subtitle" (:meta_key_id %)) %) (:options body))]
     (is (= 200 status))
     (is (= media-entry-id (:entity_id body)))
     (is (= "Madek Core" (:vocabulary_label title)))
     (is (= "Title" (:meta_key_label title)))
     (is (= "Fake export entry" (:value title)))
-    (is (= (str "Fake export entry_" media-entry-id) (:folder_name title)))))
+    (is (= (str "Fake export entry_" media-entry-id) (:folder_name title)))
+    (is (nil? (:value subtitle)))
+    (is (= (str "_" media-entry-id) (:folder_name subtitle)))))
 
 (deftest prefix-options-without-step1
   (is (= 409 (:status (web/prefix-options {})))))

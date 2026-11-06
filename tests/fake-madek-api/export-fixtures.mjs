@@ -83,7 +83,24 @@ export function exportPaths(base) {
     vocabularyMetaKeys: `${base}/api/vocabularies/madek_core/meta-keys/`,
     metaKeys: `${base}/api/meta-keys/`,
     metaKeyTitle: `${base}/api/meta-keys/madek_core:title/`,
+    metaKeySubtitle: `${base}/api/meta-keys/madek_core:subtitle/`,
   };
+}
+
+/**
+ * Madek sends `meta_keys` as a JSON array string. `null` means no filter.
+ * @param {string | null | undefined} metaKeysParam
+ * @returns {string[] | null}
+ */
+export function metaKeyIdsFromQuery(metaKeysParam) {
+  if (metaKeysParam == null || metaKeysParam === '') return null;
+  try {
+    const parsed = JSON.parse(metaKeysParam);
+    if (Array.isArray(parsed)) return parsed.map(String);
+    return [String(parsed)];
+  } catch {
+    return [String(metaKeysParam)];
+  }
 }
 
 /** @param {string} base */
@@ -160,17 +177,36 @@ export function mediaEntryResource(base, entry) {
   return roaResource(
     'Media-Entry',
     {
-      'meta-data': { name: 'Meta-Data', href: p.entryMetaData },
+      'meta-data': { name: 'Meta-Data', href: `${p.entryMetaData}{?meta_keys}` },
       'media-file': { name: 'Media-File', href: p.mediaFile },
     },
     { id: entry.id, created_at: '2020-01-01T00:00:00Z' }
   );
 }
 
-/** @param {string} base @param {{ metaDatumTitleId: string }} entry */
-export function metaDataCollectionForEntry(base, entry) {
+/**
+ * @param {string} name
+ * @param {{ meta_key_id: string, name: string, href: string }[]} members
+ * @param {string | null | undefined} [metaKeysParam]
+ */
+function filteredMetaDataCollection(name, members, metaKeysParam) {
+  const allowed = metaKeyIdsFromQuery(metaKeysParam);
+  const kept =
+    allowed == null ? members : members.filter((m) => allowed.includes(m.meta_key_id));
+  return roaCollection(
+    name,
+    kept.map(({ name: memberName, href }) => ({ name: memberName, href }))
+  );
+}
+
+/** @param {string} base @param {{ metaDatumTitleId: string }} entry @param {string | null | undefined} [metaKeysParam] */
+export function metaDataCollectionForEntry(base, entry, metaKeysParam) {
   const p = mediaEntryPaths(base, entry);
-  return roaCollection('Meta-Data', [{ name: 'MetaDatum', href: p.metaDatumTitle }]);
+  return filteredMetaDataCollection(
+    'Meta-Data',
+    [{ meta_key_id: 'madek_core:title', name: 'MetaDatum', href: p.metaDatumTitle }],
+    metaKeysParam
+  );
 }
 
 /** @param {{ title: string, metaDatumTitleId: string }} entry */
@@ -225,7 +261,7 @@ export function collectionResource(base) {
   return roaResource(
     'Collection',
     {
-      'meta-data': { name: 'Meta-Data', href: p.metaData },
+      'meta-data': { name: 'Meta-Data', href: `${p.metaData}{?meta_keys}` },
       collections: {
         name: 'Collections',
         href: `${p.collection}/collections/`,
@@ -235,10 +271,14 @@ export function collectionResource(base) {
   );
 }
 
-/** @param {string} base */
-export function collectionMetaDataCollection(base) {
+/** @param {string} base @param {string | null | undefined} [metaKeysParam] */
+export function collectionMetaDataCollection(base, metaKeysParam) {
   const p = collectionPaths(base);
-  return roaCollection('Meta-Data', [{ name: 'MetaDatum', href: p.setMetaDatumTitle }]);
+  return filteredMetaDataCollection(
+    'Meta-Data',
+    [{ meta_key_id: 'madek_core:title', name: 'MetaDatum', href: p.setMetaDatumTitle }],
+    metaKeysParam
+  );
 }
 
 /** @param {string} base */
@@ -283,19 +323,26 @@ export function vocabularyMadekCore(base) {
 }
 
 /** @param {string} base */
-export function vocabularyMetaKeysCollection(base) {
+function metaKeyMembers(base) {
   const p = exportPaths(base);
-  return roaCollection('Meta-Keys', [{ name: 'Meta-Key', href: p.metaKeyTitle }]);
+  return [
+    { name: 'Meta-Key', href: p.metaKeyTitle },
+    { name: 'Meta-Key', href: p.metaKeySubtitle },
+  ];
+}
+
+/** @param {string} base */
+export function vocabularyMetaKeysCollection(base) {
+  return roaCollection('Meta-Keys', metaKeyMembers(base));
 }
 
 /** @param {string} base */
 export function metaKeysCollection(base) {
-  const p = exportPaths(base);
-  return roaCollection('Meta-Keys', [{ name: 'Meta-Key', href: p.metaKeyTitle }]);
+  return roaCollection('Meta-Keys', metaKeyMembers(base));
 }
 
-/** @param {string} base */
-export function metaKeyTitle(base) {
+/** Text meta-key with a value on the fake entries (`madek_core:title`). */
+export function metaKeyTitle(_base) {
   return roaResource(
     'Meta-Key',
     {},
@@ -306,4 +353,28 @@ export function metaKeyTitle(base) {
       position: 0,
     }
   );
+}
+
+/**
+ * Text meta-key the fake entries do not fill. Prefix options show it as
+ * “no value”; a folder name is `_` plus the entity id.
+ */
+export function metaKeySubtitle(_base) {
+  return roaResource(
+    'Meta-Key',
+    {},
+    {
+      id: 'madek_core:subtitle',
+      label: 'Subtitle',
+      meta_datum_object_type: 'MetaDatum::Text',
+      position: 1,
+    }
+  );
+}
+
+/** @param {string} id */
+export function findMetaKey(id) {
+  if (id === 'madek_core:title') return metaKeyTitle();
+  if (id === 'madek_core:subtitle') return metaKeySubtitle();
+  return null;
 }
