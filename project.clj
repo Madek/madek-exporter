@@ -97,7 +97,9 @@
 
              :prod {}
 
-             :test {:test-paths ["jvm_main/test"]}
+             :test {:test-paths ["jvm_main/test"]
+                    ;; progress.cljc is shared with the Electron download view
+                    :source-paths ["jvm_main/src" "electron_front/src/all"]}
 
              :uberjar {
                        :prep-tasks ["compile"]

@@ -229,3 +229,14 @@
 
 (deftest prefix-options-without-step1
   (is (= 409 (:status (web/prefix-options {})))))
+
+(deftest continuing-to-step-3-aborts-prefix-options
+  (let [gen (web/abort-prefix-options!)]
+    (is (not (web/prefix-options-aborted? gen)))
+    (is (= 204 (:status (web/patch-download {:body {:recursive true}}))))
+    (is (not (web/prefix-options-aborted? gen)))
+    (is (= 204 (:status (web/patch-download {:body {:step2-completed true}}))))
+    (is (web/prefix-options-aborted? gen)))
+  (let [gen (web/abort-prefix-options!)]
+    (is (= 204 (:status (web/patch-download {:body {:step1-completed false}}))))
+    (is (web/prefix-options-aborted? gen))))

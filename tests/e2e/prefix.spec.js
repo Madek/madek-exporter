@@ -32,6 +32,12 @@ test('prefix picker: value, empty value, no prefix, and the value filter', async
   const toggle = page.locator('.prefix-dropdown-toggle');
   await expect(toggle).toBeEnabled({ timeout: 30_000 });
   await expect(toggle).toContainText(/NO META-KEY PREFIX/i);
+
+  const refresh = page.getByRole('button', { name: 'Refresh prefix options' });
+  await refresh.click();
+  await expect(toggle).toBeEnabled({ timeout: 30_000 });
+  await expect(toggle).toContainText(/NO META-KEY PREFIX/i);
+
   await toggle.click();
 
   const menu = page.locator('.prefix-dropdown-menu');

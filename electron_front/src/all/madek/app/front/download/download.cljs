@@ -6,9 +6,9 @@
     [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
     [madek.app.front.connection :as connection]
+    [madek.app.front.download.progress :as dl-progress]
 
     [clojure.string :as string]
-    [inflections.core :refer [pluralize]]
 
     [cljs.nodejs :as nodejs]
     [reagent.core :as reagent]
@@ -40,13 +40,13 @@
                            (.openExternal shell url)))}
          [:em title]]]])))
 
+(defn item-public-id [id]
+  (dl-progress/item-public-id id))
+
 (defn item-medienarchiv-url [item]
-  (when-let [base (-> @state/jvm-main-db :connection :url presence)]
-    (when-let [path (case (:type item)
-                      "Collection" "/sets/"
-                      "MediaEntry" "/entries/"
-                      nil)]
-      (str base path (:id item)))))
+  (dl-progress/medienarchiv-url
+   (-> @state/jvm-main-db :connection :url presence)
+   item))
 
 ;;; progress helpers
 
@@ -71,16 +71,11 @@
 (defn item-progress-percent [item]
   (js/Math.round (* 100 (item-progress-value item))))
 
+(defn file-progress-stats []
+  (dl-progress/file-progress-stats (items-seq)))
+
 (defn progress-percent []
-  (let [items (items-seq)
-        total (count items)
-        finished? (:download-finished @download*)]
-    (cond
-      (and finished? (zero? total)) 100
-      (zero? total) 0
-      :else (js/Math.round
-             (* 100 (/ (reduce + 0 (map item-progress-value items))
-                       total))))))
+  (dl-progress/progress-percent @download* (items-seq)))
 
 (defn current-downloading-items []
   (->> (items-seq)
@@ -183,7 +178,7 @@
     [:span.glyphicon.glyphicon-unchecked.text-muted {:aria-hidden "true"}]))
 
 (defn progress-component []
-  (let [{:keys [total passed sets media-entries]} (item-counts)
+  (let [{:keys [done total]} (file-progress-stats)
         pct (progress-percent)
         finished? (:download-finished @download*)
         cancelled? (:download-cancelled @download*)]
@@ -199,16 +194,14 @@
        :aria-valuemin 0
        :aria-valuemax 100
        :style {:width (str pct "%")
-               :min-width (when (and (not finished?) (pos? total)) "2em")}}
+               :min-width (when (and (not finished?) (pos? pct)) "2em")}}
       (if finished?
         (i18n/t :download/downloaded)
         (i18n/t :download/downloading))
-      (i18n/t :download/progress-of {:passed passed :total total})
+      (i18n/t :download/files-progress {:done done :total total})
       " ("
       (i18n/t :download/item-progress {:percent pct})
-      ") — "
-      (pluralize sets "Set") ", "
-      (pluralize media-entries "MediaEntry")]]))
+      ")"]]))
 
 (defn current-activity-component []
   (when-not (:download-finished @download*)
@@ -253,6 +246,7 @@
         files-n (media-files-count item)
         title (or (presence (:title item)) "—")
         uuid (str (:id item))
+        public-id (item-public-id uuid)
         item-pct (item-progress-percent item)
         detail (cond
                  (= status :active)
@@ -278,12 +272,12 @@
       (if-let [url (item-medienarchiv-url item)]
         [:a.item-id.text-muted
          {:href url
-          :title uuid
+          :title url
           :on-click (fn [e]
                       (.preventDefault e)
                       (.openExternal shell url))}
-         uuid]
-        [:span.item-id.text-muted {:title uuid} uuid])
+         public-id]
+        [:span.item-id.text-muted {:title public-id} public-id])
       [:span.item-detail.text-muted detail]]]))
 
 (defn item-checklist-component []
