@@ -109,6 +109,27 @@
                             (close-language-menu))}
             (get i18n/LOCALE-LABELS loc)]]))]]))
 
+(defn- burger-page [path label disabled?]
+  [:li.burger-page {:class (cond
+                             disabled? "disabled"
+                             (= @state/current-path path) "active")}
+   [:a {:href (if disabled? "#" path)
+        :on-click (fn [e]
+                    (.preventDefault e)
+                    (close-burger-menu)
+                    (when-not disabled?
+                      (accountant/navigate! path)))}
+    label]])
+
+(defn- burger-page-items []
+  (let [export-ready? @connection/export-ready?*]
+    (list
+      ^{:key "connection"} [burger-page "/connection" (i18n/t :nav/connection) false]
+      ^{:key "export"} [burger-page "/download" (i18n/t :nav/export) (not export-ready?)]
+      ^{:key "debug"} [burger-page "/debug" (i18n/t :nav/debug) false]
+      ^{:key "help"} [burger-page "/help" (i18n/t :nav/help) false]
+      [:li.divider.burger-page {:key "pages-divider" :role "separator"}])))
+
 (defn- burger-session-item [k label value]
   [:li.dropdown-header.burger-session {:key k}
    [:span.burger-session-label label]
@@ -131,6 +152,7 @@
       [:span.glyphicon.glyphicon-menu-hamburger {:aria-hidden "true"}]
       [:span.sr-only (i18n/t :nav/menu)]]
      [:ul.dropdown-menu.dropdown-menu-right
+      (burger-page-items)
       (when connected?
         (list
           (when-let [entity @connection/connected-entity*]
@@ -159,22 +181,26 @@
 
 (defn- navigation-render []
   [:nav.navbar.navbar-inverse
-   [:div.container-fluid
-    [:div.navbar-header
-     [external-link zhdk-url
-      [zhdk-logo]
-      {:class "navbar-brand navbar-brand-logo"}]
-     [external-link github-repo-url "Madek-Exporter"
-      {:class "navbar-brand"}]]
-    [:ul.navbar-nav.nav
-     [connection/status-icon-component]
-     [nav-item "/connection" (i18n/t :nav/connection)]
-     [export-nav-item]
-     [nav-item "/debug" (i18n/t :nav/debug)]
-     [nav-item "/help" (i18n/t :nav/help)]]
-    [:ul.nav.navbar-nav.navbar-right
-     [language-menu]
-     [burger-menu]]]])
+   [:div.container-fluid.navbar-bar
+    [:div.navbar-line.navbar-line-main
+     [:div.navbar-header
+      [external-link zhdk-url
+       [zhdk-logo]
+       {:class "navbar-brand navbar-brand-logo"}]
+      [external-link github-repo-url "Madek-Exporter"
+       {:class "navbar-brand"}]]
+     [:ul.nav.navbar-nav.navbar-status
+      [connection/status-icon-component]]
+     [:ul.nav.navbar-nav.navbar-language
+      [language-menu]]
+     [:ul.nav.navbar-nav.navbar-burger
+      [burger-menu]]]
+    [:div.navbar-line.navbar-line-pages
+     [:ul.nav.navbar-nav.navbar-pages
+      [nav-item "/connection" (i18n/t :nav/connection)]
+      [export-nav-item]
+      [nav-item "/debug" (i18n/t :nav/debug)]
+      [nav-item "/help" (i18n/t :nav/help)]]]]])
 
 (defn naviagation []
   (reagent/create-class
