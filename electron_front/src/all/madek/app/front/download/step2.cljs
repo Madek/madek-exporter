@@ -400,10 +400,6 @@
         open? (and loaded? @prefix-dropdown-open*)]
     [:div.form-group.prefix-picker
      {:class (when open? "open")}
-     [:div.prefix-dropdown-headers
-      [:span (column-label :download/vocabulary)]
-      [:span (column-label :download/meta-key)]
-      [:span (i18n/t :download/available-prefixes-value)]]
      [:div.prefix-dropdown-control
       [prefix-options-status-icon status]
       [:button.btn.btn-default.form-control.prefix-dropdown-toggle
@@ -421,24 +417,14 @@
        [:span.caret]]
       [:button.btn.btn-default.prefix-refresh
        {:type :button
-        :title (if (= :loading status)
-                 (i18n/t :download/prefix-pause)
-                 (i18n/t :download/prefix-refresh))
-        :aria-label (if (= :loading status)
-                      (i18n/t :download/prefix-pause)
-                      (i18n/t :download/prefix-refresh))
+        :title (i18n/t :download/prefix-refresh)
+        :aria-label (i18n/t :download/prefix-refresh)
+        :disabled (= :loading status)
         :on-click (fn [e]
                     (.preventDefault e)
                     (.stopPropagation e)
-                    (if (= :loading (:status @prefix-options*))
-                      (abort-prefix-options-request!
-                       (if (seq (:options @prefix-options*)) :loaded :idle))
-                      (load-prefix-options true)))}
-       [:span.glyphicon
-        {:class (if (= :loading status)
-                  "glyphicon-pause"
-                  "glyphicon-refresh")
-         :aria-hidden "true"}]]]
+                    (load-prefix-options true))}
+       [:span.glyphicon.glyphicon-refresh {:aria-hidden "true"}]]]
      (when open?
        [prefix-dropdown-menu])
      [prefix-example-component]
