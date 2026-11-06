@@ -214,11 +214,12 @@ const fakeSetMediaEntryIds = [
 
 /** HTTP log lines during POST /download against the fake API (see export_fake_api_test.clj). */
 const fakeExportLogCounts = {
-  mediaEntryMetadata: 12,
-  mediaEntryWithFile: 14,
-  setMetadata: 23,
-  /** v1 schema (5) + v2 schema (2) + v1 entry (7) + v2 entry (3) — see export_fake_api_test */
-  mediaEntryBothApis: 17,
+  mediaEntryMetadata: 14,
+  mediaEntryWithFile: 16,
+  setMetadata: 25,
+  /** v1 schema + v2 schema + v1 entry + v2 entry — see export_fake_api_test.
+   *  +2 versus the single-key fixture: subtitle is fetched from both meta-key lists. */
+  mediaEntryBothApis: 19,
 };
 
 /** @returns {string} empty directory for an export run */

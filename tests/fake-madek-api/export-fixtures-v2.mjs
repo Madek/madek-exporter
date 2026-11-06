@@ -29,6 +29,18 @@ export function metaKeyTitleV2() {
   };
 }
 
+/** Text key with no value on the fake entries. */
+export function metaKeySubtitleV2() {
+  return {
+    id: 'madek_core:subtitle',
+    vocabulary_id: 'madek_core',
+    label: 'Subtitle',
+    position: 1,
+    labels: { en: 'Subtitle', de: 'Untertitel' },
+    meta_datum_object_type: 'MetaDatum::Text',
+  };
+}
+
 /** @param {{ id: string, title: string }} entry */
 export function mediaEntryV2(entry) {
   return {

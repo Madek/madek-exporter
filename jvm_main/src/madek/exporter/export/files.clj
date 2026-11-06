@@ -18,26 +18,28 @@
 ;### title and prefix #########################################################
 
 (defn get-prefix [prefix-meta-key media-resource]
-  (-> media-resource
-      (roa/relation :meta-data)
-      (roa/get {:meta_keys (cheshire/generate-string [(str prefix-meta-key)])})
-      roa/coll-seq
-      first
-      (roa/get {})
-      roa/data
-      :value str))
+  "Text value of prefix-meta-key, or nil when the entity has no such datum."
+  (when-let [meta-datum (-> media-resource
+                            (roa/relation :meta-data)
+                            (roa/get {:meta_keys (cheshire/generate-string
+                                                  [(str prefix-meta-key)])})
+                            roa/coll-seq
+                            first)]
+    (-> meta-datum (roa/get {}) roa/data :value str)))
 
 (defn useableFileName [s]
   "Keep letters, digits, and spaces in a folder-name prefix."
   (.replaceAll (str s) "[^a-zA-Z0-9 ]" ""))
 
 (defn path-prefix [prefix-meta-key media-resource]
-  "Folder name: optional sanitized meta-key value, then the resource id."
-  (let [prefix-part-one (if-not (presence prefix-meta-key) ""
-                                (if-let [mk-value (get-prefix
-                                                   prefix-meta-key media-resource)]
-                                  (str (useableFileName mk-value) "_") ""))]
-    (str prefix-part-one (-> media-resource roa/data :id))))
+  "Folder name: sanitized meta-key value plus id, `_` plus id when the key is
+  set but empty, or the bare id when no prefix key is selected."
+  (let [id (-> media-resource roa/data :id)]
+    (if-not (presence prefix-meta-key)
+      (str id)
+      (if-let [v (presence (get-prefix prefix-meta-key media-resource))]
+        (str (useableFileName v) "_" id)
+        (str "_" id)))))
 
 ;### Progress-aware copy ######################################################
 

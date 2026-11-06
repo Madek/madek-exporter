@@ -67,10 +67,40 @@ async function connectWithToken(page, token, url) {
   await connectButton(page).click();
 }
 
+/** Visible label of an API-mode menu entry (English UI). */
+const API_MODE_LABEL = {
+  api: /^api \(\/api\)/,
+  'api-v2': /^api-v2 \(\/api-v2\)/,
+  both: /^both →/,
+};
+
+/** @param {import('@playwright/test').Page} page @param {'api' | 'api-v2' | 'both'} mode */
+function apiModeOption(page, mode) {
+  return page.locator('.api-mode-picker [role="option"]').filter({
+    hasText: API_MODE_LABEL[mode],
+  });
+}
+
+/** @param {import('@playwright/test').Page} page @param {'api' | 'api-v2' | 'both'} mode */
+function apiModeItem(page, mode) {
+  return page.locator('.api-mode-picker li').filter({ hasText: API_MODE_LABEL[mode] });
+}
+
+/** @param {import('@playwright/test').Page} page */
+async function openApiModeMenu(page) {
+  const toggle = page.locator('#api-mode');
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+  }
+  await expect(page.locator('.api-mode-picker .dropdown-menu')).toBeVisible();
+}
+
 /** @param {import('@playwright/test').Page} page @param {'api' | 'api-v2' | 'both'} mode */
 async function setExportApiMode(page, mode) {
-  const select = page.locator('#api-mode');
-  await expect(select).toBeVisible();
+  await openApiModeMenu(page);
+  const option = apiModeOption(page, mode);
+  await expect(option).toBeVisible();
   await Promise.all([
     page.waitForResponse(
       (r) =>
@@ -79,8 +109,9 @@ async function setExportApiMode(page, mode) {
         r.ok(),
       { timeout: 15_000 }
     ),
-    select.selectOption(mode),
+    option.click(),
   ]);
+  await expect(page.locator('#api-mode')).toContainText(API_MODE_LABEL[mode]);
 }
 
 /** @param {import('@playwright/test').Page} page */
@@ -289,6 +320,7 @@ module.exports = {
   useLoginTab,
   connectWithToken,
   connectWithLogin,
+  exportNavItem,
   expectExportDisabled,
   expectExportEnabled,
   dismissConnectionError,
@@ -299,4 +331,8 @@ module.exports = {
   exportFakeSet,
   expectExportDownloadLogCount,
   setExportApiMode,
+  openApiModeMenu,
+  apiModeOption,
+  apiModeItem,
+  API_MODE_LABEL,
 };
