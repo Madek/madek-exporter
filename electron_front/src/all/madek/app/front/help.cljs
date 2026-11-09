@@ -1,6 +1,7 @@
 (ns madek.app.front.help
   (:require
     [clojure.string :as string]
+    [madek.app.front.about :as about]
     [madek.app.front.breadcrumb :as breadcrumb]
     [madek.app.front.i18n :as i18n]
     [madek.app.front.release :as release]
@@ -11,7 +12,7 @@
 
 (def prefix-examples-id "prefix-examples")
 
-(defonce selected-section* (reagent/atom "help-version"))
+(defonce selected-section* (reagent/atom about/section-id))
 
 (defonce toc-collapsed* (reagent/atom false))
 
@@ -184,7 +185,8 @@
                                            "support.medienarchiv@zhdk.ch"]]])
 
 (def ^:private toc-sections
-  [["help-version" :help/version-and-os version-and-os-component]
+  [[about/section-id :about/title about/section]
+   ["help-version" :help/version-and-os version-and-os-component]
    ["help-login-variants" :help/login-variants login-variants-component]
    [prefix-examples-id :help/prefix-examples prefix-examples-component]
    ["help-references" :help/references references-component]
@@ -194,7 +196,7 @@
   (or (some (fn [[section-id _ component]]
               (when (= section-id id) component))
             toc-sections)
-      version-and-os-component))
+      about/section))
 
 (defn toc-component []
   (let [collapsed? @toc-collapsed*

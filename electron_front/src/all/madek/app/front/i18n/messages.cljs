@@ -252,7 +252,6 @@
    :about/electron-components "Electron Components"
    :about/nodejs-version "node.js version: "
    :about/electron-version "Electron version: "
-   :about/electron-modules "Electron modules"
    :about/chrome-version "Chrome version: "
 
    ;; debug chrome
@@ -527,7 +526,6 @@
    :about/electron-components "Electron-Komponenten"
    :about/nodejs-version "node.js-Version: "
    :about/electron-version "Electron-Version: "
-   :about/electron-modules "Electron-Module"
    :about/chrome-version "Chrome-Version: "
 
    :debug/title "Debug"
@@ -801,7 +799,6 @@
    :about/electron-components "Composants Electron"
    :about/nodejs-version "Version node.js : "
    :about/electron-version "Version Electron : "
-   :about/electron-modules "Modules Electron"
    :about/chrome-version "Version Chrome : "
 
    :debug/title "Debug"
@@ -1060,7 +1057,6 @@
    :about/electron-components "Componenti Electron"
    :about/nodejs-version "Versione node.js: "
    :about/electron-version "Versione Electron: "
-   :about/electron-modules "Moduli Electron"
    :about/chrome-version "Versione Chrome: "
 
    :debug/title "Debug"
@@ -1319,7 +1315,6 @@
    :about/electron-components "Componentes de Electron"
    :about/nodejs-version "Versión de node.js: "
    :about/electron-version "Versión de Electron: "
-   :about/electron-modules "Módulos de Electron"
    :about/chrome-version "Versión de Chrome: "
 
    :debug/title "Debug"
@@ -1578,7 +1573,6 @@
    :about/electron-components "Electron 组件"
    :about/nodejs-version "node.js 版本："
    :about/electron-version "Electron 版本："
-   :about/electron-modules "Electron 模块"
    :about/chrome-version "Chrome 版本："
 
    :debug/title "调试"

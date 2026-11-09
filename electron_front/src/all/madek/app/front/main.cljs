@@ -126,7 +126,6 @@
       ^{:key "export"} [burger-page "/download" (i18n/t :nav/export) (not export-ready?)]
       (when (= env/env :dev)
         ^{:key "debug"} [burger-page "/debug" (i18n/t :nav/debug) false])
-      ^{:key "about"} [burger-page "/about" (i18n/t :about/title) false]
       ^{:key "help"} [burger-page "/help" (i18n/t :nav/help) false]
       [:li.divider.burger-page {:key "pages-divider" :role "separator"}])))
 
@@ -201,7 +200,6 @@
       [export-nav-item]
       (when (= env/env :dev)
         [nav-item "/debug" (i18n/t :nav/debug)])
-      [nav-item "/about" (i18n/t :about/title)]
       [nav-item "/help" (i18n/t :nav/help)]]]]])
 
 (defn navigation []
