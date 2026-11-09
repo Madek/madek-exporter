@@ -1,1 +1,22 @@
-../prod/index.html
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- Dev only: CLJS :none / Figwheel need inline scripts + eval. Prod keeps a strict CSP. -->
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem: file:; script-src * 'unsafe-inline' 'unsafe-eval' blob: file:; connect-src * ws: wss: http: https:; img-src * data: blob: file:; style-src * 'unsafe-inline' file:; font-src * data: file:;">
+    <link rel="stylesheet" type="text/css" href="css/site.css">
+    <title>Madek-Exporter</title>
+  </head>
+  <body>
+    <div id="app">
+      <p>Loading ...</p>
+    </div>
+    <!-- Fallback if preload did not expose process (e.g. non-Electron). -->
+    <script>
+      if (typeof process === "undefined") {
+        window.process = { env: {}, platform: "" };
+      }
+    </script>
+    <script type="text/javascript" src="js/front.js" charset="utf-8"></script>
+  </body>
+</html>

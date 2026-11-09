@@ -61,7 +61,9 @@
                            {:preload preload-path
                             :nodeIntegration false
                             :contextIsolation true
-                            :sandbox true
+                            ;; Sandbox + strict CSP breaks CLJS :none (eval/document.write).
+                            ;; Keep sandbox for packaged prod builds only.
+                            :sandbox (not= env/env :dev)
                             :devTools (= env/env :dev)}}))
         index-html-path (str env/app-dir "/index.html")
         shown? (atom false)

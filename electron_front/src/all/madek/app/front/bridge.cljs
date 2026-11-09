@@ -1,29 +1,41 @@
 (ns madek.app.front.bridge
-  "Renderer access to Electron via contextBridge preload (`window.madek`).")
+  "Renderer access to Electron via contextBridge preload (`window.madekBridge`).
+  Named madekBridge (not madek) so it does not collide with the CLJS ns root.")
 
 (defn api []
-  (.-madek js/window))
+  (.-madekBridge js/window))
+
+(defn- with-api [f]
+  (if-let [a (api)]
+    (f a)
+    (js/console.error "window.madekBridge missing; is preload.js loaded?")))
 
 (defn choose-directory [default-path]
-  (.chooseDirectory (api) (or default-path "")))
+  (with-api #(.chooseDirectory % (or default-path ""))))
 
 (defn open-external [url]
-  (.openExternal (api) url))
+  (with-api #(.openExternal % url)))
 
 (defn open-path [dir]
-  (.openPath (api) dir))
+  (with-api #(.openPath % dir)))
 
 (defn on-jvm-sync-init [handler]
-  (.onJvmSyncInit (api) handler))
+  (with-api #(.onJvmSyncInit % handler)))
 
 (defn on-navigate [handler]
-  (.onNavigate (api) handler))
+  (with-api #(.onNavigate % handler)))
 
 (defn on-db-full [handler]
-  (.onDbFull (api) handler))
+  (with-api #(.onDbFull % handler)))
 
 (defn on-db-patch [handler]
-  (.onDbPatch (api) handler))
+  (with-api #(.onDbPatch % handler)))
 
 (defn versions []
-  (js->clj (.getVersions (api)) :keywordize-keys true))
+  (or (with-api #(js->clj (.getVersions %) :keywordize-keys true))
+      {}))
+
+(defn platform []
+  (or (with-api #(.platform %))
+      (some-> (aget js/window "navigator") .-platform)
+      ""))

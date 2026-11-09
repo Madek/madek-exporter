@@ -3,6 +3,9 @@
 /**
  * Minimal bridge for the renderer. Keep nodeIntegration off and expose only
  * the IPC/shell helpers the ClojureScript UI needs.
+ *
+ * IMPORTANT: do not expose as `window.madek` — that collides with the CLJS
+ * namespace root `madek.app.front.*` and breaks goog.provide under :none.
  */
 const { contextBridge, ipcRenderer, shell } = require('electron');
 
@@ -12,7 +15,18 @@ function on(channel, handler) {
   return () => ipcRenderer.removeListener(channel, listener);
 }
 
-contextBridge.exposeInMainWorld('madek', {
+// CLJS `:none` bootstraps `process.env` (assigns NODE_ENV). With
+// nodeIntegration off there is no Node `process` in the page — provide a
+// tiny mutable stub so goog.require("process.env") does not throw.
+contextBridge.exposeInMainWorld('process', {
+  env: {
+    NODE_ENV: process.env.NODE_ENV || 'development',
+    MADEK_E2E: process.env.MADEK_E2E || '',
+  },
+  platform: process.platform,
+});
+
+contextBridge.exposeInMainWorld('madekBridge', {
   chooseDirectory(defaultPath) {
     return ipcRenderer.invoke('madek:choose-directory', defaultPath || '');
   },
@@ -45,7 +59,9 @@ contextBridge.exposeInMainWorld('madek', {
       electron: process.versions.electron,
       chrome: process.versions.chrome,
       node: process.versions.node,
-      versions: { ...process.versions },
     };
+  },
+  platform() {
+    return process.platform;
   },
 });
