@@ -4,11 +4,23 @@ const path = require('path');
 const { _electron: electron } = require('@playwright/test');
 
 const repoRoot = path.join(__dirname, '../..');
-const appDevDir = 'app/dev';
+const appMode = process.env.MADEK_E2E_APP === 'prod' ? 'prod' : 'dev';
+const appDir = `app/${appMode}`;
 const userDataRoot = path.join(repoRoot, 'tmp/e2e-electron-user-data');
 // The router rewrites the URL to e.g. file:///connection, so page.reload()
 // would load a non-existent file; always go back to the real entry page.
-const indexUrl = `file://${path.join(fs.realpathSync(repoRoot), appDevDir, 'index.html')}`;
+const indexUrl = `file://${path.join(fs.realpathSync(repoRoot), appDir, 'index.html')}`;
+/** Dev Electron JVM password (`electron_main/.../dev/env.cljs`). */
+const jvmBasicAuth =
+  'Basic ' + Buffer.from(`e2e:${process.env.MADEK_JVM_PASSWORD || 'secret'}`).toString('base64');
+
+function jvmFetch(url, opts = {}) {
+  const headers = {
+    ...(opts.headers || {}),
+    Authorization: jvmBasicAuth,
+  };
+  return fetch(url, { ...opts, headers });
+}
 
 /**
  * Dev Electron uses a fixed JVM port (8383) by default; a running dev app or a
@@ -80,7 +92,7 @@ async function launchMadekExporter() {
     executablePath: electronPath,
     // Match README: `npx electron app/dev` from repo root (main.js resolves ./app/dev/...).
     args: [
-      appDevDir,
+      appDir,
       `--user-data-dir=${userDataDir}`,
       '--lang=en-US',
       // CI containers have no usable setuid chrome-sandbox.
@@ -90,7 +102,9 @@ async function launchMadekExporter() {
     env: {
       ...process.env,
       MADEK_E2E: '1',
+      MADEK_ELECTRON_NO_SANDBOX: process.platform === 'linux' ? '1' : '',
       MADEK_JVM_PORT: String(jvmPort),
+      MADEK_JVM_PASSWORD: process.env.MADEK_JVM_PASSWORD || 'secret',
       MADEK_USER_DATA_DIR: userDataDir,
       LANG: 'en_US.UTF-8',
       ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
@@ -110,7 +124,7 @@ async function launchMadekExporter() {
 async function closeMadekExporter(app, jvmPort) {
   const proc = app.process();
   if (jvmPort) {
-    await fetch(`http://127.0.0.1:${jvmPort}/shutdown`, { method: 'POST' }).catch(
+    await jvmFetch(`http://127.0.0.1:${jvmPort}/shutdown`, { method: 'POST' }).catch(
       () => {}
     );
   }
@@ -134,10 +148,10 @@ async function closeMadekExporter(app, jvmPort) {
  * @param {number} jvmPort
  */
 async function resetSession(page, jvmPort) {
-  await fetch(`http://127.0.0.1:${jvmPort}/download`, { method: 'DELETE' }).catch(
+  await jvmFetch(`http://127.0.0.1:${jvmPort}/download`, { method: 'DELETE' }).catch(
     () => {}
   );
-  await fetch(`http://127.0.0.1:${jvmPort}/connect`, { method: 'DELETE' }).catch(
+  await jvmFetch(`http://127.0.0.1:${jvmPort}/connect`, { method: 'DELETE' }).catch(
     () => {}
   );
   await page.goto(indexUrl);
@@ -229,8 +243,11 @@ function createE2eExportDir() {
 
 module.exports = {
   repoRoot,
-  appDevDir: path.join(repoRoot, appDevDir),
+  appMode,
+  appDevDir: path.join(repoRoot, appDir),
   indexUrl,
+  jvmFetch,
+  jvmBasicAuth,
   getFakeBaseUrl,
   fakeMediaEntryId,
   fakeMediaEntryTitle,
