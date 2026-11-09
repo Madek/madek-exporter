@@ -3,46 +3,32 @@
 
   (:require
 
-   [cheshire.core :as cheshire]
-   [clj-http.client :as http-client]
    [clj-logging-config.log4j :as logging-config]
    [clojure.data.json :as json]
-   [clojure.string :as string]
-
-   [clojure.pprint :refer [pprint]]
    [clojure.tools.logging :as logging]
    [compojure.core :refer [ANY GET PATCH POST DELETE defroutes]]
    [compojure.route :refer [not-found resources]]
-   [environ.core :refer [env]]
-   [hiccup.core :refer [html]]
-   [hiccup.page :refer [include-js include-css]]
-   [inflections.core :refer [capitalize]]
    [json-roa.client.core :as roa]
    [logbug.catcher :as catcher]
-   [logbug.debug :as debug :refer [I> I>>]]
+   [logbug.debug :as debug :refer [I>]]
    [logbug.ring :as logbug-ring :refer [wrap-handler-with-logging]]
-   [logbug.thrown :as thrown]
    [madek.exporter.api :as api]
-   [madek.exporter.api-v2 :as api-v2]
    [madek.exporter.connection :as connection]
-
    [madek.exporter.export :as export]
    [madek.exporter.export.api-v2 :as export-api-v2]
    [madek.exporter.export.compare :as export-compare]
-   [madek.exporter.export.files :as export-files]
    [madek.exporter.export.meta-data-schema :as export-meta-data-schema]
    [madek.exporter.export.meta-keys :as export-meta-keys]
    [madek.exporter.export.control :as control]
    [madek.exporter.perf-log :as perf-log]
    [madek.exporter.request-log :as request-log]
+   [madek.exporter.server.prefix-options :as prefix-options]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils :refer [str keyword deep-merge presence]]
-   [taoensso.timbre :as timbre :refer [info]]
+   [taoensso.timbre :refer [info]]
    [ring.middleware.defaults :refer [site-defaults wrap-defaults]]
    [ring.middleware.json]
-   [ring.util.response :refer [response]])
-  (:import
-   [java.util.concurrent ExecutionException Executors ExecutorService Future]))
+   [ring.util.response :refer [response]]))
 
 ;### download entity ##########################################################
 
@@ -97,26 +83,6 @@
                 target-dir)
          {:status 204}))))
 
-;(pprint @state/db)
-
-;### set options ##############################################################
-
-(defonce prefix-options-generation (atom 0))
-
-(defn abort-prefix-options!
-  "Invalidate an in-flight prefix-options walk so it stops calling Madek.
-  Returns the new generation."
-  []
-  (swap! prefix-options-generation inc))
-
-(defn prefix-options-aborted?
-  [gen]
-  (not= gen @prefix-options-generation))
-
-(defn- throw-unless-prefix-options-current! [gen]
-  (when (prefix-options-aborted? gen)
-    (throw (ex-info "Prefix options aborted" {:type :prefix-options-aborted}))))
-
 (defn patch-download [request]
   (catcher/snatch
    {:return-fn (fn [e]
@@ -129,7 +95,7 @@
                 body)]
      (when (or (true? (:step2-completed body))
                (false? (:step1-completed body)))
-       (abort-prefix-options!))
+       (prefix-options/abort!))
      (when (nil? (:logs body))
        (request-log/clear!))
      (swap! state/db
@@ -276,7 +242,7 @@
   (catcher/snatch
    {:return-fn (fn [e]
                  (mark-download-failed! e)
-                 {:status 500 :body (thrown/stringify e)})
+                 {:status 500 :body (client-error-body e)})
     :throwable Throwable}
    (stop-download-work!)
    (reset-download-progress!)
@@ -370,173 +336,6 @@
     (System/exit 0))
   {:status 202 :body {:message "Shutting down."}})
 
-;##############################################################################
-
-(defn- api-root
-  "JSON-ROA `/api` root for wizard walks that still use v1 (step 1, and
-  prefix-options when export mode is `:api` or `:both`)."
-  []
-  (roa/get-root (state/connection-entry-point)
-                :default-conn-opts (state/connection-http-options)
-                :default-middleware perf-log/middleware))
-
-;; Stays within the shared pool's per-route limit (utils/make-http-conn-manager).
-(def ^:private prefix-options-concurrency 6)
-
-(defonce ^:private prefix-options-pool*
-  (atom (Executors/newFixedThreadPool (int prefix-options-concurrency))))
-
-(defn- parallel-mapv
-  "Like mapv, with at most `n` calls of `f` in flight on the shared pool.
-  Rethrows the first failure (unwrapped) and cancels the remaining tasks."
-  [n f items]
-  (if (empty? items)
-    []
-    (let [^ExecutorService pool @prefix-options-pool*
-          futs (mapv (fn [item]
-                       (.submit pool ^Callable (fn [] (f item))))
-                     items)]
-      (try
-        (mapv #(.get ^Future %) futs)
-        (catch ExecutionException e
-          (doseq [^Future fut futs] (.cancel fut true))
-          (throw (or (.getCause e) e)))))))
-
-(defn- roa-collection-data
-  ([gen resource relation-kw]
-   (roa-collection-data gen resource relation-kw {}))
-  ([gen resource relation-kw query]
-   (throw-unless-prefix-options-current! gen)
-   (let [rels (-> resource
-                  (roa/relation relation-kw)
-                  (roa/get query)
-                  roa/coll-seq
-                  vec)]
-     (parallel-mapv prefix-options-concurrency
-                    (fn [rel]
-                      (throw-unless-prefix-options-current! gen)
-                      (roa/data (roa/get rel {})))
-                    rels))))
-
-(defn- vocabulary-id-of [meta-key]
-  (or (presence (:vocabulary_id meta-key))
-      (some-> (:id meta-key) str (string/split #":" 2) first)))
-
-(defn- prefix-folder-name [entity-id value]
-  (if-let [v (presence value)]
-    (str (export-files/useableFileName v) "_" entity-id)
-    (str "_" entity-id)))
-
-(defn- prefix-options-rows
-  "Join text meta-keys with entity values into the dropdown row shape."
-  [id vocabs values meta-keys]
-  (->> meta-keys
-       (filter #(= "MetaDatum::Text" (:meta_datum_object_type %)))
-       (map (fn [mk]
-              (let [vid (vocabulary-id-of mk)
-                    voc (get vocabs vid)
-                    value (get values (:id mk))]
-                {:vocabulary_id vid
-                 :vocabulary_label (or (:label voc) vid)
-                 :vocabulary_position (or (:position voc) 0)
-                 :meta_key_id (:id mk)
-                 :meta_key_label (or (:label mk) (:id mk))
-                 :meta_key_position (or (:position mk) 0)
-                 :value value
-                 :folder_name (prefix-folder-name id value)})))
-       (sort-by (juxt :vocabulary_position
-                      :meta_key_position
-                      :vocabulary_label
-                      :meta_key_label))
-       vec))
-
-(defn- prefix-options-via-api
-  "ROA walk over `/api` (parallel member GETs)."
-  [gen id entity-type title]
-  (let [root (api-root)
-        vocabs (->> (roa-collection-data gen root :vocabularies)
-                    (map (juxt :id identity))
-                    (into {}))
-        entity (do (throw-unless-prefix-options-current! gen)
-                   (-> root
-                       (roa/relation (keyword entity-type))
-                       (roa/get {:id id})))
-        values (->> (roa-collection-data gen entity :meta-data)
-                    (filter #(= "MetaDatum::Text" (:type %)))
-                    (map (juxt :meta_key_id :value))
-                    (into {}))
-        options (prefix-options-rows
-                 id vocabs values
-                 (roa-collection-data gen root :meta-keys))]
-    (throw-unless-prefix-options-current! gen)
-    (response {:entity_id id
-               :entity_title title
-               :options options})))
-
-(defn- prefix-options-via-api-v2
-  "Plain JSON walk over `/api-v2` (paginated lists + entity meta-data)."
-  [gen id entity-type title]
-  (let [base-url (api/entry-point :api-v2)
-        http-opts (state/connection-http-options)
-        _ (throw-unless-prefix-options-current! gen)
-        vocabs (->> (api-v2/vocabularies base-url http-opts)
-                    (map (juxt :id identity))
-                    (into {}))
-        _ (throw-unless-prefix-options-current! gen)
-        md-body (api-v2/get-json! base-url
-                                  (api-v2/meta-data-path entity-type id)
-                                  http-opts
-                                  nil)
-        values (->> (or (:meta_data md-body) [])
-                    (filter #(= "MetaDatum::Text" (:type %)))
-                    (map (juxt :meta_key_id :string))
-                    (into {}))
-        _ (throw-unless-prefix-options-current! gen)
-        options (prefix-options-rows
-                 id vocabs values
-                 (api-v2/meta-keys base-url http-opts))]
-    (throw-unless-prefix-options-current! gen)
-    (response {:entity_id id
-               :entity_title title
-               :options options})))
-
-(defn- prefix-options-api-mode
-  "Export API mode for the prefix picker.
-
-  Rules: `:api` → `/api`, `:api-v2` → `/api-v2`, `:both` → `/api`.
-  Prefer `?api-mode=` from the UI when present so the fetch matches the
-  picker even if connection state has not caught up yet."
-  [request]
-  (api/normalize-mode
-   (or (get-in request [:params :api-mode])
-       (get-in request [:query-params :api-mode])
-       (api/current-mode))))
-
-(defn prefix-options
-  "All text meta-keys from the Madek catalog, joined with the step-1 entity's
-  values. API selection: api → `/api`, api-v2 → `/api-v2`, both → `/api`.
-  ROA member GETs run in parallel (see `prefix-options-concurrency`)."
-  [request]
-  (catcher/snatch
-   {:return-fn (fn [e]
-                 (if (= :prefix-options-aborted (:type (ex-data e)))
-                   {:status 499 :body {:aborted true}}
-                   {:status 500 :body (client-error-body e)}))}
-   (let [{id :uuid entity-type :type title :title} (-> @state/db :download :entity)
-         api-mode (prefix-options-api-mode request)]
-     (if-not id
-       {:status 409 :body {:message "No export entity selected (step 1)."}}
-       (let [gen (abort-prefix-options!)]
-         (info "prefix-options" {:api-mode api-mode
-                                 :entity-id id
-                                 :entity-type entity-type})
-         (case api-mode
-           :api-v2 (prefix-options-via-api-v2 gen id entity-type title)
-           ;; :api and :both
-           (prefix-options-via-api gen id entity-type title)))))))
-
-;##############################################################################
-
 (defroutes routes
 
   (DELETE "/download" _ #'delete-download)
@@ -562,7 +361,7 @@
 
   (POST "/download/step1" _ #'download-step1)
 
-  (GET "/download/prefix-options" _ #'prefix-options)
+  (GET "/download/prefix-options" _ #'prefix-options/handler)
 
   (GET "/debug/performance" _ (response {:entries (perf-log/entries)}))
 
