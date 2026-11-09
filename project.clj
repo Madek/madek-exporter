@@ -171,7 +171,6 @@
                          :target :nodejs
                          :output-dir "app/prod/js/out_main"
                          :optimizations :advanced
-                         :source-map false
                          :pretty-print false
                          :output-wrapper true}}
              :electron-front-dev
@@ -203,7 +202,6 @@
                          :elide-asserts true
                          :output-dir "app/prod/js/out_front"
                          :optimizations :advanced
-                         :source-map false
                          :pretty-print false
                          :output-wrapper true}}
              :uberjar {
