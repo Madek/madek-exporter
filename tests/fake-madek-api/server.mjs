@@ -474,10 +474,34 @@ function handleExportStubsReady(req, res, path) {
   return true;
 }
 
+/** In-memory access log for JVM/fake-server tests (not part of Madek). */
+const recordedRequests = [];
+
+function recordRequest(method, path) {
+  if (path === '/_test/requests' || path.startsWith('/_test/')) return;
+  recordedRequests.push({ method, path });
+}
+
+function handleTestRequests(req, res, path) {
+  if (path !== '/_test/requests') return false;
+  if (req.method === 'GET') {
+    sendJson(res, 200, { requests: recordedRequests.slice() });
+    return true;
+  }
+  if (req.method === 'DELETE') {
+    recordedRequests.length = 0;
+    sendJson(res, 200, { cleared: true });
+    return true;
+  }
+  return false;
+}
+
 const server = http.createServer((req, res) => {
   const path = req.url?.split('?')[0] ?? '';
   console.log(`${LOG} ${req.method} ${path}`);
+  recordRequest(req.method, path);
 
+  if (handleTestRequests(req, res, path)) return;
   if (handleExportStubsReady(req, res, path)) return;
   if (handleApiV1(req, res, path)) return;
   if (handleApiV2(req, res, path)) return;

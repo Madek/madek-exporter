@@ -13,12 +13,13 @@
    [java.net URI]
    [org.apache.commons.lang3 SystemUtils]))
 
-;; Sized for parallel media-entry downloads (concurrency 4).
+;; Sized for parallel media-entry downloads (concurrency 4) and the step-2
+;; prefix-options lookups (concurrency 6).
 (defn- make-http-conn-manager []
   (conn-mgr/make-reusable-conn-manager
    {:timeout 5
     :threads 8
-    :default-per-route 4}))
+    :default-per-route 6}))
 
 (defonce ^:private http-conn-manager
   (atom (make-http-conn-manager)))
