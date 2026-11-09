@@ -2,14 +2,19 @@
 
 Desktop application for exporting data from Madek.
 
+Export can use Madek `/api` (JSON-ROA), `/api-v2` (REST), or **both** (writes into `api/` and `api-v2/` subfolders). After login, the UI probes both APIs and lets you pick the export mode.
+
+The **shipped app version** is the first entry in `releases.yml` (not the `version` field in root `package.json`, which may lag).
+
 ## Setup
 
-Requires `mise`, Git, Leiningen, and npm.
+Requires `mise` (Java 21, Node 22, Ruby), Git, and npm. Leiningen is invoked via `./bin/lein` (mise does not manage `lein` itself).
 
 ```zsh
 mise install
 git submodule update --init --recursive vendor
 npm install
+bundle install
 ```
 
 ## Build and run
@@ -58,7 +63,7 @@ Manual setup:
 npx electron app/dev
 ```
 
-(Electron spawns the JVM backend on port 8383; a separate `lein run -m madek.exporter.main server` is only needed without Electron.)
+(Electron spawns the JVM backend on port 8383 with a local Basic Auth password; a separate `./bin/lein run -m madek.exporter.main server` is only needed without Electron.)
 
 ## Testing
 
@@ -74,14 +79,33 @@ JVM connect/probe tests against the fake server:
 npm run test:login
 ```
 
-Playwright Electron UI tests (starts fake server automatically):
+Local JVM Basic Auth / path-sanitization unit tests:
+
+```zsh
+./bin/with-java21 lein with-profile test test :only madek.exporter.http-auth-test
+```
+
+Playwright Electron UI tests (starts fake server automatically; uses `app/dev`):
 
 ```zsh
 ./bin/build-electron-dev   # once, if app/dev artifacts are missing
 npm run test:e2e
 ```
 
-Run both:
+Optional smoke against advanced-compiled `app/prod` (not run in Cider-CI by default):
+
+```zsh
+npm run build:electron:prod && npm run build:jvm:prod
+npm run test:e2e:prod
+```
+
+Dependency audit (npm + OSV; Cider-CI `security-audit` job fails on findings):
+
+```zsh
+npm run audit:security
+```
+
+Run login + default e2e:
 
 ```zsh
 npm test
@@ -131,9 +155,13 @@ Open the printed draft URL (`https://github.com/Madek/madek-exporter/releases/ne
 ## macOS signing / notarization
 
 CI builds unsigned zips for distribution inside ZHdK. For public Gatekeeper
-installs, notarize the `.app` with your Apple Developer ID after packaging
-(`codesign` + `notarytool` / `xcrun notarytool`). This repo does not automate
-notarization yet.
+installs, notarize a packaged `.app` with your Apple Developer ID after
+packaging. Helper (requires `APPLE_ID`, `APPLE_TEAM_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`):
+
+```zsh
+./bin/notarize-mac target/packages/madek-exporter-darwin-arm64/madek-exporter.app
+```
 
 ## License
 
