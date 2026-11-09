@@ -46,19 +46,36 @@
 
 ;### download entity ##########################################################
 
+(defn- client-error-body [e]
+  (let [msg (or (ex-message e) "Internal error")
+        typ (:type (ex-data e))]
+    (logging/error e "request failed")
+    (cond-> {:message msg}
+      typ (assoc :type typ))))
+
+(defn- coerce-target-directory! [path]
+  (try
+    (utils/validate-target-directory path)
+    (catch clojure.lang.ExceptionInfo e
+      (if (= :invalid-target-directory (:type (ex-data e)))
+        (throw e)
+        (throw e)))))
+
 (defn download-step1
   "Resolve entity title via Madek `/api` (JSON-ROA) only — independent of
   export `:api-mode` (including `:both` / api + api-v2)."
   [request]
   (catcher/snatch
-   {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
-   (let [http-options (-> @state/db :connection :http-options)
-         id (-> request :body :entity-id)
+   {:return-fn (fn [e]
+                 {:status (if (= :invalid-target-directory (:type (ex-data e))) 422 500)
+                  :body (client-error-body e)})}
+   (let [id (-> request :body :entity-id)
+         target-dir (coerce-target-directory! (-> request :body :target-directory))
          entity-type (case (-> request :body :entity-type)
                        "entry" :media-entry
                        "set" :collection)
          entity (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
-                                  :default-conn-opts (-> @state/db :connection :http-options)
+                                  :default-conn-opts (state/connection-http-options)
                                   :default-middleware perf-log/middleware)
                     (roa/relation entity-type)
                     (roa/get {:id id}))
@@ -77,7 +94,7 @@
                  :uuid id
                  :type entity-type
                  :url (-> request :body :url)}
-                (-> request :body :target-directory))
+                target-dir)
          {:status 204}))))
 
 ;(pprint @state/db)
@@ -102,8 +119,14 @@
 
 (defn patch-download [request]
   (catcher/snatch
-   {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
-   (let [body (:body request)]
+   {:return-fn (fn [e]
+                 {:status (if (= :invalid-target-directory (:type (ex-data e))) 422 500)
+                  :body (client-error-body e)})}
+   (let [body (:body request)
+         body (if (contains? body :target-directory)
+                (assoc body :target-directory
+                       (coerce-target-directory! (:target-directory body)))
+                body)]
      (when (or (true? (:step2-completed body))
                (false? (:step1-completed body)))
        (abort-prefix-options!))
@@ -146,7 +169,7 @@
            (deep-merge db
                        {:download
                         {:download-finished true
-                         :errors {:dowload-error (str e)}}}))
+                         :errors {:download-error (str e)}}}))
          e)
   (notify-download-ui!))
 
@@ -284,7 +307,7 @@
 
 (defn compare-download-data [_]
   (catcher/snatch
-   {:return-fn (fn [e] {:status 500 :body {:message (thrown/stringify e)}})
+   {:return-fn (fn [e] {:status 500 :body (client-error-body e)})
     :throwable Throwable}
    (let [mode (api/current-mode)]
      (if-not (= :both mode)
@@ -309,14 +332,18 @@
   {:status 204})
 
 (defn delete-download [_]
-  (swap! state/db (fn [db]
-                    (dissoc db :download :download-entity)))
+  (swap! state/db
+         (fn [db]
+           (-> db
+               (dissoc :download)
+               (assoc :download {:target-directory state/default-download-directory
+                                 :state :step1}))))
   {:status 204})
 
 ;##############################################################################
 
 (defn patch-download-parameters [request]
-  (logging/debug 'patch-download-parameters {:request request})
+  (logging/debug 'patch-download-parameters {:path (:uri request)})
   (swap! state/db
          (fn [db params]
            (deep-merge db
@@ -327,17 +354,21 @@
 ;##############################################################################
 
 (defn open [request]
-  (logging/debug request)
-  (utils/os-browse (-> request :body :uri))
-  {:status 201})
+  (let [uri (-> request :body :uri)
+        target (get-in @state/db [:download :target-directory])]
+    (if (utils/safe-uri-to-open? uri target)
+      (do (utils/os-browse uri)
+          {:status 201})
+      {:status 422
+       :body {:message "URI scheme not allowed."}})))
 
 ;##############################################################################
 
-(defn shutdown [request]
+(defn shutdown [_]
   (future
     (Thread/sleep 3000)
     (System/exit 0))
-  "Good Bye!")
+  {:status 202 :body {:message "Shutting down."}})
 
 ;##############################################################################
 
@@ -352,25 +383,24 @@
 ;; Stays within the shared pool's per-route limit (utils/make-http-conn-manager).
 (def ^:private prefix-options-concurrency 6)
 
+(defonce ^:private prefix-options-pool*
+  (atom (Executors/newFixedThreadPool (int prefix-options-concurrency))))
+
 (defn- parallel-mapv
-  "Like mapv, with at most `n` calls of `f` in flight. Rethrows the first
-  failure (unwrapped) and cancels the remaining tasks."
+  "Like mapv, with at most `n` calls of `f` in flight on the shared pool.
+  Rethrows the first failure (unwrapped) and cancels the remaining tasks."
   [n f items]
   (if (empty? items)
     []
-    (let [^ExecutorService pool (Executors/newFixedThreadPool
-                                 (int (min n (count items))))]
+    (let [^ExecutorService pool @prefix-options-pool*
+          futs (mapv (fn [item]
+                       (.submit pool ^Callable (fn [] (f item))))
+                     items)]
       (try
-        (let [futs (mapv (fn [item]
-                           (.submit pool ^Callable (fn [] (f item))))
-                         items)]
-          (try
-            (mapv #(.get ^Future %) futs)
-            (catch ExecutionException e
-              (doseq [^Future fut futs] (.cancel fut true))
-              (throw (or (.getCause e) e)))))
-        (finally
-          (.shutdownNow pool))))))
+        (mapv #(.get ^Future %) futs)
+        (catch ExecutionException e
+          (doseq [^Future fut futs] (.cancel fut true))
+          (throw (or (.getCause e) e)))))))
 
 (defn- roa-collection-data
   ([gen resource relation-kw]
@@ -491,7 +521,7 @@
    {:return-fn (fn [e]
                  (if (= :prefix-options-aborted (:type (ex-data e)))
                    {:status 499 :body {:aborted true}}
-                   {:status 500 :body (thrown/stringify e)}))}
+                   {:status 500 :body (client-error-body e)}))}
    (let [{id :uuid entity-type :type title :title} (-> @state/db :download :entity)
          api-mode (prefix-options-api-mode request)]
      (if-not id

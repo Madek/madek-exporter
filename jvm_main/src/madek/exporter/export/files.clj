@@ -11,7 +11,7 @@
    [madek.exporter.export.control :as control]
    [madek.exporter.export.progress :as progress]
    [madek.exporter.state :as state]
-   [madek.exporter.utils :refer [deep-merge presence]])
+   [madek.exporter.utils :as utils :refer [deep-merge presence]])
 
   (:import
    [java.io File InputStream OutputStream]))
@@ -115,7 +115,9 @@
         (let [preview (roa/get preview-rel {})
               preview-id (-> preview roa/data :id)
               preview-path (str previews-dir File/separator
-                                (-> preview roa/data :filename))
+                                (utils/safe-export-filename
+                                 (-> preview roa/data :filename)
+                                 preview-id))
               preview-response (-> preview
                                    (roa/relation :data-stream)
                                    (roa/get {} :mod-conn-opts #(assoc % :as :stream)))
@@ -149,10 +151,9 @@
                      (roa/relation :data-stream)
                      (roa/get {} :mod-conn-opts #(assoc % :as :stream)))
         content-length (header-content-length response)
-        file-name (let [filename (-> media-file roa/data :filename)]
-                    (if (clojure.string/blank? filename)
-                      media-file-id
-                      filename))
+        file-name (utils/safe-export-filename
+                   (-> media-file roa/data :filename)
+                   media-file-id)
         file-path (str target-dir File/separator file-name)]
     (swap! state/db
            (fn [db params]

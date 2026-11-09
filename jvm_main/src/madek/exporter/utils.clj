@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [str keyword])
   (:require
    [clj-http.conn-mgr :as conn-mgr]
+   [clojure.java.io :as io]
    [clojure.java.shell :refer [sh]]
    [clojure.string :as string]
    [json-roa.client.core :as roa]
@@ -11,6 +12,7 @@
   (:import
    [java.awt Desktop]
    [java.net URI]
+   [java.nio.file Paths]
    [org.apache.commons.lang3 SystemUtils]))
 
 ;; Sized for parallel media-entry downloads (concurrency 4) and the step-2
@@ -92,6 +94,107 @@
 (defn authenticated-http-options? [http-options]
   (boolean (or (:basic-auth http-options)
                (some-> http-options :headers (clojure.core/get "authorization") presence))))
+
+(defn redact-http-options
+  "Drop live secrets from maps that may be logged or pushed to clients."
+  [http-options]
+  (cond-> (or http-options {})
+    (get-in http-options [:headers "authorization"])
+    (assoc-in [:headers "authorization"] "***redacted***")
+    (:basic-auth http-options)
+    (assoc :basic-auth "***redacted***")
+    (:connection-manager http-options)
+    (dissoc :connection-manager)))
+
+(defn redact-connection
+  "Public connection snapshot for Sente / Debug (no Madek credentials)."
+  [connection]
+  (cond-> (dissoc (or connection {}) :http-options)
+    (:http-options connection)
+    (assoc :authenticated? (authenticated-http-options? (:http-options connection))
+           :http-options-present true)))
+
+(defn client-safe-db
+  "DB view for Electron clients — never includes Madek auth material."
+  [db]
+  (cond-> (or db {})
+    (contains? db :connection)
+    (update :connection redact-connection)))
+
+(def ^:private blocked-export-roots
+  #{"/" "/etc" "/usr" "/bin" "/sbin" "/System" "/Library" "/private"
+    "C:\\" "C:\\Windows" "C:\\Program Files" "C:\\Program Files (x86)"})
+
+(defn- nio-absolute [path]
+  (.normalize (.toAbsolutePath (Paths/get (str path) (into-array String [])))))
+
+(defn under-dir?
+  "True when `path` is `dir` or a descendant (after normalize)."
+  [dir path]
+  (let [dir-p (nio-absolute dir)
+        path-p (nio-absolute path)]
+    (.startsWith path-p dir-p)))
+
+(defn validate-target-directory
+  "Return canonical absolute path or throw ex-info {:type :invalid-target-directory}."
+  [path]
+  (let [raw (presence (some-> path str))]
+    (when-not raw
+      (throw (ex-info "Target directory is required."
+                      {:type :invalid-target-directory})))
+    (let [file (io/file raw)]
+      (when-not (.isAbsolute file)
+        (throw (ex-info "Target directory must be an absolute path."
+                        {:type :invalid-target-directory :path raw})))
+      (let [abs (.getCanonicalFile file)
+            abs-path (.getPath abs)
+            parent (.getParentFile abs)
+            home-path (.getPath (.getCanonicalFile
+                                 (io/file (System/getProperty "user.home"))))
+            tmp-path (.getPath (.getCanonicalFile
+                                (io/file (System/getProperty "java.io.tmpdir"))))]
+        (when (contains? blocked-export-roots abs-path)
+          (throw (ex-info "Refusing to export into a system directory."
+                          {:type :invalid-target-directory :path abs-path})))
+        (when (.isFile abs)
+          (throw (ex-info "Target directory must not be an existing file."
+                          {:type :invalid-target-directory :path abs-path})))
+        (when-not (or (under-dir? home-path abs-path)
+                      (under-dir? tmp-path abs-path)
+                      (and parent (.exists parent)))
+          (throw (ex-info "Target directory parent does not exist."
+                          {:type :invalid-target-directory :path abs-path})))
+        abs-path))))
+
+(defn safe-export-filename
+  "Basename-only filename safe to join under an export directory."
+  [filename fallback-id]
+  (let [base (or (last (string/split (-> (str filename)
+                                         (string/replace #"\\" "/"))
+                                     #"/"))
+                 "")
+        cleaned (-> base
+                    (string/replace #"[^\w.\- ]+" "_")
+                    (string/replace #"^\.+" "")
+                    string/trim)]
+    (if (or (string/blank? cleaned)
+            (#{"." ".."} cleaned))
+      (str (or (presence fallback-id) "file"))
+      cleaned)))
+
+(defn safe-uri-to-open?
+  "Allow only http(s) and file: URIs under the current export target."
+  [uri target-directory]
+  (try
+    (let [u (URI. (str uri))
+          scheme (some-> (.getScheme u) string/lower-case)]
+      (case scheme
+        ("http" "https") true
+        "file" (and (presence target-directory)
+                    (under-dir? target-directory (.getPath u)))
+        false))
+    (catch Exception _
+      false)))
 
 (defn str
   "Like clojure.core/str but maps keywords to strings without preceding colon."

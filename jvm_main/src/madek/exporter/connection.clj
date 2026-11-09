@@ -8,6 +8,8 @@
    [json-roa.client.core :as roa]
    [logbug.catcher :as catcher]
    [logbug.debug :as debug]
+   [madek.exporter.export.meta-data-schema :as export-meta-data-schema]
+   [madek.exporter.export.meta-keys :as export-meta-keys]
    [madek.exporter.perf-log :as perf-log]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils]
@@ -400,6 +402,8 @@
                                     "Check the URL and your network connection.")}}))))))
 
 (defn disconnect [_]
+  (export-meta-data-schema/reset-cache!)
+  (export-meta-keys/reset-cache!)
   (swap! state/db assoc-in [:connection] {}))
 
 (defn patch-api-mode
