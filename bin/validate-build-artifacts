@@ -44,10 +44,25 @@ find_python() {
 # Core build artifacts
 require_file "app/prod/jvm-main.jar"
 require_file "app/prod/css/site.css"
+require_file "app/prod/preload.js"
+require_file "app/prod/js/front.js"
+require_file "app/prod/js/main.js"
 
 if grep -q "Error: Can't find stylesheet to import" app/prod/css/site.css; then
   fail "stylesheet build contains sass error marker"
 fi
+
+# Advanced build must not ship Closure work trees or source maps.
+for p in \
+  app/prod/js/out_front \
+  app/prod/js/out_main \
+  app/prod/js/front.js.map \
+  app/prod/js/main.js.map
+do
+  if [[ -e "$p" ]]; then
+    fail "prod package must not include $p"
+  fi
+done
 
 # Platform packages: required in Cider-CI; locally best-effort
 require_platform_packages() {
