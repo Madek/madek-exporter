@@ -12,18 +12,13 @@
     [reagent.ratom :as ratom :refer [reaction]]
     [madek.app.front.state :as state]
     [madek.app.front.env]
-    [cljs.nodejs :as nodejs]
+    [madek.app.front.bridge :as bridge]
     [inflections.core :as inflections]
 
     )
   (:import
     [goog Uri]
     ))
-
-(def Electron (nodejs/require "electron"))
-
-(def ipcRenderer (.-ipcRenderer Electron))
-
 
 (def path-regex #"^/(sets|entries)/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$")
 
@@ -96,7 +91,7 @@
 
 (defn choose-target-directory []
   (let [current (:target-directory @form-data*)]
-    (-> (.invoke ipcRenderer "madek:choose-directory" current)
+    (-> (bridge/choose-directory current)
         (.then (fn [path]
                  (when (presence path)
                    (set-value :target-directory path)))))))

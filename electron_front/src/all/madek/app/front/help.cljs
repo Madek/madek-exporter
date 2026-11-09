@@ -5,13 +5,9 @@
     [madek.app.front.i18n :as i18n]
     [madek.app.front.release :as release]
     [madek.app.front.state :as state]
-    [cljs.nodejs :as nodejs]
+    [madek.app.front.bridge :as bridge]
     [reagent.core :as reagent]
     ))
-
-(def Electron (nodejs/require "electron"))
-
-(def shell (.-shell Electron))
 
 (def prefix-examples-id "prefix-examples")
 
@@ -33,7 +29,7 @@
    [:a {:href url
         :on-click (fn [e]
                     (.preventDefault e)
-                    (.openExternal shell url))}
+                    (bridge/open-external url))}
     label]))
 
 (defn full-version []

@@ -1,6 +1,7 @@
 (ns madek.app.main.menu
   (:require
     [cljs.nodejs :as nodejs]
+    [madek.app.main.env :as env]
     [madek.app.main.windows]
     )
   )
@@ -42,27 +43,27 @@
                    {:type "separator"}
                    new-window-subitem]}
         {:label "Window"
-         :submenu [{:role "close"}
-                   {:type "separator"}
-                   reload-page-subitem
-                   toggle-deftools-subitem
-                   {:type "separator"}
-                   new-window-subitem
-                   ]}
+         :submenu (cond-> [{:role "close"}]
+                    (= env/env :dev)
+                    (concat [{:type "separator"}
+                             reload-page-subitem
+                             toggle-deftools-subitem])
+                    true
+                    (concat [{:type "separator"}
+                             new-window-subitem]))}
         {:label "Help"
          :submenu [{:label "Login help"
                     :click (fn [_ win _]
                              (when win
-                               (.send (.-webContents win) "madek:navigate" "/help")))}]}]
+                               (.send (.-webContents win) "madek:navigate" "/help")))}
+                   {:label "About"
+                    :click (fn [_ win _]
+                             (when win
+                               (.send (.-webContents win) "madek:navigate" "/about")))}]}]
        (filter identity)))
-
-(.log js/console "menu" (clj->js menu-template))
 
 (def menu (.buildFromTemplate Menu (clj->js menu-template)))
 
 (defn initialize []
   (.setApplicationMenu Menu menu)
   )
-
-;
-

@@ -23,11 +23,6 @@
 
 (def windows (atom {}))
 
-(add-watch
-  windows :windows-change-logger
-  (fn [_ _ _ new-state]
-    (.log js/console "windows changed" (-> new-state keys clj->js))))
-
 (defn- show-and-focus [window]
   (when window
     (when (.isMinimized window)
@@ -58,10 +53,16 @@
 
 (defn open-new []
   (let [id (-> (uuid/make-random-uuid) uuid/uuid-string)
-        window (BrowserWindow. (clj->js {:width 800 :height 600
-                                         :show false
-                                         :webPreferences {:nodeIntegration true
-                                                          :contextIsolation false}}))
+        preload-path (str env/app-dir "/preload.js")
+        window (BrowserWindow.
+                 (clj->js {:width 800 :height 600
+                           :show false
+                           :webPreferences
+                           {:preload preload-path
+                            :nodeIntegration false
+                            :contextIsolation true
+                            :sandbox true
+                            :devTools (= env/env :dev)}}))
         index-html-path (str env/app-dir "/index.html")
         shown? (atom false)
         ensure-shown (fn []
@@ -79,7 +80,7 @@
          (fn []
            (.send (.-webContents window) "madek:jvm-sync:init"
                   (clj->js {:jvm-port env/jvm-port
-                            :jvm-password env/jvm-password}))
+                            :jvm-password (str env/jvm-password)}))
            (send-db-full id)))
     (.on window "closed" (fn [] (swap! windows dissoc id)))))
 

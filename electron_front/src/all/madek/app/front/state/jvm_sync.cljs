@@ -4,17 +4,19 @@
     [timothypratley.patchin :as patchin]
     ))
 
+(defonce jvm-password* (atom nil))
+
+(defn jvm-password []
+  @jvm-password*)
 
 (defn init [jvm-main-db client-db opts]
 
   (let [{port :jvm-port password :jvm-password} opts
+        _ (reset! jvm-password* (str password))
         {:keys [chsk ch-recv send-fn state jvm-port]}
         (sente/make-channel-socket! "/chsk"
           {:type :auto ; e/o #{:auto :ajax :ws}
-           ; TODO we add parameters for basic auth here; it is not supported by chome yet
-           ; and hence disabled on the server side;
-           ; I am not sure if this is the right place here; but is seems as it doesn't
-           ; mess up the host; chrome seems just to remove it
+           ;; URL userinfo supplies Basic Auth for /chsk (WS + AJAX).
            :host (str (:client-id @client-db) ":" password "@localhost:" port)
            :protocol :http
            :client-id (:client-id @client-db)})]
@@ -31,7 +33,6 @@
            (:diff patch-data)))
 
   (defn event-msg-handler [{:as message :keys [id ?data event]}]
-    ;(js/console.log (clj->js {:message message}))
     (when (= id :chsk/recv)
       (let [[event-id data] ?data]
         (when event-id
@@ -53,6 +54,3 @@
   (start-message-router)
 
   )
-
-
-

@@ -9,15 +9,13 @@
     [madek.app.front.state :as state]
     [madek.app.front.utils :refer [str keyword deep-merge]]
 
+    [madek.app.front.bridge :as bridge]
+    [madek.app.front.env :as env]
+
     [accountant.core :as accountant]
-    [cljs.nodejs :as nodejs]
     [reagent.core :as reagent :refer [atom]]
     [secretary.core :as secretary :include-macros true :refer [defroute]]
     ))
-
-(def Electron (nodejs/require "electron"))
-
-(def shell (.-shell Electron))
 
 (def github-repo-url "https://github.com/Madek/madek-exporter")
 (def zhdk-url "https://zhdk.medienarchiv.ch/")
@@ -67,7 +65,7 @@
   [:a (merge {:href url
               :on-click (fn [e]
                           (.preventDefault e)
-                          (.openExternal shell url))}
+                          (bridge/open-external url))}
              attrs)
    label])
 
@@ -126,7 +124,9 @@
     (list
       ^{:key "connection"} [burger-page "/connection" (i18n/t :nav/connection) false]
       ^{:key "export"} [burger-page "/download" (i18n/t :nav/export) (not export-ready?)]
-      ^{:key "debug"} [burger-page "/debug" (i18n/t :nav/debug) false]
+      (when (= env/env :dev)
+        ^{:key "debug"} [burger-page "/debug" (i18n/t :nav/debug) false])
+      ^{:key "about"} [burger-page "/about" (i18n/t :about/title) false]
       ^{:key "help"} [burger-page "/help" (i18n/t :nav/help) false]
       [:li.divider.burger-page {:key "pages-divider" :role "separator"}])))
 
@@ -199,10 +199,12 @@
      [:ul.nav.navbar-nav.navbar-pages
       [nav-item "/connection" (i18n/t :nav/connection)]
       [export-nav-item]
-      [nav-item "/debug" (i18n/t :nav/debug)]
+      (when (= env/env :dev)
+        [nav-item "/debug" (i18n/t :nav/debug)])
+      [nav-item "/about" (i18n/t :about/title)]
       [nav-item "/help" (i18n/t :nav/help)]]]]])
 
-(defn naviagation []
+(defn navigation []
   (reagent/create-class
     {:component-did-mount
      (fn [_]
@@ -216,7 +218,7 @@
   (let [_ @i18n/locale*]
     [:div
      [request/modal]
-     [naviagation]
+     [navigation]
      [:div.container-fluid
       [release/update-available-alert-component]
       (when-let [page @state/current-page]

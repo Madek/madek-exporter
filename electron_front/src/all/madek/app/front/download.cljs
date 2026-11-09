@@ -17,7 +17,6 @@
     [reagent.ratom :as ratom :refer [reaction]]
     [madek.app.front.state :as state]
     [madek.app.front.env]
-    [cljs.nodejs :as nodejs]
 
     )
   (:import
