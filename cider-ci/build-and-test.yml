@@ -32,6 +32,9 @@ scripts:
       ./bin/with-java21 lein do \
         externs electron-front-prod app/prod/js/front_externs.js, \
         cljsbuild once electron-front-prod
+      # Advanced build only needs front.js — drop Closure work dirs / maps
+      # (must match bin/build-electron-front-prod; validate-build-artifacts enforces).
+      rm -rf app/prod/js/out_front app/prod/js/front.js.map
     start_when:
       install-npm-packages has passed:
         script_key: install-npm-packages
@@ -43,6 +46,9 @@ scripts:
       ./bin/with-java21 lein do \
         externs electron-main-prod app/prod/js/main_externs.js, \
         cljsbuild once electron-main-prod
+      # Advanced build only needs main.js — drop Closure work dirs / maps
+      # (must match bin/build-electron-main-prod; validate-build-artifacts enforces).
+      rm -rf app/prod/js/out_main app/prod/js/main.js.map
     start_when:
       install-npm-packages has passed:
         script_key: install-npm-packages

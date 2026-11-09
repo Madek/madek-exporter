@@ -62,22 +62,27 @@
                         req-opts)
         id (uuid/uuid-string (uuid/make-random-uuid))
         params (:json-params req)
-        params-for-log (cond-> (dissoc params :password :api-token)
-                         (contains? params :password)
-                         (assoc :password "***redacted***"
-                                :password-present (boolean (presence (:password params))))
-                         (contains? params :api-token)
-                         (assoc :api-token "***redacted***"
-                                :api-token-present (boolean (presence (:api-token params)))))]
+        ;; Never keep Madek secrets in client-db / Debug dumps — only in the
+        ;; live HTTP call (`req` below), which is not stored.
+        params-for-store (cond-> (dissoc params :password :api-token)
+                           (contains? params :password)
+                           (assoc :password "***redacted***"
+                                  :password-present (boolean (presence (:password params))))
+                           (contains? params :api-token)
+                           (assoc :api-token "***redacted***"
+                                  :api-token-present (boolean (presence (:api-token params)))))
+        req-for-store (cond-> req
+                        (contains? req :json-params)
+                        (assoc :json-params params-for-store))]
     (state/add-app-log!
       :info :request/send
       {:id id
        :method (:method req)
        :url (:url req)
        :path (:path req-opts)
-       :json-params params-for-log})
+       :json-params params-for-store})
     (swap! state/client-db assoc-in [:requests id]
-           {:request req :meta (deep-merge META-DEFAULTS meta-req)})
+           {:request req-for-store :meta (deep-merge META-DEFAULTS meta-req)})
     (go (let [resp (<! (http/request req))]
           (when (-> @state/client-db :requests (get id))
             (swap! state/client-db assoc-in [:requests id :response] resp))

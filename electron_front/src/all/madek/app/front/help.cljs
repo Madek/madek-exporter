@@ -4,8 +4,6 @@
     [madek.app.front.about :as about]
     [madek.app.front.breadcrumb :as breadcrumb]
     [madek.app.front.i18n :as i18n]
-    [madek.app.front.release :as release]
-    [madek.app.front.state :as state]
     [madek.app.front.bridge :as bridge]
     [reagent.core :as reagent]
     ))
@@ -18,10 +16,15 @@
 
 (defonce scroll-to* (atom nil))
 
+(defn- normalize-section-id [id]
+  (if (= id about/legacy-version-section-id)
+    about/section-id
+    id))
+
 (defn- consume-requested-section! []
   (when-let [id @scroll-to*]
     (reset! scroll-to* nil)
-    (reset! selected-section* id)
+    (reset! selected-section* (normalize-section-id id))
     (reset! toc-collapsed* false)))
 
 (defn- external-link
@@ -32,30 +35,6 @@
                     (.preventDefault e)
                     (bridge/open-external url))}
     label]))
-
-(defn full-version []
-  (when-let [rel (-> @state/electron-main-db :environment :latest-release)]
-    (str (:version_major rel)
-         "." (:version_minor rel)
-         "." (:version_patch rel)
-         (when-let [pre (:version_pre rel)] (str "-" pre))
-         (when-let [build (:version_build rel)] (str "+" build)))))
-
-(defn version-and-os-component []
-  (let [version (or (full-version) @release/version*)
-        url (when version
-              (str "https://github.com/Madek/madek-exporter/releases#release-" version))]
-    [:div.version {:id "help-version"}
-     [:h4 (i18n/t :help/version-and-os)]
-     [:p (i18n/t :help/version-prefix) [:code version]]
-     [:p (i18n/t :help/date-of-creation) [:code "2026-08-07"]]
-     (when url
-       [:p (i18n/t :help/release) [external-link url]])
-     [:h5 (i18n/t :help/supported-os)]
-     [:ul
-      [:li "macOS (x64, ARM64)"]
-      [:li "Linux (x64, ARM64)"]
-      [:li "Windows (x64)"]]]))
 
 (defn login-variants-component []
   [:div.login-variants {:id "help-login-variants"}
@@ -186,7 +165,6 @@
 
 (def ^:private toc-sections
   [[about/section-id :about/title about/section]
-   ["help-version" :help/version-and-os version-and-os-component]
    ["help-login-variants" :help/login-variants login-variants-component]
    [prefix-examples-id :help/prefix-examples prefix-examples-component]
    ["help-references" :help/references references-component]
@@ -194,7 +172,7 @@
 
 (defn- section-component [id]
   (or (some (fn [[section-id _ component]]
-              (when (= section-id id) component))
+              (when (= section-id (normalize-section-id id)) component))
             toc-sections)
       about/section))
 

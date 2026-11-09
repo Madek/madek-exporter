@@ -92,14 +92,14 @@ Playwright Electron UI tests (starts fake server automatically; uses `app/dev`):
 npm run test:e2e
 ```
 
-Optional smoke against advanced-compiled `app/prod` (not run in Cider-CI by default):
+Prod smoke against advanced-compiled `app/prod` (also run in Cider-CI as `playwright-prod`):
 
 ```zsh
 npm run build:electron:prod && npm run build:jvm:prod
 npm run test:e2e:prod
 ```
 
-Dependency audit (npm + OSV; Cider-CI `security-audit` job fails on findings):
+Dependency audit (npm + OSV). Cider-CI `security-audit` fails the job on OSV findings; it does not gate the `build` job. `npm audit` inside the script is advisory:
 
 ```zsh
 npm run audit:security

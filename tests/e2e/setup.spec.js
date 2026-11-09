@@ -56,14 +56,15 @@ test('help: toc on the left shows the selected section', async ({ page }) => {
   const toc = page.locator('nav.toc');
   const content = page.locator('.help-content');
   await expect(toc.getByRole('heading', { name: 'Contents' })).toBeVisible();
-  await expect(toc.getByRole('link', { name: 'Version & supported operating systems' })).toBeVisible();
-  await expect(toc.getByRole('link', { name: 'Supported operating systems', exact: true })).toHaveCount(0);
-  await expect(content.getByRole('heading', { name: 'Version & supported operating systems' })).toBeVisible();
+  await expect(toc.getByRole('link', { name: 'About the Madek-Exporter' })).toBeVisible();
+  await expect(toc.getByRole('link', { name: 'Version & supported operating systems' })).toHaveCount(0);
+  await expect(content.getByRole('heading', { name: 'About the Madek-Exporter' })).toBeVisible();
+  await expect(content.getByRole('heading', { name: 'Supported operating systems' })).toBeVisible();
   await expect(content.getByText('macOS (x64, ARM64)')).toBeVisible();
 
   await toc.getByRole('link', { name: 'References' }).click();
   await expect(content.getByRole('heading', { name: 'References' })).toBeVisible();
-  await expect(content.getByRole('heading', { name: 'Version & supported operating systems' })).toHaveCount(0);
+  await expect(content.getByRole('heading', { name: 'About the Madek-Exporter' })).toHaveCount(0);
 
   await toc.locator('button.toc-toggle').click();
   await expect(toc.getByRole('heading', { name: 'Contents' })).toHaveCount(0);
