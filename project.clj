@@ -1,4 +1,4 @@
-(defproject madek "0.11.2-2"
+(defproject madek "0.11.2-3"
   :description "Desktop exporter for Madek media archives"
   :url "https://github.com/Madek/madek-exporter"
   :license {:name "GPL-3.0-or-later"
