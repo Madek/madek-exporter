@@ -58,12 +58,17 @@
           (clj->js {:java-path java-path
                     :jar-path jar-path}))
     (file-log/log! "INFO" "starting jvm-main-process" {:javaPath java-path :jarPath jar-path})
-    (reset! jvm-main-process-child
-            (.spawn child-process java-path
-                    (clj->js ["-jar" jar-path
-                              "server"
-                              "-p" (str env/jvm-port)
-                              "-s" (str env/jvm-password)])))
+    (let [spawn-env (js/Object.assign #js {} (.-env js/process))]
+      (when (= env/env :dev)
+        ;; Enables JVM /debug/performance for the Electron Debug tab.
+        (aset spawn-env "MADEK_EXPORTER_DEBUG" "1"))
+      (reset! jvm-main-process-child
+              (.spawn child-process java-path
+                      (clj->js ["-jar" jar-path
+                                "server"
+                                "-p" (str env/jvm-port)
+                                "-s" (str env/jvm-password)])
+                      (clj->js {:env spawn-env}))))
     (.on @jvm-main-process-child "error"
          (fn [err]
            (.log js/console (str "JVM-MAIN_PROC-ERR " err))

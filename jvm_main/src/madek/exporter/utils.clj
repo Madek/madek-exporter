@@ -142,8 +142,13 @@
     (update :connection redact-connection)))
 
 (def ^:private blocked-export-roots
-  #{"/" "/etc" "/usr" "/bin" "/sbin" "/System" "/Library" "/private"
-    "C:\\" "C:\\Windows" "C:\\Program Files" "C:\\Program Files (x86)"})
+  ;; Exact filesystem roots (match path only — never treat "/" as a prefix of everything).
+  #{"/" "C:\\" "C:\\/"} )
+
+(def ^:private blocked-export-prefixes
+  ;; Refuse these trees and any descendant (e.g. /usr/local, /etc/foo).
+  #{"/etc" "/usr" "/bin" "/sbin" "/System" "/Library" "/private"
+    "C:\\Windows" "C:\\Program Files" "C:\\Program Files (x86)"})
 
 (defn- nio-absolute [path]
   (.normalize (.toAbsolutePath (Paths/get (str path) (into-array String [])))))
@@ -154,6 +159,12 @@
   (let [dir-p (nio-absolute dir)
         path-p (nio-absolute path)]
     (.startsWith path-p dir-p)))
+
+(defn- blocked-target-path?
+  "True when `abs-path` is a forbidden system root or under a blocked prefix."
+  [abs-path]
+  (or (contains? blocked-export-roots abs-path)
+      (some #(under-dir? % abs-path) blocked-export-prefixes)))
 
 (defn validate-target-directory
   "Return canonical absolute path or throw ex-info {:type :invalid-target-directory}."
@@ -173,7 +184,7 @@
                                  (io/file (System/getProperty "user.home"))))
             tmp-path (.getPath (.getCanonicalFile
                                 (io/file (System/getProperty "java.io.tmpdir"))))]
-        (when (contains? blocked-export-roots abs-path)
+        (when (blocked-target-path? abs-path)
           (throw (ex-info "Refusing to export into a system directory."
                           {:type :invalid-target-directory :path abs-path})))
         (when (.isFile abs)

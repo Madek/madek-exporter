@@ -18,10 +18,31 @@
 (defn fix-path [path]
   (clojure.string/replace path #"^/\w:" ""))
 
+(defn- redact-request-entry [entry]
+  (let [params (get-in entry [:request :json-params])]
+    (cond-> entry
+      (get params :password)
+      (assoc-in [:request :json-params :password] "***redacted***")
+      (get params :api-token)
+      (assoc-in [:request :json-params :api-token] "***redacted***")
+      (get params "password")
+      (assoc-in [:request :json-params "password"] "***redacted***")
+      (get params "api-token")
+      (assoc-in [:request :json-params "api-token"] "***redacted***"))))
+
 (defn- redact-client-db [db]
   (cond-> db
     (get-in db [:connection :form :password])
-    (assoc-in [:connection :form :password] "***redacted***")))
+    (assoc-in [:connection :form :password] "***redacted***")
+    (get-in db [:connection :form :api-token])
+    (assoc-in [:connection :form :api-token] "***redacted***")
+    (:requests db)
+    (update :requests
+            (fn [reqs]
+              (into {}
+                    (map (fn [[id entry]]
+                           [id (redact-request-entry entry)])
+                         reqs))))))
 
 (defn state-content []
   [:div.content

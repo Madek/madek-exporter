@@ -37,10 +37,16 @@ contextBridge.exposeInMainWorld('madekBridge', {
     return Promise.reject(new Error('Blocked non-http(s) openExternal'));
   },
   openPath(dir) {
-    if (typeof dir === 'string' && dir.length > 0) {
+    // Only absolute paths without traversal — used to reveal the export target.
+    const absolute =
+      typeof dir === 'string' &&
+      dir.length > 0 &&
+      !dir.includes('..') &&
+      (dir.startsWith('/') || /^[A-Za-z]:[\\/]/.test(dir));
+    if (absolute) {
       return shell.openPath(dir);
     }
-    return Promise.reject(new Error('Blocked empty openPath'));
+    return Promise.reject(new Error('Blocked unsafe openPath'));
   },
   onJvmSyncInit(handler) {
     return on('madek:jvm-sync:init', handler);

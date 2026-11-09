@@ -40,6 +40,14 @@
                         #"absolute"
                         (utils/validate-target-directory "relative/path"))))
 
+(deftest validate-target-directory-rejects-system-prefix
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                        #"system directory"
+                        (utils/validate-target-directory "/usr/local/madek-export")))
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                        #"system directory"
+                        (utils/validate-target-directory "/etc/madek"))))
+
 (deftest client-safe-db-strips-http-options
   (let [db {:connection {:url "https://example.test"
                          :http-options {:basic-auth ["u" "p"]
