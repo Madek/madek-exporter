@@ -54,8 +54,7 @@
 (bridge/on-jvm-sync-init
   (fn [data]
     (let [opts (-> data js->clj clojure.walk/keywordize-keys)]
-      (js/console.log "madek:jvm-sync:init"
-                      (clj->js (dissoc opts :jvm-password)))
+      (js/console.log "madek:jvm-sync:init" (clj->js opts))
       (jvm-sync/init jvm-main-db client-db opts))))
 
 (bridge/on-navigate
