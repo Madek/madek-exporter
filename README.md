@@ -128,6 +128,13 @@ Zips land in `target/server-artefacts/`:
 
 Open the printed draft URL (`https://github.com/Madek/madek-exporter/releases/new?tag=<version>&title=<version>`), attach the five zips, and publish. Publishing creates the git tag. There is no automated GitHub release.
 
+## macOS signing / notarization
+
+CI builds unsigned zips for distribution inside ZHdK. For public Gatekeeper
+installs, notarize the `.app` with your Apple Developer ID after packaging
+(`codesign` + `notarytool` / `xcrun notarytool`). This repo does not automate
+notarization yet.
+
 ## License
 
 Copyright Zuercher Hochschule der Kuenste (Zurich University of the Arts).

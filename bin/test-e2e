@@ -40,7 +40,14 @@ export MADEK_E2E=1
 # Non-TTY output: the list reporter otherwise truncates titles to the pane width.
 export PLAYWRIGHT_FORCE_TTY="${PLAYWRIGHT_FORCE_TTY:-0}"
 
-if [[ ! -f app/dev/js/front.js || ! -f app/dev/js/main.js || ! -f app/dev/jvm-main.jar ]]; then
+APP_MODE="${MADEK_E2E_APP:-dev}"
+if [[ "$APP_MODE" == "prod" ]]; then
+  if [[ ! -f app/prod/js/front.js || ! -f app/prod/js/main.js || ! -f app/prod/jvm-main.jar || ! -f app/prod/preload.js ]]; then
+    echo "[test-e2e] building prod electron artifacts..." >&2
+    ./bin/build-electron-prod
+    ./bin/build-jvm-main-prod
+  fi
+elif [[ ! -f app/dev/js/front.js || ! -f app/dev/js/main.js || ! -f app/dev/jvm-main.jar ]]; then
   echo "[test-e2e] building dev artifacts (first run)..." >&2
   ./bin/build-electron-dev
 fi
