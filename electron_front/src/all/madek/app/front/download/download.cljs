@@ -319,7 +319,7 @@
            :show_request_modal false})))
 
 (defn file-manager-label-key []
-  (case (.-platform nodejs/process)
+  (case (bridge/platform)
     "darwin" :download/open-finder
     "win32" :download/open-explorer
     :download/open-file-manager))

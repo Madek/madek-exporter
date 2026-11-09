@@ -1,8 +1,8 @@
 /**
- * contextBridge API exposed as window.madek (see app/prod/preload.js).
+ * contextBridge API exposed as window.madekBridge (see app/prod/preload.js).
  * Kept separate so `lein externs` can overwrite front_externs.js safely.
  */
-var madek = {
+var madekBridge = {
   chooseDirectory: function () {},
   openExternal: function () {},
   openPath: function () {},
@@ -10,5 +10,6 @@ var madek = {
   onNavigate: function () {},
   onDbFull: function () {},
   onDbPatch: function () {},
-  getVersions: function () {}
+  getVersions: function () {},
+  platform: function () {}
 };
