@@ -76,6 +76,8 @@
 
 (defonce perf-kind* (reagent/atom :all))
 
+(defonce perf-filter* (reagent/atom ""))
+
 (defonce perf-sort-by-duration* (reagent/atom false))
 
 (defonce perf-auto-refresh* (reagent/atom true))
@@ -97,10 +99,19 @@
 (defn- format-time [at]
   (.format (js/moment at) "HH:mm:ss.SSS"))
 
+(defn- matches-perf-filter? [term entry]
+  (or (empty? term)
+      (some #(clojure.string/includes?
+              (clojure.string/lower-case (str %))
+              term)
+            ((juxt :kind :method :status :ms :thread :url :at) entry))))
+
 (defn- visible-entries []
-  (let [kind @perf-kind*]
+  (let [kind @perf-kind*
+        term (clojure.string/lower-case (clojure.string/trim @perf-filter*))]
     (cond->> @perf-entries*
       (not= :all kind) (filter #(= (name kind) (:kind %)))
+      (seq term) (filter #(matches-perf-filter? term %))
       true reverse
       @perf-sort-by-duration* (sort-by :ms >)
       true (take MAX-ROWS))))
@@ -124,31 +135,39 @@
    [:td {:style {:word-break "break-all"}} url]])
 
 (defn- perf-controls []
-  [:div.form-inline {:style {:margin-bottom "1em"}}
-   [:select.form-control.input-sm
-    {:value (name @perf-kind*)
-     :on-change #(reset! perf-kind* (keyword (.. % -target -value)))}
-    [:option {:value "all"} (i18n/t :debug/perf-kind-all)]
-    [:option {:value "madek"} (i18n/t :debug/perf-kind-madek)]
-    [:option {:value "local"} (i18n/t :debug/perf-kind-local)]]
-   " "
-   [:label.checkbox-inline
-    [:input {:type :checkbox
-             :checked @perf-sort-by-duration*
-             :on-change #(swap! perf-sort-by-duration* not)}]
-    " " (i18n/t :debug/perf-sort-by-duration)]
-   " "
-   [:label.checkbox-inline
-    [:input {:type :checkbox
-             :checked @perf-auto-refresh*
-             :on-change #(swap! perf-auto-refresh* not)}]
-    " " (i18n/t :debug/perf-auto-refresh)]
-   " "
-   [:button.btn.btn-default.btn-sm {:on-click fetch-perf!}
-    (i18n/t :debug/perf-refresh)]
-   " "
-   [:button.btn.btn-default.btn-sm {:on-click clear-perf!}
-    (i18n/t :debug/clear-logs)]])
+  [:div {:style {:margin-bottom "1em"}}
+   [:div.form-inline {:style {:margin-bottom "0.5em"}}
+    [:input.form-control.input-sm
+     {:type :search
+      :style {:min-width "16em"}
+      :placeholder (i18n/t :debug/perf-filter)
+      :value @perf-filter*
+      :on-change #(reset! perf-filter* (.. % -target -value))}]
+    " "
+    [:select.form-control.input-sm
+     {:value (name @perf-kind*)
+      :on-change #(reset! perf-kind* (keyword (.. % -target -value)))}
+     [:option {:value "all"} (i18n/t :debug/perf-kind-all)]
+     [:option {:value "madek"} (i18n/t :debug/perf-kind-madek)]
+     [:option {:value "local"} (i18n/t :debug/perf-kind-local)]]
+    " "
+    [:label.checkbox-inline
+     [:input {:type :checkbox
+              :checked @perf-sort-by-duration*
+              :on-change #(swap! perf-sort-by-duration* not)}]
+     " " (i18n/t :debug/perf-sort-by-duration)]
+    " "
+    [:label.checkbox-inline
+     [:input {:type :checkbox
+              :checked @perf-auto-refresh*
+              :on-change #(swap! perf-auto-refresh* not)}]
+     " " (i18n/t :debug/perf-auto-refresh)]
+    " "
+    [:button.btn.btn-default.btn-sm {:on-click fetch-perf!}
+     (i18n/t :debug/perf-refresh)]
+    " "
+    [:button.btn.btn-default.btn-sm {:on-click clear-perf!}
+     (i18n/t :debug/clear-logs)]]])
 
 (defn- performance-render []
   (let [entries (visible-entries)]
