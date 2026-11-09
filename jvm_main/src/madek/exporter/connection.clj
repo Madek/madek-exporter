@@ -8,6 +8,7 @@
    [json-roa.client.core :as roa]
    [logbug.catcher :as catcher]
    [logbug.debug :as debug]
+   [madek.exporter.perf-log :as perf-log]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils]
    [taoensso.timbre :as timbre :refer [info debug]]))
@@ -162,7 +163,8 @@
     (probe-failure 401 "Missing credentials")
     (try
       (let [api-root (roa/get-root (str base-url "/api/")
-                                   :default-conn-opts live-http-options)
+                                   :default-conn-opts live-http-options
+                                   :default-middleware perf-log/middleware)
             response (-> api-root (roa/relation :auth-info) (roa/get {}))
             status (:status response)
             headers (:headers response)]
@@ -202,12 +204,13 @@
     :else
     (try
       (let [url (str base-url "/api-v2/auth-info/")
-            response (http-client/get
-                      url
-                      (merge live-http-options
-                             {:as :text
-                              :throw-exceptions false
-                              :coerce :false}))
+            response (http-client/with-middleware perf-log/middleware
+                       (http-client/get
+                        url
+                        (merge live-http-options
+                               {:as :text
+                                :throw-exceptions false
+                                :coerce :false})))
             status (:status response)
             headers (:headers response)]
         (if-not (ok-status? status)
@@ -275,7 +278,9 @@
 ;;; legacy helper (export credential check) ###################################
 
 (defn auth-info [api-entry-point api-http-opts]
-  (let [response (-> (roa/get-root api-entry-point :default-conn-opts api-http-opts)
+  (let [response (-> (roa/get-root api-entry-point
+                                   :default-conn-opts api-http-opts
+                                   :default-middleware perf-log/middleware)
                      (roa/relation :auth-info)
                      (roa/get {}))]
     (debug (-> response roa/data))

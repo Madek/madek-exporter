@@ -5,6 +5,7 @@
    [clojure.string :as string]
    [json-roa.client.core :as roa]
    [madek.exporter.download-log-lines :as download-log-lines]
+   [madek.exporter.perf-log :as perf-log]
    [madek.exporter.state :as state]))
 
 (def ^:private max-logs 2000)
@@ -76,8 +77,8 @@
                (raise e))))))
 
 (def middleware
-  "default-middleware plus request logging (outermost)."
-  (conj (vec http-client/default-middleware) wrap-log))
+  "default-middleware plus timing and request logging (outermost)."
+  (conj (vec http-client/default-middleware) perf-log/wrap-perf wrap-log))
 
 (defn get-root
   "Like `roa/get-root`, but records each HTTP call while a download is active."

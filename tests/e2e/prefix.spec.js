@@ -54,7 +54,7 @@ test('prefix picker: value, empty value, no prefix, and the value filter', async
   }
   await expect(onlyWithValue).toBeChecked();
 
-  // Checked filter hides the empty subtitle and the “no prefix” row.
+  // Options are valued text meta-data only; empty keys (subtitle) are not fetched.
   await expect(menu.locator('tr', { hasText: 'madek_core:title' })).toBeVisible();
   await expect(menu.locator('tr', { hasText: 'madek_core:subtitle' })).toHaveCount(0);
   await expect(menu.locator('tr.no-prefix')).toHaveCount(0);
@@ -66,10 +66,7 @@ test('prefix picker: value, empty value, no prefix, and the value filter', async
 
   await filter.fill('');
   await setOnlyWithValue(false);
-  await expect(menu.locator('tr', { hasText: 'madek_core:subtitle' })).toContainText(/no value/i);
-  await expect(menu.locator('tr', { hasText: 'madek_core:subtitle' })).toContainText(
-    `_${fakeMediaEntryId}`
-  );
+  await expect(menu.locator('tr', { hasText: 'madek_core:subtitle' })).toHaveCount(0);
   await expect(menu.locator('tr.no-prefix')).toBeVisible();
   await expect(menu.locator('tr.no-prefix code')).toHaveText(fakeMediaEntryId);
 
@@ -79,11 +76,6 @@ test('prefix picker: value, empty value, no prefix, and the value filter', async
     'Fake export entry_',
     'Fake export entry_',
   ]);
-
-  await toggle.click();
-  await setOnlyWithValue(false);
-  await menu.locator('tr', { hasText: 'madek_core:subtitle' }).click();
-  await expect(page.locator('.prefix-example .prefix-part')).toHaveText(['_', '_']);
 
   await toggle.click();
   await setOnlyWithValue(false);

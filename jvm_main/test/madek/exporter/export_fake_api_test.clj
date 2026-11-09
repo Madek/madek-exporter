@@ -1,11 +1,14 @@
 (ns madek.exporter.export-fake-api-test
   (:require
+   [clj-http.client :as http]
    [clojure.java.io :as io]
+   [clojure.string :as string]
    [clojure.test :refer [deftest is use-fixtures]]
    [madek.exporter.connection :as connection]
    [madek.exporter.export :as export]
    [madek.exporter.export.meta-data-schema :as export-meta-data-schema]
    [madek.exporter.export.meta-keys :as export-meta-keys]
+   [madek.exporter.perf-log :as perf-log]
    [madek.exporter.request-log :as request-log]
    [madek.exporter.server.web :as web]
    [madek.exporter.state :as state]
@@ -208,24 +211,104 @@
     (is (not (.exists (io/file target-dir (str "Fake export entry_" media-entry-id)))))
     (is (not (.exists (io/file target-dir (str "_" media-entry-id)))))))
 
-(deftest prefix-options-lists-title-with-folder-name
-  (connect-fake!)
+(defn- clear-fake-requests!
+  []
+  (require-fake!)
+  (let [res (http/delete (str fake-base-url "/_test/requests")
+                         {:as :json :throw-exceptions false})]
+    (is (= 200 (:status res)) "clear fake request log")))
+
+(defn- fake-request-paths []
+  (require-fake!)
+  (let [res (http/get (str fake-base-url "/_test/requests")
+                      {:as :json :throw-exceptions false})]
+    (is (= 200 (:status res)))
+    (->> (get-in res [:body :requests])
+         (map :path)
+         vec)))
+
+(defn- api-v1-path? [path]
+  (boolean (re-find #"^/api(/|$)" (str path))))
+
+(defn- api-v2-path? [path]
+  (boolean (re-find #"^/api-v2(/|$)" (str path))))
+
+(defn- step1-entry! []
   (is (= 204 (:status (web/download-step1
                        {:body {:entity-id media-entry-id
                                :entity-type "entry"
                                :url (str fake-base-url "/entries/" media-entry-id)
-                               :target-directory (System/getProperty "java.io.tmpdir")}}))))
+                               :target-directory (System/getProperty "java.io.tmpdir")}})))))
+
+(defn- step1-set! []
+  (is (= 204 (:status (web/download-step1
+                       {:body {:entity-id set-id
+                               :entity-type "set"
+                               :url (str fake-base-url "/sets/" set-id)
+                               :target-directory (System/getProperty "java.io.tmpdir")}})))))
+
+(deftest prefix-options-lists-title-with-folder-name
+  (connect-fake!)
+  (step1-entry!)
   (let [{:keys [status body]} (web/prefix-options {})
         title (some #(when (= "madek_core:title" (:meta_key_id %)) %) (:options body))
         subtitle (some #(when (= "madek_core:subtitle" (:meta_key_id %)) %) (:options body))]
     (is (= 200 status))
     (is (= media-entry-id (:entity_id body)))
+    (is (= 1 (count (:options body)))
+        "only text meta-data with a value (title), not empty keys (subtitle)")
     (is (= "Madek Core" (:vocabulary_label title)))
     (is (= "Title" (:meta_key_label title)))
     (is (= "Fake export entry" (:value title)))
     (is (= (str "Fake export entry_" media-entry-id) (:folder_name title)))
-    (is (nil? (:value subtitle)))
-    (is (= (str "_" media-entry-id) (:folder_name subtitle)))))
+    (is (nil? subtitle))
+    (is (some #(and (= :madek (:kind %))
+                    (re-find #"/api/meta-keys/madek_core(%3A|:)title/" (:url %))
+                    (= 200 (:status %))
+                    (integer? (:ms %)))
+              (perf-log/entries))
+        "Madek calls are recorded for the Debug → Performance tab")))
+(deftest wizard-steps-use-api-only-when-both-apis-selected
+  ;; With export api-mode :both (api + api-v2), step1 and prefix-options must
+  ;; still call Madek `/api` only — never `/api-v2`.
+  (connect-fake! :api-mode :both)
+  (clear-fake-requests!)
+  (step1-entry!)
+  (let [after-step1 (fake-request-paths)]
+    (is (seq after-step1) "step1 hits the fake server")
+    (is (every? api-v1-path? after-step1)
+        (str "step1 must use /api only, got: " after-step1))
+    (is (not-any? api-v2-path? after-step1)
+        (str "step1 must not touch /api-v2, got: " after-step1)))
+  (clear-fake-requests!)
+  (let [{:keys [status body]} (web/prefix-options {})
+        after-prefix (fake-request-paths)]
+    (is (= 200 status))
+    (is (= 1 (count (:options body))))
+    (is (seq after-prefix) "prefix-options hits the fake server")
+    (is (every? api-v1-path? after-prefix)
+        (str "prefix-options must use /api only, got: " after-prefix))
+    (is (not-any? api-v2-path? after-prefix)
+        (str "prefix-options must not touch /api-v2, got: " after-prefix))
+    (is (some #(string/includes? % "meta-keys") after-prefix)
+        "prefix-options loads meta-keys via /api")))
+
+(deftest wizard-steps-use-api-only-for-set-when-both-apis-selected
+  ;; Same /api-only guarantee for a set (collection) entity under :both.
+  (connect-fake! :api-mode :both)
+  (clear-fake-requests!)
+  (step1-set!)
+  (let [after-step1 (fake-request-paths)]
+    (is (every? api-v1-path? after-step1))
+    (is (not-any? api-v2-path? after-step1))
+    (is (some #(string/includes? % "collections") after-step1)
+        "set step1 uses /api/collections"))
+  (clear-fake-requests!)
+  (let [{:keys [status]} (web/prefix-options {})
+        after-prefix (fake-request-paths)]
+    (is (= 200 status))
+    (is (every? api-v1-path? after-prefix))
+    (is (not-any? api-v2-path? after-prefix))))
 
 (deftest prefix-options-without-step1
   (is (= 409 (:status (web/prefix-options {})))))
