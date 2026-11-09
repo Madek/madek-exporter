@@ -1,6 +1,6 @@
 jobs:
   check-releases-file-is-up-to-date:
-    name: Check if app/prod/releases.json is up to date
+    name: Check if releases.json and package versions are up to date
     run_when:
       on any branch:
         type: branch
@@ -24,7 +24,11 @@ jobs:
                 set -euo pipefail
                 ./bin/env/ruby-setup
                 bundle exec ./bin/update-releases
-                git diff --stat --exit-code -- app/prod/releases.json
+                git diff --stat --exit-code -- \
+                  app/prod/releases.json \
+                  package.json \
+                  package-lock.json \
+                  project.clj
 
   security-audit:
     name: Security audit (npm + OSV)

@@ -4,7 +4,7 @@ Desktop application for exporting data from Madek.
 
 Export can use Madek `/api` (JSON-ROA), `/api-v2` (REST), or **both** (writes into `api/` and `api-v2/` subfolders). After login, the UI probes both APIs and lets you pick the export mode.
 
-The **shipped app version** is the first entry in `releases.yml` (not the `version` field in root `package.json`, which may lag).
+The **shipped app version** is the first entry in `releases.yml`. Run `bundle exec ./bin/update-releases` after editing it so `app/*/releases.json`, `package.json`, `package-lock.json`, and `project.clj` stay aligned.
 
 ## Setup
 
@@ -134,7 +134,7 @@ The packaged version is the first entry in `releases.yml` (`major.minor.patch`, 
 bundle exec ./bin/update-releases
 ```
 
-That writes `app/prod/releases.json` and `app/dev/releases.json`. Commit both with `releases.yml`. CI rejects the branch if `app/prod/releases.json` is stale.
+That writes `app/prod/releases.json` and `app/dev/releases.json`, and syncs the top release version into `package.json`, `package-lock.json`, and `project.clj` (not the long release-notes `description`). Commit those with `releases.yml`. CI rejects the branch if they are stale.
 
 Push the branch. CI builds Linux (x64, ARM64), macOS (x64, ARM64), and Windows, then `./bin/prepare-release-infos` copies the zips to a durable path on the executor and prints the version, notes, fetch command, and draft URL. Fetch as soon as those platform jobs finish — the CI working tree is cleaned shortly after:
 

@@ -9,12 +9,59 @@ require 'filewatcher'
 
 options = {watch: false, help: false}
 
+def current_release_version
+  release = YAML.load_file("releases.yml").first
+  version = "#{release["version_major"]}.#{release["version_minor"]}.#{release["version_patch"]}"
+  version += "-#{release["version_pre"]}" if release["version_pre"]
+  version += "+#{release["version_build"]}" if release["version_build"]
+  version
+end
+
+def sync_package_json_version!(version)
+  path = "package.json"
+  pkg = JSON.parse(File.read(path))
+  return if pkg["version"] == version
+  pkg["version"] = version
+  # Keep 2-space JSON matching the repo style.
+  File.write(path, JSON.pretty_generate(pkg) + "\n")
+  puts "Updated #{path} version -> #{version}"
+end
+
+def sync_package_lock_version!(version)
+  path = "package-lock.json"
+  return unless File.exist?(path)
+  content = File.read(path)
+  # Surgical replace so we do not reformat the whole lockfile.
+  updated = content.sub(/^(\s*"version":\s*")[^"]*(")/, "\\1#{version}\\2")
+  updated = updated.sub(
+    /("packages"\s*:\s*\{\s*""\s*:\s*\{[^}]*?"version":\s*")[^"]*(")/m,
+    "\\1#{version}\\2"
+  )
+  return if updated == content
+  File.write(path, updated)
+  puts "Updated #{path} version -> #{version}"
+end
+
+def sync_project_clj_version!(version)
+  path = "project.clj"
+  content = File.read(path)
+  updated = content.sub(/\(defproject\s+madek\s+"[^"]*"/, "(defproject madek \"#{version}\"")
+  return if updated == content
+  File.write(path, updated)
+  puts "Updated #{path} version -> #{version}"
+end
+
 def update
   begin
     releases_json = YAML.load_file("releases.yml").to_json
     IO.write("app/prod/releases.json", releases_json)
     IO.write("app/dev/releases.json", releases_json)
     puts "Updated app/(prod|dev)/releases.json"
+
+    version = current_release_version
+    sync_package_json_version!(version)
+    sync_package_lock_version!(version)
+    sync_project_clj_version!(version)
   rescue Exception => e
     puts e
   end
