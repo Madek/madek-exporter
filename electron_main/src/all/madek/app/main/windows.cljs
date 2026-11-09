@@ -78,9 +78,9 @@
     (js/setTimeout ensure-shown 2000)
     (.on (.-webContents window) "dom-ready"
          (fn []
+           ;; Password stays in main (webRequest injection); renderer only gets the port.
            (.send (.-webContents window) "madek:jvm-sync:init"
-                  (clj->js {:jvm-port env/jvm-port
-                            :jvm-password (str env/jvm-password)}))
+                  (clj->js {:jvm-port env/jvm-port}))
            (send-db-full id)))
     (.on window "closed" (fn [] (swap! windows dissoc id)))))
 

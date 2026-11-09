@@ -2,6 +2,7 @@
   (:require
     [cljs.nodejs :as nodejs]
 
+    [madek.app.main.jvm-auth]
     [madek.app.main.jvm-main-process]
     [madek.app.main.file-logger :as file-log]
     [madek.app.main.menu]
@@ -87,6 +88,7 @@
            (fn []
              (.quit app)))
       (.on app "ready" (fn []
+                          (madek.app.main.jvm-auth/install!)
                           (madek.app.main.windows/init-ipc)
                           (madek.app.main.menu/initialize)
                           (madek.app.main.windows/open-new))))))

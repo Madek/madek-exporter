@@ -1,30 +1,23 @@
 (ns madek.app.front.state.jvm-sync
   (:require
-    [taoensso.sente  :as sente :refer (cb-success?)]
+    [taoensso.sente :as sente]
     [timothypratley.patchin :as patchin]
     ))
 
-(defonce jvm-password* (atom nil))
-
-(defn jvm-password []
-  @jvm-password*)
-
 (defn init [jvm-main-db client-db opts]
 
-  (let [{port :jvm-port password :jvm-password} opts
-        _ (reset! jvm-password* (str password))
-        {:keys [chsk ch-recv send-fn state jvm-port]}
+  (let [{port :jvm-port} opts
+        ;; Auth is injected by Electron main (webRequest); no password in renderer.
+        {:keys [chsk ch-recv send-fn state]}
         (sente/make-channel-socket! "/chsk"
-          {:type :auto ; e/o #{:auto :ajax :ws}
-           ;; URL userinfo supplies Basic Auth for /chsk (WS + AJAX).
-           :host (str (:client-id @client-db) ":" password "@localhost:" port)
+          {:type :auto
+           :host (str "localhost:" port)
            :protocol :http
            :client-id (:client-id @client-db)})]
     (def chsk       chsk)
-    (def ch-chsk    ch-recv) ; ChannelSocket's receive channel
-    (def chsk-send! send-fn) ; ChannelSocket's send API fn
-    (def chsk-state state)   ; Watchable, read-only atom)
-    )
+    (def ch-chsk    ch-recv)
+    (def chsk-send! send-fn)
+    (def chsk-state state))
 
   (defn patch-db [patch-data]
     (swap! jvm-main-db
