@@ -1,16 +1,22 @@
 # Madek Exporter — Prod readiness V2
 
-Date: 2026-11-09 (updated after open-task implementation)  
-Scope: README accuracy, cleanliness, production readiness on `mr/tests-apiv2`.
+Date: 2026-11-09 (fresh audit + remediation)  
+Scope: README accuracy, cleanliness, production readiness on `mr/tests-apiv2` @ `0.11.2-3`.
 
 ## Verdict
+
+| Audience | Status |
+|----------|--------|
+| ZHdK internal Electron distribution | **Prod-ready** after today’s fixes |
+| Public macOS Gatekeeper | Not ready (unsigned; notarization manual) |
+| Long-term stack (cljs / reagent / Bootstrap) | Deferred (EOL front stack) |
 
 | Area | Status |
 |------|--------|
 | Core app (export / login / packaging) | Prod-capable for ZHdK internal distribution |
-| Security hardening | Done for localhost control plane |
-| README | Updated (version, setup, tests, API modes) |
-| Code cleanliness | Dead root clj leftovers removed; prefix-options split |
+| Security hardening | Localhost control plane OK; secrets no longer stored in client-db requests |
+| Packaging strip (`out_*` / maps) | Fixed in `bin/build-electron-prod` + Cider-CI cljs steps |
+| README | Corrected prod e2e / audit notes |
 | Public Gatekeeper / long-term stack | Not fully prod-ready (T8 / full T9) |
 
 ---
@@ -19,42 +25,20 @@ Scope: README accuracy, cleanliness, production readiness on `mr/tests-apiv2`.
 
 | ID | Priority | Area | Item | Status |
 |----|----------|------|------|--------|
-| T1 | P1 | CI / tests | Wire `test:e2e:prod` into Cider-CI | Done — `playwright-prod` → `cider-ci/test-e2e-prod.yml` |
+| T1 | P1 | CI / tests | Wire `test:e2e:prod` into Cider-CI | Done — `playwright-prod` |
 | T2 | P1 | CI / tests | Run `madek.exporter.http-auth-test` from `bin/test-login` / CI | Done |
-| T3 | P1 | Security / UI | Gate or remove `/debug` route in prod builds (nav already hidden) | Done — route registered only when `env/env :dev` |
-| T4 | P2 | Cleanliness | Replace remaining `thrown/stringify` client body in `server/web.clj` download handler | Done — `client-error-body` |
-| T5 | P2 | Cleanliness | Remove or relocate dead root `madek/exporter/utils.clj` + `clj_http/client.clj` | Done |
-| T6 | P2 | Metadata | Align `package.json` `version` / `description` with `releases.yml` | Done — `0.11.2-2` (+ `project.clj`) |
-| T7 | P3 | Security | Avoid sending JVM password to renderer over IPC | Done — main `webRequest` injects Basic Auth; IPC sends port only |
-| T8 | P3 | Stack | Upgrade ClojureScript / Reagent / Bootstrap (EOL front stack) | Deferred |
-| T9 | P3 | Release | Automate macOS codesign + notarization | Partial — `bin/notarize-mac` helper (manual credentials) |
-| T10 | P3 | Maintainability | Optional split of large `web.clj` | Done — `server/prefix_options.clj` |
-
-### Done recently (no action)
-
-| ID | Area | Item | Status |
-|----|------|------|--------|
-| D1 | Security | Localhost JVM Basic Auth + Electron/e2e wiring | Done |
-| D2 | Security | Madek secrets redacted from Sente; form secrets cleared after connect | Done |
-| D3 | Security | Electron preload + `contextIsolation` / no `nodeIntegration` | Done |
-| D4 | Security | Target-dir validation + safe media filenames; `/open` allowlist | Done |
-| D5 | Packaging | Prod strips maps/`out_*`; validator asserts | Done |
-| D6 | UX | Prod menu without DevTools/Reload | Done |
-| D7 | Hygiene | GPL metadata; no `FIX.md` / scratch; `debug-ns` off | Done |
-| D8 | CI | Security audit job fails on findings | Done |
-| D9 | Docs | README: version source, `bundle install`, `./bin/lein`, API modes, `test:e2e:prod`, `audit:security`, http-auth test | Done |
-
----
-
-## README fixes applied
-
-- Documented **API modes** (`api` / `api-v2` / `both`)
-- Clarified **version** = first entry in `releases.yml` (not root `package.json`)
-- Setup: **`bundle install`**, mise tools, **`./bin/lein`**
-- Testing: **`test:e2e:prod`**, **`audit:security`**, **`http-auth-test`**
-- Note that Electron starts JVM with local Basic Auth
-
-One-click (`tmp/dev-madek-exporter`) left as-is (local workflow).
+| T3 | P1 | Security / UI | Gate `/debug` route in prod builds | Done — front route `:dev` only |
+| T4 | P2 | Cleanliness | Replace `thrown/stringify` in download handler | Done — `client-error-body` |
+| T5 | P2 | Cleanliness | Remove dead root leftovers | Done |
+| T6 | P2 | Metadata | Align versions with `releases.yml` | Done — `0.11.2-3` |
+| T7 | P3 | Security | JVM password not sent to renderer | Done — webRequest inject |
+| T8 | P3 | Stack | Upgrade ClojureScript / Reagent / Bootstrap | Deferred |
+| T9 | P3 | Release | Automate macOS codesign + notarization | Partial — `bin/notarize-mac` |
+| T10 | P3 | Maintainability | Split large `web.clj` | Done — `prefix_options.clj` |
+| T11 | P1 | Security | Do not store Madek secrets in client-db `:requests` | Done — store redacted copy |
+| T12 | P1 | Packaging | Strip `out_*` / maps on all prod cljs paths | Done — `build-electron-prod` + CI |
+| T13 | P2 | Security | Gate JVM `/debug/performance` | Done — `MADEK_EXPORTER_DEBUG=1` |
+| T14 | P2 | Security | Harden `openPath` + target-dir prefix blocklist | Done |
 
 ---
 
@@ -66,7 +50,8 @@ One-click (`tmp/dev-madek-exporter`) left as-is (local workflow).
 npm run test:login
 npm run test:e2e
 npm run audit:security
-npm run build:electron:prod && npm run build:jvm:prod && npm run test:e2e:prod
+npm run build:electron:prod && npm run build:jvm:prod && npm run check:artifacts
+npm run test:e2e:prod
 ```
 
 ---

@@ -25,10 +25,16 @@
    [madek.exporter.server.prefix-options :as prefix-options]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils :refer [str keyword deep-merge presence]]
+   [environ.core :refer [env]]
    [taoensso.timbre :refer [info]]
    [ring.middleware.defaults :refer [site-defaults wrap-defaults]]
    [ring.middleware.json]
    [ring.util.response :refer [response]]))
+
+(defn- debug-endpoints-enabled?
+  "Perf debug HTTP routes are opt-in (Electron :dev sets MADEK_EXPORTER_DEBUG=1)."
+  []
+  (= "1" (str (or (env :madek-exporter-debug) ""))))
 
 ;### download entity ##########################################################
 
@@ -363,9 +369,15 @@
 
   (GET "/download/prefix-options" _ #'prefix-options/handler)
 
-  (GET "/debug/performance" _ (response {:entries (perf-log/entries)}))
+  (GET "/debug/performance" _
+       (if (debug-endpoints-enabled?)
+         (response {:entries (perf-log/entries)})
+         {:status 404 :body "Not Found"}))
 
-  (DELETE "/debug/performance" _ (do (perf-log/clear!) {:status 204}))
+  (DELETE "/debug/performance" _
+          (if (debug-endpoints-enabled?)
+            (do (perf-log/clear!) {:status 204})
+            {:status 404 :body "Not Found"}))
 
   (ANY "/shutdown" _ #'shutdown)
 
