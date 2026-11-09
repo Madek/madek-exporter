@@ -23,6 +23,7 @@
    [logbug.ring :as logbug-ring :refer [wrap-handler-with-logging]]
    [logbug.thrown :as thrown]
    [madek.exporter.api :as api]
+   [madek.exporter.api-v2 :as api-v2]
    [madek.exporter.connection :as connection]
 
    [madek.exporter.export :as export]
@@ -341,8 +342,8 @@
 ;##############################################################################
 
 (defn- api-root
-  "Wizard Madek root: always `/api` (ROA), never `/api-v2`, even when export
-  `:api-mode` is `:both` or `:api-v2`."
+  "JSON-ROA `/api` root for wizard walks that still use v1 (step 1, and
+  prefix-options when export mode is `:api` or `:both`)."
   []
   (roa/get-root (state/connection-entry-point)
                 :default-conn-opts (state/connection-http-options)
@@ -396,11 +397,90 @@
     (str (export-files/useableFileName v) "_" entity-id)
     (str "_" entity-id)))
 
+(defn- prefix-options-rows
+  "Join text meta-keys with entity values into the dropdown row shape."
+  [id vocabs values meta-keys]
+  (->> meta-keys
+       (filter #(= "MetaDatum::Text" (:meta_datum_object_type %)))
+       (map (fn [mk]
+              (let [vid (vocabulary-id-of mk)
+                    voc (get vocabs vid)
+                    value (get values (:id mk))]
+                {:vocabulary_id vid
+                 :vocabulary_label (or (:label voc) vid)
+                 :vocabulary_position (or (:position voc) 0)
+                 :meta_key_id (:id mk)
+                 :meta_key_label (or (:label mk) (:id mk))
+                 :meta_key_position (or (:position mk) 0)
+                 :value value
+                 :folder_name (prefix-folder-name id value)})))
+       (sort-by (juxt :vocabulary_position
+                      :meta_key_position
+                      :vocabulary_label
+                      :meta_key_label))
+       vec))
+
+(defn- prefix-options-via-api
+  "ROA walk over `/api` (parallel member GETs)."
+  [gen id entity-type title]
+  (let [root (api-root)
+        vocabs (->> (roa-collection-data gen root :vocabularies)
+                    (map (juxt :id identity))
+                    (into {}))
+        entity (do (throw-unless-prefix-options-current! gen)
+                   (-> root
+                       (roa/relation (keyword entity-type))
+                       (roa/get {:id id})))
+        values (->> (roa-collection-data gen entity :meta-data)
+                    (filter #(= "MetaDatum::Text" (:type %)))
+                    (map (juxt :meta_key_id :value))
+                    (into {}))
+        options (prefix-options-rows
+                 id vocabs values
+                 (roa-collection-data gen root :meta-keys))]
+    (throw-unless-prefix-options-current! gen)
+    (response {:entity_id id
+               :entity_title title
+               :options options})))
+
+(defn- prefix-options-via-api-v2
+  "Plain JSON walk over `/api-v2` (paginated lists + entity meta-data)."
+  [gen id entity-type title]
+  (let [base-url (api/entry-point :api-v2)
+        http-opts (state/connection-http-options)
+        _ (throw-unless-prefix-options-current! gen)
+        vocabs (->> (api-v2/vocabularies base-url http-opts)
+                    (map (juxt :id identity))
+                    (into {}))
+        _ (throw-unless-prefix-options-current! gen)
+        md-body (api-v2/get-json! base-url
+                                  (api-v2/meta-data-path entity-type id)
+                                  http-opts
+                                  nil)
+        values (->> (or (:meta_data md-body) [])
+                    (filter #(= "MetaDatum::Text" (:type %)))
+                    (map (juxt :meta_key_id :string))
+                    (into {}))
+        _ (throw-unless-prefix-options-current! gen)
+        options (prefix-options-rows
+                 id vocabs values
+                 (api-v2/meta-keys base-url http-opts))]
+    (throw-unless-prefix-options-current! gen)
+    (response {:entity_id id
+               :entity_title title
+               :options options})))
+
+(defn- prefix-options-use-api-v2?
+  "Follow export `:api-mode`: only `:api-v2` uses `/api-v2`. `:both` and
+  `:api` use `/api`."
+  []
+  (= :api-v2 (api/current-mode)))
+
 (defn prefix-options
   "All text meta-keys from the Madek catalog, joined with the step-1 entity's
-  values. Collection member GETs run in parallel (see
-  `prefix-options-concurrency`) over the shared HTTP pool.
-  Uses `/api` only — never `/api-v2` — even when export mode is `:both`."
+  values. Uses `/api-v2` when export mode is `:api-v2`; otherwise `/api`
+  (including `:both`). ROA member GETs run in parallel (see
+  `prefix-options-concurrency`) over the shared HTTP pool."
   [_]
   (catcher/snatch
    {:return-fn (fn [e]
@@ -410,42 +490,10 @@
    (let [{id :uuid entity-type :type title :title} (-> @state/db :download :entity)]
      (if-not id
        {:status 409 :body {:message "No export entity selected (step 1)."}}
-       (let [gen (abort-prefix-options!)
-             root (api-root)
-             vocabs (->> (roa-collection-data gen root :vocabularies)
-                         (map (juxt :id identity))
-                         (into {}))
-             entity (do (throw-unless-prefix-options-current! gen)
-                        (-> root
-                            (roa/relation (keyword entity-type))
-                            (roa/get {:id id})))
-             values (->> (roa-collection-data gen entity :meta-data)
-                         (filter #(= "MetaDatum::Text" (:type %)))
-                         (map (juxt :meta_key_id :value))
-                         (into {}))
-             options (->> (roa-collection-data gen root :meta-keys)
-                          (filter #(= "MetaDatum::Text" (:meta_datum_object_type %)))
-                          (map (fn [mk]
-                                 (let [vid (vocabulary-id-of mk)
-                                       voc (get vocabs vid)
-                                       value (get values (:id mk))]
-                                   {:vocabulary_id vid
-                                    :vocabulary_label (or (:label voc) vid)
-                                    :vocabulary_position (or (:position voc) 0)
-                                    :meta_key_id (:id mk)
-                                    :meta_key_label (or (:label mk) (:id mk))
-                                    :meta_key_position (or (:position mk) 0)
-                                    :value value
-                                    :folder_name (prefix-folder-name id value)})))
-                          (sort-by (juxt :vocabulary_position
-                                         :meta_key_position
-                                         :vocabulary_label
-                                         :meta_key_label))
-                          vec)]
-         (throw-unless-prefix-options-current! gen)
-         (response {:entity_id id
-                    :entity_title title
-                    :options options}))))))
+       (let [gen (abort-prefix-options!)]
+         (if (prefix-options-use-api-v2?)
+           (prefix-options-via-api-v2 gen id entity-type title)
+           (prefix-options-via-api gen id entity-type title)))))))
 
 ;##############################################################################
 
