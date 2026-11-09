@@ -396,58 +396,10 @@
     (str (export-files/useableFileName v) "_" entity-id)
     (str "_" entity-id)))
 
-(defn- encode-path-segment
-  "Percent-encode a single path segment (`madek_core:title` → `madek_core%3Atitle`).
-  Production Madek returns 404 for an unencoded colon in the meta-key id."
-  [s]
-  (-> (str s)
-      (java.net.URLEncoder/encode "UTF-8")
-      (string/replace "+" "%20")))
-
-(defn- api-resource-url
-  "Absolute Madek v1 URL under `{connection}/api/…`. Prefer absolute hrefs:
-  resolving a relative path against `/api` (no trailing slash) drops the
-  `api` segment. Path segments are encoded; a trailing empty segment keeps
-  Madek's conventional trailing slash."
-  [& path-segments]
-  (let [base (string/replace (str (-> @state/db :connection :url)) #"/+$" "")]
-    (str base "/api/"
-         (->> path-segments
-              (map (fn [seg]
-                     (let [s (string/replace (str seg) #"^/+" "")]
-                       (if (empty? s) "" (encode-path-segment s)))))
-              (string/join "/")))))
-
-(defn- http-status-of [e]
-  (or (:status (ex-data e))
-      (some-> e ex-data :object :status)))
-
-(defn- roa-get-url
-  "GET an absolute Madek API URL. Returns nil on HTTP 404 so a missing
-  meta-key/vocabulary does not abort the whole prefix-options response."
-  [gen root url]
-  (throw-unless-prefix-options-current! gen)
-  (try
-    (-> {:href url
-         :roa-conn-opts (:roa-conn-opts root)}
-        (roa/get {})
-        roa/data)
-    (catch Exception e
-      (if (= 404 (http-status-of e))
-        (do (info "prefix-options skip missing resource" {:url url})
-            nil)
-        (throw e)))))
-
-(defn- fallback-meta-key [mk-id]
-  {:id mk-id
-   :label mk-id
-   :meta_datum_object_type "MetaDatum::Text"
-   :position 0
-   :vocabulary_id (some-> mk-id str (string/split #":" 2) first)})
-
 (defn prefix-options
-  "Text meta-data that have a value on the step-1 entity, with meta-key and
-  vocabulary labels for those keys only (no full meta-key catalog walk).
+  "All text meta-keys from the Madek catalog, joined with the step-1 entity's
+  values. Collection member GETs run in parallel (see
+  `prefix-options-concurrency`) over the shared HTTP pool.
   Uses `/api` only — never `/api-v2` — even when export mode is `:both`."
   [_]
   (catcher/snatch
@@ -460,50 +412,28 @@
        {:status 409 :body {:message "No export entity selected (step 1)."}}
        (let [gen (abort-prefix-options!)
              root (api-root)
+             vocabs (->> (roa-collection-data gen root :vocabularies)
+                         (map (juxt :id identity))
+                         (into {}))
              entity (do (throw-unless-prefix-options-current! gen)
                         (-> root
                             (roa/relation (keyword entity-type))
                             (roa/get {:id id})))
-             valued-text (->> (roa-collection-data gen entity :meta-data)
-                              (filterv #(and (= "MetaDatum::Text" (:type %))
-                                             (presence (:value %)))))
-             text-keys (->> (parallel-mapv
-                             prefix-options-concurrency
-                             (fn [md]
-                               (let [mk-id (str (:meta_key_id md))
-                                     mk (or (roa-get-url gen root
-                                                         (api-resource-url
-                                                          "meta-keys" mk-id ""))
-                                            (fallback-meta-key mk-id))]
-                                 [md mk]))
-                             valued-text)
-                            (filterv (fn [[_ mk]]
-                                       (= "MetaDatum::Text"
-                                          (:meta_datum_object_type mk)))))
-             vocab-ids (->> text-keys
-                            (map (fn [[_ mk]] (vocabulary-id-of mk)))
-                            (filter presence)
-                            distinct
-                            vec)
-             vocabs (->> (parallel-mapv
-                          prefix-options-concurrency
-                          (fn [vid]
-                            [vid (roa-get-url gen root
-                                              (api-resource-url
-                                               "vocabularies" (str vid) ""))])
-                          vocab-ids)
+             values (->> (roa-collection-data gen entity :meta-data)
+                         (filter #(= "MetaDatum::Text" (:type %)))
+                         (map (juxt :meta_key_id :value))
                          (into {}))
-             options (->> text-keys
-                          (map (fn [[md mk]]
-                                 (let [mk-id (:meta_key_id md)
-                                       value (:value md)
-                                       vid (vocabulary-id-of mk)
-                                       voc (get vocabs vid)]
+             options (->> (roa-collection-data gen root :meta-keys)
+                          (filter #(= "MetaDatum::Text" (:meta_datum_object_type %)))
+                          (map (fn [mk]
+                                 (let [vid (vocabulary-id-of mk)
+                                       voc (get vocabs vid)
+                                       value (get values (:id mk))]
                                    {:vocabulary_id vid
                                     :vocabulary_label (or (:label voc) vid)
                                     :vocabulary_position (or (:position voc) 0)
-                                    :meta_key_id (or (:id mk) mk-id)
-                                    :meta_key_label (or (:label mk) mk-id)
+                                    :meta_key_id (:id mk)
+                                    :meta_key_label (or (:label mk) (:id mk))
                                     :meta_key_position (or (:position mk) 0)
                                     :value value
                                     :folder_name (prefix-folder-name id value)})))
