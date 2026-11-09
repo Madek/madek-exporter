@@ -7,7 +7,8 @@
    [madek.exporter.connection :refer [connect-to-madek-server]]
    [madek.exporter.export :as export]
    [madek.exporter.state :as state]
-   [taoensso.timbre :as timbre :refer [info debug warn error]]))
+   [madek.exporter.utils :as utils]
+   [taoensso.timbre :as timbre :refer [info error]]))
 
 (def cli-options
   [["-u" "--madek-url  URL" "Madek URL"
@@ -33,17 +34,35 @@
        flatten
        (clojure.string/join \newline)))
 
+(defn- redacted-options [options]
+  (cond-> options
+    (:token options) (assoc :token "***redacted***")))
+
 (defn run [options]
-  (info 'run options)
-  (connect-to-madek-server {:body {:api-token (:token options)
-                                   :url (:madek-url options)}})
-  (info 'state/db @state/db)
-  (when-let [media-entry-id (:media-entry-id options)]
-    (export/download-media-entry
-     media-entry-id
-     ""
-     (str (-> @state/db :connection :url) "/api")
-     (-> @state/db :connection :http-options))))
+  (info 'run (redacted-options options))
+  (let [resp (connect-to-madek-server
+              {:body {:api-token (:token options)
+                      :url (:madek-url options)
+                      :sign-in-method :token}})
+        status (:status resp)]
+    (info 'connect-status status)
+    (info 'state/db (utils/client-safe-db @state/db))
+    (when-not (<= 200 status 299)
+      (throw (ex-info "CLI connect failed"
+                      {:status status :body (:body resp)})))
+    (when-let [media-entry-id (:media-entry-id options)]
+      (let [target-dir (utils/validate-target-directory
+                        (or (:download-dir options)
+                            (get-in @state/db [:download :target-directory])))
+            entry-point (str (-> @state/db :connection :url) "/api")
+            http-opts (state/connection-http-options)]
+        (export/download-media-entry
+         media-entry-id
+         target-dir
+         false
+         nil
+         entry-point
+         http-opts)))))
 
 (defn main [global-options args]
   (try
@@ -53,9 +72,13 @@
           pass-on-args (->> (rest arguments) flatten (into []))
           options (into (sorted-map) options)
           print-summary #(println (main-usage summary {:args args :options options}))]
-      (info {'args args 'options options 'cmd cmd 'pass-on-args pass-on-args})
+      (info {'args args
+             'options (redacted-options options)
+             'cmd cmd
+             'pass-on-args pass-on-args})
       (cond
         (:help options) (print-summary)
         :else (run (merge global-options options))))
     (catch Exception ex
-      (error ex))))
+      (error ex "cli-run failed")
+      (throw ex))))

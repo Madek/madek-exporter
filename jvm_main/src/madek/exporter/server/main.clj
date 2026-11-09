@@ -55,11 +55,13 @@
      (println (usage summary {:options options}))
      (let [{target-dir :download-dir madek-url :madek-url} options]
        (state/initialize
-        {:jvm-main-options options
+        {:jvm-main-options (dissoc options :password)
          :download-parameters
          {:target-dir target-dir}
+         :download
+         {:target-directory target-dir}
          :connection
-         {:madek-url madek-url}}))
+         {:url madek-url}}))
      (let [{port :port host :interface password :password} options]
        (server/initialize
         {:port port

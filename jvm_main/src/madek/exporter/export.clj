@@ -16,7 +16,7 @@
    [madek.exporter.export.progress :as progress]
    [madek.exporter.request-log :as request-log]
    [madek.exporter.state :as state]
-   [madek.exporter.utils :refer [authenticated-http-options? deep-merge presence]]
+   [madek.exporter.utils :as utils :refer [authenticated-http-options? deep-merge presence]]
    [taoensso.timbre :as logging :refer [debug info]])
 
   (:import
@@ -51,12 +51,7 @@
 
 (defn nio-path [s] (Paths/get s (into-array [""])))
 
-(defn- under-dir?
-  "True when `path` is `dir` or a descendant (after normalize)."
-  [dir path]
-  (let [dir-p (.normalize (.toAbsolutePath (nio-path (str dir))))
-        path-p (.normalize (.toAbsolutePath (nio-path (str path))))]
-    (.startsWith path-p dir-p)))
+(def under-dir? utils/under-dir?)
 
 (defn export-tree-root
   "Root that owns an export path for symlink policy.
@@ -363,6 +358,6 @@
 ;(logging-config/set-logger! :level :debug)
 ;(logging-config/set-logger! :level :info)
 ;(debug/debug-ns 'ring.middleware.resource)
-(debug/debug-ns *ns*)
+;(debug/debug-ns *ns*)
 ;(debug/debug-ns 'json-roa.client.core)
 ;(debug/debug-ns 'uritemplate-clj.core)

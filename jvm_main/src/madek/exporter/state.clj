@@ -80,7 +80,9 @@
   (patchin/diff a b))
 
 (defn- data-for-clients [db]
-  (download-log-lines/attach-to-db db))
+  (-> db
+      utils/client-safe-db
+      download-log-lines/attach-to-db))
 
 (defn publish
   "Push db updates to a client. Retries with compare-and-set so concurrent
@@ -166,7 +168,7 @@
         (initialize-sente)
         (add-watch connected-uids :connected-uids #'watch-connected-uids)
         (add-watch db :db #'watch-db)
-        (info "initialized state" {:db @db})
+        (info "initialized state" {:db (utils/client-safe-db @db)})
         (reset! initialized* true))))
 
 ;### Debug ####################################################################
