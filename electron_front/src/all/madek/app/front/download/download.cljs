@@ -10,13 +10,10 @@
 
     [clojure.string :as string]
 
-    [cljs.nodejs :as nodejs]
+    [madek.app.front.bridge :as bridge]
     [reagent.core :as reagent]
     [reagent.ratom :as ratom :refer [reaction]]
     ))
-
-(def Electron (nodejs/require "electron"))
-(def shell (.-shell Electron))
 
 (def download* (reaction (-> @state/jvm-main-db :download)))
 
@@ -37,7 +34,7 @@
              :on-click (fn [e]
                          (.preventDefault e)
                          (when-let [url (:url entity)]
-                           (.openExternal shell url)))}
+                           (bridge/open-external url)))}
          [:em title]]]])))
 
 (defn item-public-id [id]
@@ -275,7 +272,7 @@
           :title url
           :on-click (fn [e]
                       (.preventDefault e)
-                      (.openExternal shell url))}
+                      (bridge/open-external url))}
          public-id]
         [:span.item-id.text-muted {:title public-id} public-id])
       [:span.item-detail.text-muted detail]]]))
@@ -333,7 +330,7 @@
 (defn open-target-directory [e]
   (.preventDefault e)
   (when-let [dir (presence (:target-directory @download*))]
-    (.openPath shell dir)))
+    (bridge/open-path dir)))
 
 (defn check-export-data []
   (let [req {:method :post

@@ -12,15 +12,11 @@
     [reagent.ratom :as ratom :refer [reaction]]
     [madek.app.front.state :as state]
     [madek.app.front.env]
-    [cljs.nodejs :as nodejs]
     )
   (:import
     [goog Uri]
     )
   )
-
-
-(def Electron (nodejs/require "electron"))
 
 (def form-data (reaction (-> @state/client-db :connection :form)))
 
@@ -76,6 +72,10 @@
 
 ;;; connect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defn clear-form-sign-in-data []
+  (update-form-data-value :login nil)
+  (update-form-data-value :password nil))
+
 (defn connect-params []
   (let [fd @form-data
         ;; Prefer the picker value; first connect defaults to api.
@@ -101,7 +101,10 @@
      (request/send-off
        req {:title (or title (i18n/t :connection/connect-req))
             :error-title (or error-title (i18n/t :connection/connect-failed))}
-       :callback callback))))
+       :callback (fn [resp]
+                   (when (request/response-success? resp)
+                     (clear-form-sign-in-data))
+                   (when callback (callback resp)))))))
 
 (defn connect
   "Connect button handler. Ignores the DOM click event (must stay 0-arity
@@ -110,7 +113,7 @@
   (connect!))
 
 (defn set-api-mode!
-  "Persist the picker choice and reconnect so JVM connection :api-mode matches."
+  "Persist the picker choice on the existing JVM session (no re-auth)."
   [mode]
   (when (api-mode-available? (current-api-status) mode)
     (let [mode (keyword mode)
@@ -119,19 +122,18 @@
                                 :api))]
       (when (not= mode previous)
         (update-form-data-value :api-mode mode)
-        (connect!
+        (request/send-off
+         {:method :patch
+          :path "/connect/api-mode"
+          :json-params {:api-mode (name mode)}}
          {:title (i18n/t :connection/api-mode-update-req)
-          :error-title (i18n/t :connection/api-mode-update-failed)
-          :callback (fn [resp]
-                      (when-not (request/response-success? resp)
-                        (update-form-data-value :api-mode previous)))})))))
+          :error-title (i18n/t :connection/api-mode-update-failed)}
+         :callback (fn [resp]
+                     (when-not (request/response-success? resp)
+                       (update-form-data-value :api-mode previous))))))))
 
 
 ;;; disconnect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn clear-form-sign-in-data []
-  (update-form-data-value :login nil)
-  (update-form-data-value :password nil))
 
 (defn disconnect []
   (let [req {:method :delete

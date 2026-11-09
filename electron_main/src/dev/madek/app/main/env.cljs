@@ -23,6 +23,9 @@
 (def jvm-port
   (let [p (some-> js/process .-env (aget "MADEK_JVM_PORT") js/parseInt)]
     (if (and p (not (js/isNaN p))) p 8383)))
-(def jvm-password "secret")
+
+(def jvm-password
+  (or (some-> js/process .-env (aget "MADEK_JVM_PASSWORD") not-empty)
+      "secret"))
 
 

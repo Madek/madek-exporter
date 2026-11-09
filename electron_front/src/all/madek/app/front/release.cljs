@@ -9,6 +9,7 @@
     [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
     [madek.app.front.state :as state]
+    [madek.app.front.bridge :as bridge]
 
     [cljs-http.client :as http]
     [cljs-uuid-utils.core :as uuid]
@@ -16,13 +17,8 @@
     [goog.string :as gstring]
     [goog.string.format]
     [reagent.core :as r]
-    [cljs.nodejs :as nodejs]
     ))
 
-
-(def Electron (nodejs/require "electron"))
-
-(def shell (.-shell Electron))
 
 (defn fetch-gh-release []
   (let [req-opts {:method :get
@@ -106,8 +102,7 @@
       [:a {:href "https://github.com/Madek/madek-exporter/releases"
            :on-click (fn [e]
                        (.preventDefault e)
-                       (.openExternal
-                         shell
+                       (bridge/open-external
                          "https://github.com/Madek/madek-exporter/releases"))
            :style {:font-family "monospaced"}}
        "https://github.com/Madek/madek-exporter/releases"
