@@ -13,7 +13,7 @@
    [madek.exporter.export.index-html :as index-html]
    [madek.exporter.export.meta-data :as meta-data]
    [madek.exporter.export.progress :as progress]
-   [madek.exporter.utils :refer [presence]]
+   [madek.exporter.utils :as utils :refer [presence]]
    [taoensso.timbre :refer [warn]])
   (:import
    [java.io File]))
@@ -93,10 +93,7 @@
                                                (:http-opts ctx)
                                                nil)
                           summary)
-              file-name (let [filename (:filename preview)]
-                          (if (clojure.string/blank? (str filename))
-                            preview-id
-                            filename))
+              file-name (utils/safe-export-filename (:filename preview) preview-id)
               preview-path (str previews-dir File/separator file-name)
               response (api-v2/get-stream! (:base-url ctx)
                                            (api-v2/preview-stream-path preview-id)
@@ -118,10 +115,7 @@
           media-files-dir (str target-dir File/separator "media-files")
           media-file-dir (str media-files-dir File/separator media-file-id)
           data-path (str media-file-dir File/separator "data.json")
-          file-name (let [filename (:filename media-file)]
-                      (if (clojure.string/blank? (str filename))
-                        media-file-id
-                        filename))
+          file-name (utils/safe-export-filename (:filename media-file) media-file-id)
           file-path (str media-file-dir File/separator file-name)
           response (api-v2/get-stream! (:base-url ctx)
                                        (api-v2/media-file-stream-path media-file-id)
