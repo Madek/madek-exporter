@@ -115,6 +115,68 @@ async function setExportApiMode(page, mode) {
   await expect(page.locator('#api-mode')).toContainText(API_MODE_LABEL[mode]);
 }
 
+async function clearFakeRequests() {
+  const res = await fetch(`${getFakeBaseUrl()}/_test/requests`, { method: 'DELETE' });
+  expect(res.status).toBe(200);
+}
+
+async function fakeRequestPaths() {
+  const res = await fetch(`${getFakeBaseUrl()}/_test/requests`);
+  expect(res.status).toBe(200);
+  const body = await res.json();
+  return (body.requests || []).map((r) => r.path);
+}
+
+function isApiV1Path(p) {
+  return /^\/api(\/|$)/.test(p);
+}
+
+function isApiV2Path(p) {
+  return /^\/api-v2(\/|$)/.test(p);
+}
+
+/**
+ * @param {string[]} paths
+ * @param {'api' | 'api-v2' | 'both'} expectedApi
+ * @param {string} context
+ */
+function expectPathsForApi(paths, expectedApi, context) {
+  expect(paths.length, `${context}: expected Madek hits, got none`).toBeGreaterThan(0);
+  if (expectedApi === 'api-v2') {
+    expect(
+      paths.every(isApiV2Path),
+      `${context}: must use /api-v2 only, got: ${JSON.stringify(paths)}`
+    ).toBe(true);
+  } else if (expectedApi === 'api') {
+    expect(
+      paths.every(isApiV1Path),
+      `${context}: must use /api only, got: ${JSON.stringify(paths)}`
+    ).toBe(true);
+  } else {
+    expect(
+      paths.some(isApiV1Path),
+      `${context}: must hit /api, got: ${JSON.stringify(paths)}`
+    ).toBe(true);
+    expect(
+      paths.some(isApiV2Path),
+      `${context}: must hit /api-v2, got: ${JSON.stringify(paths)}`
+    ).toBe(true);
+  }
+}
+
+/**
+ * Catalog GETs used by the prefix picker (ignore unrelated probe noise).
+ * @param {string[]} paths
+ */
+function catalogPaths(paths) {
+  return paths.filter(
+    (p) =>
+      p.includes('meta-keys') ||
+      p.includes('vocabularies') ||
+      p.includes('meta-data')
+  );
+}
+
 /** @param {import('@playwright/test').Page} page */
 async function connectWithLogin(page, login, password) {
   await useLoginTab(page);
@@ -364,4 +426,10 @@ module.exports = {
   apiModeOption,
   apiModeItem,
   API_MODE_LABEL,
+  clearFakeRequests,
+  fakeRequestPaths,
+  isApiV1Path,
+  isApiV2Path,
+  expectPathsForApi,
+  catalogPaths,
 };

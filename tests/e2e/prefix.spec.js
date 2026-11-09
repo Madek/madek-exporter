@@ -5,6 +5,10 @@ const {
   expectConnected,
   openExportPage,
   setExportApiMode,
+  clearFakeRequests,
+  fakeRequestPaths,
+  expectPathsForApi,
+  catalogPaths,
 } = require('./fixtures');
 const {
   getFakeBaseUrl,
@@ -14,18 +18,6 @@ const {
 } = require('./electron-app');
 
 test.describe.configure({ timeout: 120_000 });
-
-async function clearFakeRequests() {
-  const res = await fetch(`${getFakeBaseUrl()}/_test/requests`, { method: 'DELETE' });
-  expect(res.status).toBe(200);
-}
-
-async function fakeRequestPaths() {
-  const res = await fetch(`${getFakeBaseUrl()}/_test/requests`);
-  expect(res.status).toBe(200);
-  const body = await res.json();
-  return (body.requests || []).map((r) => r.path);
-}
 
 async function openPrefixStep(page, { apiMode = 'api' } = {}) {
   const targetDir = createE2eExportDir();
@@ -115,14 +107,6 @@ test('prefix picker: value, empty value, no prefix, and the value filter', async
   await expect(page.locator('.prefix-example')).not.toContainText('Fake export entry_');
 });
 
-function isApiV1Path(p) {
-  return /^\/api(\/|$)/.test(p);
-}
-
-function isApiV2Path(p) {
-  return /^\/api-v2(\/|$)/.test(p);
-}
-
 async function expectPrefixRefreshUsesApi(page, expectedApi) {
   await clearFakeRequests();
   const refresh = page.getByRole('button', { name: 'Refresh prefix options' });
@@ -135,29 +119,8 @@ async function expectPrefixRefreshUsesApi(page, expectedApi) {
   );
   await refresh.click();
   await prefixDone;
-
-  const paths = await fakeRequestPaths();
-  const catalog = paths.filter(
-    (p) =>
-      p.includes('meta-keys') ||
-      p.includes('vocabularies') ||
-      p.includes('meta-data')
-  );
-  expect(
-    catalog.length,
-    `expected catalog hits after refresh, got: ${JSON.stringify(paths)}`
-  ).toBeGreaterThan(0);
-  if (expectedApi === 'api-v2') {
-    expect(
-      catalog.every(isApiV2Path),
-      `prefix refresh must use /api-v2 only, got: ${JSON.stringify(catalog)}`
-    ).toBe(true);
-  } else {
-    expect(
-      catalog.every(isApiV1Path),
-      `prefix refresh must use /api only, got: ${JSON.stringify(catalog)}`
-    ).toBe(true);
-  }
+  const catalog = catalogPaths(await fakeRequestPaths());
+  expectPathsForApi(catalog, expectedApi, 'prefix refresh');
   expect(catalog.some((p) => p.includes('meta-keys'))).toBe(true);
 }
 
