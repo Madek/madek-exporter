@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Notarize a packaged Madek Exporter .app (Apple Developer ID required).
+# Does not run in CI by default — set credentials in the environment first.
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$ROOT"
+
+APP_PATH="${1:-}"
+if [[ -z "$APP_PATH" ]]; then
+  if [[ "$(uname -m)" == "arm64" ]]; then
+    APP_PATH="target/packages/madek-exporter-darwin-arm64/madek-exporter.app"
+  else
+    APP_PATH="target/packages/madek-exporter-darwin-x64/madek-exporter.app"
+  fi
+fi
+
+if [[ ! -d "$APP_PATH" ]]; then
+  echo "[notarize] missing app: $APP_PATH" >&2
+  echo "[notarize] build with npm run build:mac:arm64:prod (or x64) first" >&2
+  exit 1
+fi
+
+: "${APPLE_ID:?Set APPLE_ID (Apple ID email)}"
+: "${APPLE_TEAM_ID:?Set APPLE_TEAM_ID}"
+: "${APPLE_APP_SPECIFIC_PASSWORD:?Set APPLE_APP_SPECIFIC_PASSWORD}"
+SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application}"
+
+echo "[notarize] codesign $APP_PATH"
+codesign --deep --force --options runtime \
+  --sign "$SIGN_IDENTITY" \
+  "$APP_PATH"
+
+ZIP_PATH="${APP_PATH%.app}-notarize.zip"
+echo "[notarize] zip -> $ZIP_PATH"
+ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+echo "[notarize] submit to notarytool"
+xcrun notarytool submit "$ZIP_PATH" \
+  --apple-id "$APPLE_ID" \
+  --team-id "$APPLE_TEAM_ID" \
+  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+  --wait
+
+echo "[notarize] staple"
+xcrun stapler staple "$APP_PATH"
+echo "[notarize] OK: $APP_PATH"
