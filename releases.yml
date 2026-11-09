@@ -3,6 +3,38 @@
 - version_major: 0
   version_minor: 11
   version_patch: 2
+  version_pre: 3
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Harden the local JVM control plane: HTTP Basic Auth, Madek secret redaction over Sente, export path/filename safety, and `/open` URI allowlisting.
+    * Isolate the Electron renderer behind preload/`contextBridge` (`nodeIntegration` off); inject JVM Basic Auth from the main process so the password never reaches the renderer.
+    * Do not store Madek passwords/tokens in client-db request history or Debug dumps; keep secrets only for the live HTTP call.
+    * Route step-2 prefix-options walks to `/api` or `/api-v2` from the selected export mode (`both` uses `/api`); reconnect after changing the mode.
+    * Gate the `/debug` route to dev builds; gate JVM `/debug/performance` behind `MADEK_EXPORTER_DEBUG=1` (Electron `:dev` sets it).
+    * Strip prod Closure `out_*` dirs and source maps on every prod cljs path (`bin/build-electron-prod` and Cider-CI); fail CI on security-audit findings.
+    * Harden preload `openPath` and refuse export targets under system path prefixes; quiet JVM library logging for production (`madek.exporter` stays at `:info`).
+    * Merge Help “About” with version, release link, runtime versions, and supported operating systems into one TOC section.
+    * Add auth/path unit tests, optional prod Electron Playwright smoke, and wire them into Cider-CI / `bin/test-login`.
+    * Sync `package.json` / `package-lock.json` / `project.clj` versions from `releases.yml` via `bin/update-releases`; add a manual macOS `bin/notarize-mac` helper.
+    * Remove dead root `clj_http` / `madek/exporter` leftovers; extract prefix-options into its own JVM namespace.
+
+    Notes
+    -----
+
+    * Same packaging, toolchain, and platform notes as 0.11.2-2.
+    * After pulling, rebuild Electron and JVM (`bin/build-electron-dev`, `bin/build-jvm-main-dev`) so preload auth injection, Help, and logging changes are picked up.
+
+####### 0.11.2 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 2
   version_pre: 2
   version_build: NULL
   name: NULL
