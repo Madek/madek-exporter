@@ -269,9 +269,46 @@
                     (integer? (:ms %)))
               (perf-log/entries))
         "Madek calls are recorded for the Debug → Performance tab")))
-(deftest wizard-steps-use-api-only-when-both-apis-selected
-  ;; With export api-mode :both (api + api-v2), step1 and prefix-options must
-  ;; still call Madek `/api` only — never `/api-v2`.
+(defn- assert-prefix-options-paths!
+  "Assert prefix-options hit the expected Madek API and return the body."
+  [expected-api]
+  (clear-fake-requests!)
+  (let [{:keys [status body]} (web/prefix-options {})
+        after-prefix (fake-request-paths)
+        title (some #(when (= "madek_core:title" (:meta_key_id %)) %)
+                    (:options body))]
+    (is (= 200 status))
+    (is (= 2 (count (:options body)))
+        "title (with value) + subtitle (empty) from the selected API")
+    (is (= "Fake export entry" (:value title)))
+    (is (seq after-prefix) "prefix-options hits the fake server")
+    (case expected-api
+      :api
+      (do
+        (is (every? api-v1-path? after-prefix)
+            (str "prefix-options must use /api only, got: " after-prefix))
+        (is (not-any? api-v2-path? after-prefix)
+            (str "prefix-options must not touch /api-v2, got: " after-prefix))
+        (is (some #(string/includes? % "meta-keys") after-prefix)
+            "prefix-options loads meta-keys via /api"))
+      :api-v2
+      (do
+        (is (every? api-v2-path? after-prefix)
+            (str "prefix-options must use /api-v2 only, got: " after-prefix))
+        (is (not-any? api-v1-path? after-prefix)
+            (str "prefix-options must not touch /api, got: " after-prefix))
+        (is (some #(string/includes? % "meta-keys") after-prefix)
+            "prefix-options loads meta-keys via /api-v2")))
+    body))
+
+(deftest prefix-options-uses-api-when-mode-is-api
+  (connect-fake! :api-mode :api)
+  (step1-entry!)
+  (assert-prefix-options-paths! :api))
+
+(deftest prefix-options-uses-api-when-both-apis-selected
+  ;; Mode :both exports into api/ + api-v2/, but the prefix picker still
+  ;; walks Madek `/api` only.
   (connect-fake! :api-mode :both)
   (clear-fake-requests!)
   (step1-entry!)
@@ -281,21 +318,14 @@
         (str "step1 must use /api only, got: " after-step1))
     (is (not-any? api-v2-path? after-step1)
         (str "step1 must not touch /api-v2, got: " after-step1)))
-  (clear-fake-requests!)
-  (let [{:keys [status body]} (web/prefix-options {})
-        after-prefix (fake-request-paths)]
-    (is (= 200 status))
-    (is (= 1 (count (:options body))))
-    (is (seq after-prefix) "prefix-options hits the fake server")
-    (is (every? api-v1-path? after-prefix)
-        (str "prefix-options must use /api only, got: " after-prefix))
-    (is (not-any? api-v2-path? after-prefix)
-        (str "prefix-options must not touch /api-v2, got: " after-prefix))
-    (is (some #(string/includes? % "meta-keys") after-prefix)
-        "prefix-options loads meta-keys via /api")))
+  (assert-prefix-options-paths! :api))
 
-(deftest wizard-steps-use-api-only-for-set-when-both-apis-selected
-  ;; Same /api-only guarantee for a set (collection) entity under :both.
+(deftest prefix-options-uses-api-v2-when-mode-is-api-v2
+  (connect-fake! :api-mode :api-v2)
+  (step1-entry!)
+  (assert-prefix-options-paths! :api-v2))
+
+(deftest prefix-options-uses-api-for-set-when-both-apis-selected
   (connect-fake! :api-mode :both)
   (clear-fake-requests!)
   (step1-set!)
@@ -310,6 +340,20 @@
     (is (= 200 status))
     (is (every? api-v1-path? after-prefix))
     (is (not-any? api-v2-path? after-prefix))))
+
+(deftest prefix-options-uses-api-v2-for-set-when-mode-is-api-v2
+  (connect-fake! :api-mode :api-v2)
+  (step1-set!)
+  (clear-fake-requests!)
+  (let [{:keys [status body]} (web/prefix-options {})
+        after-prefix (fake-request-paths)]
+    (is (= 200 status))
+    (is (= 2 (count (:options body))))
+    (is (every? api-v2-path? after-prefix)
+        (str "set prefix-options must use /api-v2 only, got: " after-prefix))
+    (is (not-any? api-v1-path? after-prefix))
+    (is (some #(string/includes? % "collections") after-prefix)
+        "set prefix-options loads collection meta-data via /api-v2")))
 
 (deftest prefix-options-without-step1
   (is (= 409 (:status (web/prefix-options {})))))

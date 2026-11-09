@@ -4,6 +4,7 @@ const {
   connectWithToken,
   expectConnected,
   openExportPage,
+  setExportApiMode,
 } = require('./fixtures');
 const {
   getFakeBaseUrl,
@@ -14,10 +15,25 @@ const {
 
 test.describe.configure({ timeout: 120_000 });
 
-test('prefix picker: value, empty value, no prefix, and the value filter', async ({ page }) => {
+async function clearFakeRequests() {
+  const res = await fetch(`${getFakeBaseUrl()}/_test/requests`, { method: 'DELETE' });
+  expect(res.status).toBe(200);
+}
+
+async function fakeRequestPaths() {
+  const res = await fetch(`${getFakeBaseUrl()}/_test/requests`);
+  expect(res.status).toBe(200);
+  const body = await res.json();
+  return (body.requests || []).map((r) => r.path);
+}
+
+async function openPrefixStep(page, { apiMode = 'api' } = {}) {
   const targetDir = createE2eExportDir();
   await connectWithToken(page, fakeToken);
   await expectConnected(page);
+  if (apiMode !== 'api') {
+    await setExportApiMode(page, apiMode);
+  }
   await openExportPage(page);
 
   await page.locator('section.pre-download-check input[type="url"]').fill(
@@ -31,6 +47,12 @@ test('prefix picker: value, empty value, no prefix, and the value filter', async
 
   const toggle = page.locator('.prefix-dropdown-toggle');
   await expect(toggle).toBeEnabled({ timeout: 30_000 });
+  return toggle;
+}
+
+test('prefix picker: value, empty value, no prefix, and the value filter', async ({ page }) => {
+  const toggle = await openPrefixStep(page);
+
   await expect(toggle).toContainText(/NO META-KEY PREFIX/i);
 
   const refresh = page.getByRole('button', { name: 'Refresh prefix options' });
@@ -91,4 +113,65 @@ test('prefix picker: value, empty value, no prefix, and the value filter', async
   await expect(page.locator('.prefix-example .prefix-part')).toHaveCount(0);
   await expect(page.locator('.prefix-example')).toContainText(fakeMediaEntryId);
   await expect(page.locator('.prefix-example')).not.toContainText('Fake export entry_');
+});
+
+function isApiV1Path(p) {
+  return /^\/api(\/|$)/.test(p);
+}
+
+function isApiV2Path(p) {
+  return /^\/api-v2(\/|$)/.test(p);
+}
+
+async function expectPrefixRefreshUsesApi(page, expectedApi) {
+  await clearFakeRequests();
+  const refresh = page.getByRole('button', { name: 'Refresh prefix options' });
+  const prefixDone = page.waitForResponse(
+    (r) =>
+      r.url().includes('/download/prefix-options') &&
+      r.request().method() === 'GET' &&
+      r.ok(),
+    { timeout: 30_000 }
+  );
+  await refresh.click();
+  await prefixDone;
+
+  const paths = await fakeRequestPaths();
+  const catalog = paths.filter(
+    (p) =>
+      p.includes('meta-keys') ||
+      p.includes('vocabularies') ||
+      p.includes('meta-data')
+  );
+  expect(
+    catalog.length,
+    `expected catalog hits after refresh, got: ${JSON.stringify(paths)}`
+  ).toBeGreaterThan(0);
+  if (expectedApi === 'api-v2') {
+    expect(
+      catalog.every(isApiV2Path),
+      `prefix refresh must use /api-v2 only, got: ${JSON.stringify(catalog)}`
+    ).toBe(true);
+  } else {
+    expect(
+      catalog.every(isApiV1Path),
+      `prefix refresh must use /api only, got: ${JSON.stringify(catalog)}`
+    ).toBe(true);
+  }
+  expect(catalog.some((p) => p.includes('meta-keys'))).toBe(true);
+}
+
+test('prefix refresh uses /api when mode is api', async ({ page }) => {
+  await openPrefixStep(page, { apiMode: 'api' });
+  await expectPrefixRefreshUsesApi(page, 'api');
+});
+
+test('prefix refresh uses /api-v2 when mode is api-v2', async ({ page }) => {
+  await openPrefixStep(page, { apiMode: 'api-v2' });
+  await expectPrefixRefreshUsesApi(page, 'api-v2');
+});
+
+test('prefix refresh uses /api when mode is both', async ({ page }) => {
+  await openPrefixStep(page, { apiMode: 'both' });
+  await expectPrefixRefreshUsesApi(page, 'api');
 });

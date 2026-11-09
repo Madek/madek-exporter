@@ -33,6 +33,8 @@ import {
   metaKeySubtitleV2,
   mediaEntryV2,
   metaDataRelatedForMediaEntry,
+  collectionV2,
+  metaDataRelatedForCollection,
   listBody,
 } from './export-fixtures-v2.mjs';
 
@@ -445,6 +447,40 @@ function handleApiV2(req, res, path) {
     } else {
       sendJson(res, 200, {
         meta_data: metaDataRelatedForMediaEntry(entry).map((row) => row.meta_data),
+      });
+    }
+    return true;
+  }
+
+  const colMatch = path.match(/^\/api-v2\/collections\/([^/]+)\/?$/);
+  if (req.method === 'GET' && colMatch) {
+    if (colMatch[1] !== FAKE_SET_ID) {
+      sendJson(res, 404, { message: 'Not found' });
+    } else {
+      sendJson(res, 200, collectionV2());
+    }
+    return true;
+  }
+
+  const colRelatedMatch = path.match(
+    /^\/api-v2\/collections\/([^/]+)\/meta-data-related\/?$/
+  );
+  if (req.method === 'GET' && colRelatedMatch) {
+    if (colRelatedMatch[1] !== FAKE_SET_ID) {
+      sendJson(res, 404, { message: 'Not found' });
+    } else {
+      sendJson(res, 200, metaDataRelatedForCollection());
+    }
+    return true;
+  }
+
+  const colMetaMatch = path.match(/^\/api-v2\/collections\/([^/]+)\/meta-data\/?$/);
+  if (req.method === 'GET' && colMetaMatch) {
+    if (colMetaMatch[1] !== FAKE_SET_ID) {
+      sendJson(res, 404, { message: 'Not found' });
+    } else {
+      sendJson(res, 200, {
+        meta_data: metaDataRelatedForCollection().map((row) => row.meta_data),
       });
     }
     return true;
