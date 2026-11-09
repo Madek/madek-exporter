@@ -50,6 +50,12 @@ module.exports = {
       timeout: 120_000,
     },
     {
+      name: 'api-mode-endpoints',
+      testMatch: /api-mode-endpoints\.spec\.js$/,
+      dependencies: ['setup'],
+      timeout: 120_000,
+    },
+    {
       name: 'export-from-both-apis',
       testMatch: /export-from-both-apis\.spec\.js$/,
       dependencies: ['setup'],

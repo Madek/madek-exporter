@@ -4,6 +4,7 @@
    [clojure.java.io :as io]
    [clojure.string :as string]
    [clojure.test :refer [deftest is use-fixtures]]
+   [madek.exporter.api :as api]
    [madek.exporter.connection :as connection]
    [madek.exporter.export :as export]
    [madek.exporter.export.meta-data-schema :as export-meta-data-schema]
@@ -269,37 +270,54 @@
                     (integer? (:ms %)))
               (perf-log/entries))
         "Madek calls are recorded for the Debug → Performance tab")))
+(defn- assert-paths-for-api!
+  [expected-api paths context]
+  (is (seq paths) (str context " hits the fake server"))
+  (case expected-api
+    :api
+    (do
+      (is (every? api-v1-path? paths)
+          (str context " must use /api only, got: " paths))
+      (is (not-any? api-v2-path? paths)
+          (str context " must not touch /api-v2, got: " paths)))
+    :api-v2
+    (do
+      (is (every? api-v2-path? paths)
+          (str context " must use /api-v2 only, got: " paths))
+      (is (not-any? api-v1-path? paths)
+          (str context " must not touch /api, got: " paths)))
+    :both
+    (do
+      (is (some api-v1-path? paths)
+          (str context " must hit /api, got: " paths))
+      (is (some api-v2-path? paths)
+          (str context " must hit /api-v2, got: " paths)))))
+
 (defn- assert-prefix-options-paths!
-  "Assert prefix-options hit the expected Madek API and return the body."
-  [expected-api]
-  (clear-fake-requests!)
-  (let [{:keys [status body]} (web/prefix-options {})
-        after-prefix (fake-request-paths)
-        title (some #(when (= "madek_core:title" (:meta_key_id %)) %)
-                    (:options body))]
-    (is (= 200 status))
-    (is (= 2 (count (:options body)))
-        "title (with value) + subtitle (empty) from the selected API")
-    (is (= "Fake export entry" (:value title)))
-    (is (seq after-prefix) "prefix-options hits the fake server")
-    (case expected-api
-      :api
-      (do
-        (is (every? api-v1-path? after-prefix)
-            (str "prefix-options must use /api only, got: " after-prefix))
-        (is (not-any? api-v2-path? after-prefix)
-            (str "prefix-options must not touch /api-v2, got: " after-prefix))
-        (is (some #(string/includes? % "meta-keys") after-prefix)
-            "prefix-options loads meta-keys via /api"))
-      :api-v2
-      (do
-        (is (every? api-v2-path? after-prefix)
-            (str "prefix-options must use /api-v2 only, got: " after-prefix))
-        (is (not-any? api-v1-path? after-prefix)
-            (str "prefix-options must not touch /api, got: " after-prefix))
-        (is (some #(string/includes? % "meta-keys") after-prefix)
-            "prefix-options loads meta-keys via /api-v2")))
-    body))
+  "Assert prefix-options hit the expected Madek API and return the body.
+  Optional `request` may include `:params` / `:query-params` for `?api-mode=`."
+  ([expected-api]
+   (assert-prefix-options-paths! expected-api {}))
+  ([expected-api request]
+   (clear-fake-requests!)
+   (let [{:keys [status body]} (web/prefix-options request)
+         after-prefix (fake-request-paths)
+         title (some #(when (= "madek_core:title" (:meta_key_id %)) %)
+                     (:options body))]
+     (is (= 200 status))
+     (is (= 2 (count (:options body)))
+         "title (with value) + subtitle (empty) from the selected API")
+     (is (= "Fake export entry" (:value title)))
+     (assert-paths-for-api! expected-api after-prefix "prefix-options")
+     (is (some #(string/includes? % "meta-keys") after-prefix)
+         "prefix-options loads meta-keys")
+     body)))
+
+(deftest connect-stores-selected-api-mode
+  (doseq [mode [:api :api-v2 :both]]
+    (connect-fake! :api-mode mode)
+    (is (= mode (api/current-mode))
+        (str "connect with api-mode " mode))))
 
 (deftest prefix-options-uses-api-when-mode-is-api
   (connect-fake! :api-mode :api)
@@ -313,11 +331,7 @@
   (clear-fake-requests!)
   (step1-entry!)
   (let [after-step1 (fake-request-paths)]
-    (is (seq after-step1) "step1 hits the fake server")
-    (is (every? api-v1-path? after-step1)
-        (str "step1 must use /api only, got: " after-step1))
-    (is (not-any? api-v2-path? after-step1)
-        (str "step1 must not touch /api-v2, got: " after-step1)))
+    (assert-paths-for-api! :api after-step1 "step1"))
   (assert-prefix-options-paths! :api))
 
 (deftest prefix-options-uses-api-v2-when-mode-is-api-v2
@@ -325,21 +339,30 @@
   (step1-entry!)
   (assert-prefix-options-paths! :api-v2))
 
+(deftest prefix-options-query-param-overrides-connection-mode
+  ;; UI sends ?api-mode= so the walk matches the picker even if connection
+  ;; state still has another mode.
+  (connect-fake! :api-mode :api)
+  (step1-entry!)
+  (assert-prefix-options-paths! :api-v2 {:params {:api-mode "api-v2"}})
+  (assert-prefix-options-paths! :api {:params {:api-mode "both"}})
+  (connect-fake! :api-mode :api-v2)
+  (step1-entry!)
+  (assert-prefix-options-paths! :api {:params {:api-mode "api"}}))
+
 (deftest prefix-options-uses-api-for-set-when-both-apis-selected
   (connect-fake! :api-mode :both)
   (clear-fake-requests!)
   (step1-set!)
   (let [after-step1 (fake-request-paths)]
-    (is (every? api-v1-path? after-step1))
-    (is (not-any? api-v2-path? after-step1))
+    (assert-paths-for-api! :api after-step1 "set step1")
     (is (some #(string/includes? % "collections") after-step1)
         "set step1 uses /api/collections"))
   (clear-fake-requests!)
   (let [{:keys [status]} (web/prefix-options {})
         after-prefix (fake-request-paths)]
     (is (= 200 status))
-    (is (every? api-v1-path? after-prefix))
-    (is (not-any? api-v2-path? after-prefix))))
+    (assert-paths-for-api! :api after-prefix "set prefix-options")))
 
 (deftest prefix-options-uses-api-v2-for-set-when-mode-is-api-v2
   (connect-fake! :api-mode :api-v2)
@@ -349,11 +372,52 @@
         after-prefix (fake-request-paths)]
     (is (= 200 status))
     (is (= 2 (count (:options body))))
-    (is (every? api-v2-path? after-prefix)
-        (str "set prefix-options must use /api-v2 only, got: " after-prefix))
-    (is (not-any? api-v1-path? after-prefix))
+    (assert-paths-for-api! :api-v2 after-prefix "set prefix-options")
     (is (some #(string/includes? % "collections") after-prefix)
         "set prefix-options loads collection meta-data via /api-v2")))
+
+(defn- export-paths-only!
+  "Connect + step1 + step2, then clear the fake log and run export only."
+  [api-mode]
+  (let [target-dir (doto (io/file (System/getProperty "java.io.tmpdir")
+                                  (str "madek-export-paths-" (name api-mode)
+                                       "-" (System/nanoTime)))
+                     (.mkdirs)
+                     (.deleteOnExit))]
+    (connect-fake! :api-mode api-mode)
+    (is (= 204 (:status (web/download-step1
+                         {:body {:entity-id media-entry-id
+                                 :entity-type "entry"
+                                 :url (str fake-base-url "/entries/" media-entry-id)
+                                 :target-directory (.getAbsolutePath target-dir)}}))))
+    (is (= 204 (:status (web/patch-download
+                         {:body {:step2-completed true
+                                 :skip_media_files true
+                                 :recursive false}}))))
+    (clear-fake-requests!)
+    (is (= 202 (:status (web/download {}))))
+    (loop [n 0]
+      (cond
+        (get-in @state/db [:download :download-finished])
+        (fake-request-paths)
+        (> n 200) (do (is false "export did not finish in time") [])
+        :else (do (Thread/sleep 100) (recur (inc n)))))))
+
+(deftest export-media-entry-hits-only-api-when-mode-is-api
+  (let [paths (export-paths-only! :api)]
+    (assert-paths-for-api! :api paths "export")
+    (is (some #(string/includes? % "media-entries") paths))))
+
+(deftest export-media-entry-hits-only-api-v2-when-mode-is-api-v2
+  (let [paths (export-paths-only! :api-v2)]
+    (assert-paths-for-api! :api-v2 paths "export")
+    (is (some #(string/includes? % "media-entries") paths))))
+
+(deftest export-media-entry-hits-both-apis-when-mode-is-both
+  (let [paths (export-paths-only! :both)]
+    (assert-paths-for-api! :both paths "export")
+    (is (some #(and (api-v1-path? %) (string/includes? % "media-entries")) paths))
+    (is (some #(and (api-v2-path? %) (string/includes? % "media-entries")) paths))))
 
 (deftest prefix-options-without-step1
   (is (= 409 (:status (web/prefix-options {})))))
