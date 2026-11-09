@@ -119,12 +119,21 @@
      (swap! prefix-options* assoc :status status)
      (reset! prefix-dropdown-open* false))))
 
+(defn- export-api-mode
+  "Same mode the connection picker shows: form override, else JVM connection."
+  []
+  (keyword
+   (or (-> @state/client-db :connection :form :api-mode)
+       (-> @state/jvm-main-db :connection :api-mode)
+       :api)))
+
 (defn- prefix-options-fetched?
-  "True after one successful load for this entity. Returning from step 3
-  must not start another automatic request."
+  "True after one successful load for this entity + API mode. Changing API
+  mode (reconnect) must fetch again; returning from step 3 must not."
   [id]
   (let [state @prefix-options*]
     (and (= id (:entity-id state))
+         (= (export-api-mode) (:api-mode state))
          (true? (:fetched state)))))
 
 (defn- load-prefix-options
@@ -140,6 +149,7 @@
 
        (and (not force?)
             (= id (:entity-id @prefix-options*))
+            (= (export-api-mode) (:api-mode @prefix-options*))
             (= :loading (:status @prefix-options*)))
        nil
 
@@ -147,14 +157,18 @@
        (do
          (abort-prefix-options-request!)
          (let [gen @prefix-load-gen*
-               cancel (chan)]
-           (reset! prefix-options* {:entity-id id :status :loading})
+               cancel (chan)
+               api-mode (export-api-mode)]
+           (reset! prefix-options* {:entity-id id
+                                    :api-mode api-mode
+                                    :status :loading})
            (reset! prefix-dropdown-open* false)
            (reset! prefix-request*
                    {:cancel cancel
                     :id (request/send-off
                           {:method :get
                            :path "/download/prefix-options"
+                           :query-params {:api-mode (name api-mode)}
                            :cancel cancel}
                           {:title (i18n/t :download/fetch-prefix-options)}
                           :callback (fn [resp]
@@ -163,11 +177,14 @@
                                         (reset! prefix-options*
                                                 (if (:success resp)
                                                   {:entity-id id
+                                                   :api-mode api-mode
                                                    :status :loaded
                                                    :fetched true
                                                    :entity-title (-> resp :body :entity_title)
                                                    :options (vec (or (-> resp :body :options) []))}
-                                                  {:entity-id id :status :failed})))))})))))))
+                                                  {:entity-id id
+                                                   :api-mode api-mode
+                                                   :status :failed})))))})))))))
 
 (defn- choose-prefix [meta-key-id]
   (set-value :prefix_meta_key (or meta-key-id ""))

@@ -78,9 +78,12 @@
 
 (defn connect-params []
   (let [fd @form-data
-        ;; API mode is chosen after login; connect with provisional :api.
+        ;; Prefer the picker value; first connect defaults to api.
+        api-mode (name (keyword (or (:api-mode fd)
+                                    (-> @state/jvm-main-db :connection :api-mode)
+                                    :api)))
         base (merge (select-keys fd [:url :sign-in-method :show-password])
-                    {:api-mode :api})]
+                    {:api-mode api-mode})]
     (case (or (:sign-in-method fd) :token)
       :login (merge base (select-keys fd [:login :password]))
       :token (merge base
@@ -88,29 +91,40 @@
                       {:api-token token}))
       base)))
 
-(defn connect []
-  (let [req {:method :post
-             :json-params (connect-params)
-             :path "/connect"}]
-    (request/send-off
-      req {:title (i18n/t :connection/connect-req)
-           :error-title (i18n/t :connection/connect-failed)})))
+(defn- connect!
+  "POST /connect. `opts` may include :title, :error-title, :callback."
+  ([] (connect! {}))
+  ([{:keys [title error-title callback]}]
+   (let [req {:method :post
+              :json-params (connect-params)
+              :path "/connect"}]
+     (request/send-off
+       req {:title (or title (i18n/t :connection/connect-req))
+            :error-title (or error-title (i18n/t :connection/connect-failed))}
+       :callback callback))))
 
-(defn set-api-mode! [mode]
+(defn connect
+  "Connect button handler. Ignores the DOM click event (must stay 0-arity
+  for `:on-click connect`; multi-arity would treat the event as opts)."
+  []
+  (connect!))
+
+(defn set-api-mode!
+  "Persist the picker choice and reconnect so JVM connection :api-mode matches."
+  [mode]
   (when (api-mode-available? (current-api-status) mode)
-    (let [previous (or (:api-mode @form-data)
-                       (-> @state/jvm-main-db :connection :api-mode)
-                       :api)
-          req {:method :post
-               :json-params {:api-mode mode}
-               :path "/connect/api-mode"}]
-      (update-form-data-value :api-mode mode)
-      (request/send-off
-        req {:title (i18n/t :connection/api-mode-update-req)
-             :error-title (i18n/t :connection/api-mode-update-failed)}
-        :callback (fn [resp]
-                    (when-not (request/response-success? resp)
-                      (update-form-data-value :api-mode previous)))))))
+    (let [mode (keyword mode)
+          previous (keyword (or (:api-mode @form-data)
+                                (-> @state/jvm-main-db :connection :api-mode)
+                                :api))]
+      (when (not= mode previous)
+        (update-form-data-value :api-mode mode)
+        (connect!
+         {:title (i18n/t :connection/api-mode-update-req)
+          :error-title (i18n/t :connection/api-mode-update-failed)
+          :callback (fn [resp]
+                      (when-not (request/response-success? resp)
+                        (update-form-data-value :api-mode previous)))})))))
 
 
 ;;; disconnect ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -256,9 +270,10 @@
                      (-> @connection* :login presence boolean)))))
 
 (defn- selected-api-mode []
-  (or (:api-mode @form-data)
-      (:api-mode @connection*)
-      :api))
+  (keyword
+   (or (:api-mode @form-data)
+       (:api-mode @connection*)
+       :api)))
 
 (defn- current-api-status []
   (:api-status @connection*))

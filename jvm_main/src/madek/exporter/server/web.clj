@@ -470,29 +470,39 @@
                :entity_title title
                :options options})))
 
-(defn- prefix-options-use-api-v2?
-  "Follow export `:api-mode`: only `:api-v2` uses `/api-v2`. `:both` and
-  `:api` use `/api`."
-  []
-  (= :api-v2 (api/current-mode)))
+(defn- prefix-options-api-mode
+  "Export API mode for the prefix picker.
+
+  Rules: `:api` → `/api`, `:api-v2` → `/api-v2`, `:both` → `/api`.
+  Prefer `?api-mode=` from the UI when present so the fetch matches the
+  picker even if connection state has not caught up yet."
+  [request]
+  (api/normalize-mode
+   (or (get-in request [:params :api-mode])
+       (get-in request [:query-params :api-mode])
+       (api/current-mode))))
 
 (defn prefix-options
   "All text meta-keys from the Madek catalog, joined with the step-1 entity's
-  values. Uses `/api-v2` when export mode is `:api-v2`; otherwise `/api`
-  (including `:both`). ROA member GETs run in parallel (see
-  `prefix-options-concurrency`) over the shared HTTP pool."
-  [_]
+  values. API selection: api → `/api`, api-v2 → `/api-v2`, both → `/api`.
+  ROA member GETs run in parallel (see `prefix-options-concurrency`)."
+  [request]
   (catcher/snatch
    {:return-fn (fn [e]
                  (if (= :prefix-options-aborted (:type (ex-data e)))
                    {:status 499 :body {:aborted true}}
                    {:status 500 :body (thrown/stringify e)}))}
-   (let [{id :uuid entity-type :type title :title} (-> @state/db :download :entity)]
+   (let [{id :uuid entity-type :type title :title} (-> @state/db :download :entity)
+         api-mode (prefix-options-api-mode request)]
      (if-not id
        {:status 409 :body {:message "No export entity selected (step 1)."}}
        (let [gen (abort-prefix-options!)]
-         (if (prefix-options-use-api-v2?)
-           (prefix-options-via-api-v2 gen id entity-type title)
+         (info "prefix-options" {:api-mode api-mode
+                                 :entity-id id
+                                 :entity-type entity-type})
+         (case api-mode
+           :api-v2 (prefix-options-via-api-v2 gen id entity-type title)
+           ;; :api and :both
            (prefix-options-via-api gen id entity-type title)))))))
 
 ;##############################################################################
