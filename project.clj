@@ -1,8 +1,8 @@
 (defproject madek "0.4.0"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
-  :license {:name "GPL"
-            :url "https://de.wikipedia.org/wiki/GNU_General_Public_License"}
+  :description "Desktop exporter for Madek media archives"
+  :url "https://github.com/Madek/madek-exporter"
+  :license {:name "GPL-3.0-or-later"
+            :url "https://www.gnu.org/licenses/gpl-3.0.html"}
 
   ;; Pin transitive versions that OSV flags.
   :managed-dependencies [[com.fasterxml.jackson.core/jackson-core "2.18.11"]
@@ -161,7 +161,7 @@
              {:source-paths ["electron_main/src/all" "electron_main/src/prod"]
               :incremental true
               :jar true
-              :assert true
+              :assert false
               :compiler {:output-to "app/prod/js/main.js"
                          :externs ["app/prod/js/main_externs.js"
                                    "node_modules/closurecompiler-externs/path.js"
@@ -171,8 +171,8 @@
                          :target :nodejs
                          :output-dir "app/prod/js/out_main"
                          :optimizations :advanced
-                         :source-map "app/prod/js/main.js.map"
-                         :pretty-print true
+                         :source-map false
+                         :pretty-print false
                          :output-wrapper true}}
              :electron-front-dev
              {:source-paths ["electron_front/src/all" "electron_front/src/dev"]
@@ -195,15 +195,16 @@
              {:source-paths ["electron_front/src/all" "electron_front/src/prod"]
               :incremental true
               :jar true
-              :assert true
+              :assert false
               :compiler {:output-to "app/prod/js/front.js"
-                         :externs ["app/prod/js/front_externs.js"]
+                         :externs ["app/prod/js/front_externs.js"
+                                   "electron_front/externs/front_bridge_externs.js"]
                          :warnings true
                          :elide-asserts true
                          :output-dir "app/prod/js/out_front"
                          :optimizations :advanced
-                         :source-map "app/prod/js/front.js.map"
-                         :pretty-print true
+                         :source-map false
+                         :pretty-print false
                          :output-wrapper true}}
              :uberjar {
                        :source-paths ["jvm_main/src"]
