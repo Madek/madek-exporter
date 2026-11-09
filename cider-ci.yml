@@ -54,15 +54,9 @@ jobs:
                   chmod +x "${OSV_BIN_DIR}/osv-scanner"
                   export PATH="${OSV_BIN_DIR}:${PATH}"
                 fi
-                ./bin/security-audit || {
-                  rc=$?
-                  # Exit 1 = findings (npm/osv-scanner); keep job green for branch protection.
-                  if [[ "$rc" -eq 1 ]]; then
-                    echo "Vulnerabilities or audit findings reported (non-blocking in CI)."
-                    exit 0
-                  fi
-                  exit "$rc"
-                }
+                # Fail the job on audit findings (exit 1). Use osv-scanner.toml
+                # ignores for accepted exceptions.
+                ./bin/security-audit
 
   tests:
     name: All tests

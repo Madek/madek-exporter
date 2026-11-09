@@ -14,3 +14,6 @@ rm -rf \
 lein externs electron-front-prod app/prod/js/front_externs.js
 
 lein cljsbuild once electron-front-prod
+
+# Advanced build only needs front.js in the package — drop Closure work dirs / maps.
+rm -rf app/prod/js/out_front app/prod/js/front.js.map

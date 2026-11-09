@@ -14,3 +14,5 @@ lein externs electron-main-prod app/prod/js/main_externs.js
 
 lein cljsbuild once electron-main-prod
 
+rm -rf app/prod/js/out_main app/prod/js/main.js.map
+
