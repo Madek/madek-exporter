@@ -74,6 +74,10 @@ jobs:
           name: End2End-Tests
           include:
             - cider-ci/test-login-e2e.yml
+        playwright-prod:
+          name: End2End-Tests (prod advanced build)
+          include:
+            - cider-ci/test-e2e-prod.yml
 
   build:
     name: Build the App

@@ -1,0 +1,51 @@
+# Playwright smoke against advanced-compiled app/prod (opt-in job in tests).
+include:
+  - cider-ci/environment_variables.yml
+  - cider-ci/install-missing-libs.yml
+  - cider-ci/toolchain.yml
+git_options:
+  submodules:
+    include_match: ^vendor
+trial_attachments:
+  screenshots:
+    include_match: 'test-results\/.+\.png$'
+    content_type: image/png
+  playwright-report:
+    include_match: 'playwright-report\/index\.html$'
+    content_type: text/html
+  logs:
+    include_match: 'logs\/.+\.log$'
+    content_type: text/plain
+traits:
+  JDK: true
+  Leiningen: true
+  nodejs: true
+scripts:
+  build-prod-electron:
+    timeout: 45 Minutes
+    body: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      ./bin/with-java21 ./bin/with-node22 ./bin/build-electron-prod
+      ./bin/with-java21 ./bin/build-jvm-main-prod
+    start_when:
+      install-npm-packages has passed:
+        script_key: install-npm-packages
+      java toolchain is ready:
+        script_key: check-java-toolchain
+  test-e2e-prod:
+    timeout: 20 Minutes
+    body: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      if [[ -f .tools/sysroot-env.sh ]]; then
+        # shellcheck disable=SC1091
+        source .tools/sysroot-env.sh
+      fi
+      CI=1 MADEK_E2E_APP=prod MADEK_E2E_PROD=1 \
+        ./bin/with-java21 ./bin/with-node22 ./bin/test-e2e -- tests/e2e/prod-smoke.spec.js
+    start_when:
+      missing libs installed:
+        script_key: install-missing-libs
+      prod electron built:
+        script_key: build-prod-electron
