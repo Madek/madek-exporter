@@ -32,17 +32,23 @@
    [madek.exporter.export.meta-data-schema :as export-meta-data-schema]
    [madek.exporter.export.meta-keys :as export-meta-keys]
    [madek.exporter.export.control :as control]
+   [madek.exporter.perf-log :as perf-log]
    [madek.exporter.request-log :as request-log]
    [madek.exporter.state :as state]
    [madek.exporter.utils :as utils :refer [str keyword deep-merge presence]]
    [taoensso.timbre :as timbre :refer [info]]
    [ring.middleware.defaults :refer [site-defaults wrap-defaults]]
    [ring.middleware.json]
-   [ring.util.response :refer [response]]))
+   [ring.util.response :refer [response]])
+  (:import
+   [java.util.concurrent ExecutionException Executors ExecutorService Future]))
 
 ;### download entity ##########################################################
 
-(defn download-step1 [request]
+(defn download-step1
+  "Resolve entity title via Madek `/api` (JSON-ROA) only — independent of
+  export `:api-mode` (including `:both` / api + api-v2)."
+  [request]
   (catcher/snatch
    {:return-fn (fn [e] {:status 500 :body (thrown/stringify e)})}
    (let [http-options (-> @state/db :connection :http-options)
@@ -51,7 +57,8 @@
                        "entry" :media-entry
                        "set" :collection)
          entity (-> (roa/get-root (str (-> @state/db :connection :url) "/api")
-                                  :default-conn-opts (-> @state/db :connection :http-options))
+                                  :default-conn-opts (-> @state/db :connection :http-options)
+                                  :default-middleware perf-log/middleware)
                     (roa/relation entity-type)
                     (roa/get {:id id}))
          title (-> entity
@@ -333,24 +340,52 @@
 
 ;##############################################################################
 
-(defn- api-root []
-  (roa/get-root (str (-> @state/db :connection :url) "/api")
-                :default-conn-opts (-> @state/db :connection :http-options)))
+(defn- api-root
+  "Wizard Madek root: always `/api` (ROA), never `/api-v2`, even when export
+  `:api-mode` is `:both` or `:api-v2`."
+  []
+  (roa/get-root (state/connection-entry-point)
+                :default-conn-opts (state/connection-http-options)
+                :default-middleware perf-log/middleware))
+
+;; Stays within the shared pool's per-route limit (utils/make-http-conn-manager).
+(def ^:private prefix-options-concurrency 6)
+
+(defn- parallel-mapv
+  "Like mapv, with at most `n` calls of `f` in flight. Rethrows the first
+  failure (unwrapped) and cancels the remaining tasks."
+  [n f items]
+  (if (empty? items)
+    []
+    (let [^ExecutorService pool (Executors/newFixedThreadPool
+                                 (int (min n (count items))))]
+      (try
+        (let [futs (mapv (fn [item]
+                           (.submit pool ^Callable (fn [] (f item))))
+                         items)]
+          (try
+            (mapv #(.get ^Future %) futs)
+            (catch ExecutionException e
+              (doseq [^Future fut futs] (.cancel fut true))
+              (throw (or (.getCause e) e)))))
+        (finally
+          (.shutdownNow pool))))))
 
 (defn- roa-collection-data
   ([gen resource relation-kw]
    (roa-collection-data gen resource relation-kw {}))
   ([gen resource relation-kw query]
    (throw-unless-prefix-options-current! gen)
-   (->> (-> resource
-            (roa/relation relation-kw)
-            (roa/get query)
-            roa/coll-seq)
-        (map (fn [rel]
-               (throw-unless-prefix-options-current! gen)
-               (roa/get rel {})))
-        (map roa/data)
-        doall)))
+   (let [rels (-> resource
+                  (roa/relation relation-kw)
+                  (roa/get query)
+                  roa/coll-seq
+                  vec)]
+     (parallel-mapv prefix-options-concurrency
+                    (fn [rel]
+                      (throw-unless-prefix-options-current! gen)
+                      (roa/data (roa/get rel {})))
+                    rels))))
 
 (defn- vocabulary-id-of [meta-key]
   (or (presence (:vocabulary_id meta-key))
@@ -361,8 +396,59 @@
     (str (export-files/useableFileName v) "_" entity-id)
     (str "_" entity-id)))
 
+(defn- encode-path-segment
+  "Percent-encode a single path segment (`madek_core:title` → `madek_core%3Atitle`).
+  Production Madek returns 404 for an unencoded colon in the meta-key id."
+  [s]
+  (-> (str s)
+      (java.net.URLEncoder/encode "UTF-8")
+      (string/replace "+" "%20")))
+
+(defn- api-resource-url
+  "Absolute Madek v1 URL under `{connection}/api/…`. Prefer absolute hrefs:
+  resolving a relative path against `/api` (no trailing slash) drops the
+  `api` segment. Path segments are encoded; a trailing empty segment keeps
+  Madek's conventional trailing slash."
+  [& path-segments]
+  (let [base (string/replace (str (-> @state/db :connection :url)) #"/+$" "")]
+    (str base "/api/"
+         (->> path-segments
+              (map (fn [seg]
+                     (let [s (string/replace (str seg) #"^/+" "")]
+                       (if (empty? s) "" (encode-path-segment s)))))
+              (string/join "/")))))
+
+(defn- http-status-of [e]
+  (or (:status (ex-data e))
+      (some-> e ex-data :object :status)))
+
+(defn- roa-get-url
+  "GET an absolute Madek API URL. Returns nil on HTTP 404 so a missing
+  meta-key/vocabulary does not abort the whole prefix-options response."
+  [gen root url]
+  (throw-unless-prefix-options-current! gen)
+  (try
+    (-> {:href url
+         :roa-conn-opts (:roa-conn-opts root)}
+        (roa/get {})
+        roa/data)
+    (catch Exception e
+      (if (= 404 (http-status-of e))
+        (do (info "prefix-options skip missing resource" {:url url})
+            nil)
+        (throw e)))))
+
+(defn- fallback-meta-key [mk-id]
+  {:id mk-id
+   :label mk-id
+   :meta_datum_object_type "MetaDatum::Text"
+   :position 0
+   :vocabulary_id (some-> mk-id str (string/split #":" 2) first)})
+
 (defn prefix-options
-  "Text meta-keys from all vocabularies, joined with the step-1 entity's values."
+  "Text meta-data that have a value on the step-1 entity, with meta-key and
+  vocabulary labels for those keys only (no full meta-key catalog walk).
+  Uses `/api` only — never `/api-v2` — even when export mode is `:both`."
   [_]
   (catcher/snatch
    {:return-fn (fn [e]
@@ -374,28 +460,50 @@
        {:status 409 :body {:message "No export entity selected (step 1)."}}
        (let [gen (abort-prefix-options!)
              root (api-root)
-             vocabs (->> (roa-collection-data gen root :vocabularies)
-                         (map (juxt :id identity))
-                         (into {}))
              entity (do (throw-unless-prefix-options-current! gen)
                         (-> root
                             (roa/relation (keyword entity-type))
                             (roa/get {:id id})))
-             values (->> (roa-collection-data gen entity :meta-data)
-                         (filter #(= "MetaDatum::Text" (:type %)))
-                         (map (juxt :meta_key_id :value))
+             valued-text (->> (roa-collection-data gen entity :meta-data)
+                              (filterv #(and (= "MetaDatum::Text" (:type %))
+                                             (presence (:value %)))))
+             text-keys (->> (parallel-mapv
+                             prefix-options-concurrency
+                             (fn [md]
+                               (let [mk-id (str (:meta_key_id md))
+                                     mk (or (roa-get-url gen root
+                                                         (api-resource-url
+                                                          "meta-keys" mk-id ""))
+                                            (fallback-meta-key mk-id))]
+                                 [md mk]))
+                             valued-text)
+                            (filterv (fn [[_ mk]]
+                                       (= "MetaDatum::Text"
+                                          (:meta_datum_object_type mk)))))
+             vocab-ids (->> text-keys
+                            (map (fn [[_ mk]] (vocabulary-id-of mk)))
+                            (filter presence)
+                            distinct
+                            vec)
+             vocabs (->> (parallel-mapv
+                          prefix-options-concurrency
+                          (fn [vid]
+                            [vid (roa-get-url gen root
+                                              (api-resource-url
+                                               "vocabularies" (str vid) ""))])
+                          vocab-ids)
                          (into {}))
-             options (->> (roa-collection-data gen root :meta-keys)
-                          (filter #(= "MetaDatum::Text" (:meta_datum_object_type %)))
-                          (map (fn [mk]
-                                 (let [vid (vocabulary-id-of mk)
-                                       voc (get vocabs vid)
-                                       value (get values (:id mk))]
+             options (->> text-keys
+                          (map (fn [[md mk]]
+                                 (let [mk-id (:meta_key_id md)
+                                       value (:value md)
+                                       vid (vocabulary-id-of mk)
+                                       voc (get vocabs vid)]
                                    {:vocabulary_id vid
                                     :vocabulary_label (or (:label voc) vid)
                                     :vocabulary_position (or (:position voc) 0)
-                                    :meta_key_id (:id mk)
-                                    :meta_key_label (or (:label mk) (:id mk))
+                                    :meta_key_id (or (:id mk) mk-id)
+                                    :meta_key_label (or (:label mk) mk-id)
                                     :meta_key_position (or (:position mk) 0)
                                     :value value
                                     :folder_name (prefix-folder-name id value)})))
@@ -438,6 +546,10 @@
 
   (GET "/download/prefix-options" _ #'prefix-options)
 
+  (GET "/debug/performance" _ (response {:entries (perf-log/entries)}))
+
+  (DELETE "/debug/performance" _ (do (perf-log/clear!) {:status 204}))
+
   (ANY "/shutdown" _ #'shutdown)
 
   (resources "/")
@@ -452,7 +564,8 @@
       (wrap-defaults (assoc-in site-defaults [:security :anti-forgery] false))
       (ring.middleware.json/wrap-json-body {:keywords? true})
       ring.middleware.keyword-params/wrap-keyword-params
-      ring.middleware.params/wrap-params))
+      ring.middleware.params/wrap-params
+      perf-log/wrap-ring))
 
 ;### Debug ####################################################################
 ;(logging-config/set-logger! :level :debug)

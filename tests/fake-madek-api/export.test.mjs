@@ -163,4 +163,40 @@ describe('fake-madek-api v2 export fixtures', () => {
     assert.equal(body.ready, true);
     assert.ok(body.stubs.includes('meta-keys'));
   });
+
+  it('records /api vs /api-v2 hits for wizard-step tests', async () => {
+    await new Promise((resolve, reject) => {
+      const req = http.request(
+        `${base}/_test/requests`,
+        { method: 'DELETE' },
+        (res) => {
+          res.resume();
+          res.on('end', () => resolve(res.statusCode));
+        }
+      );
+      req.on('error', reject);
+      req.end();
+    });
+
+    await get(`/api/media-entries/${FAKE_MEDIA_ENTRY_ID}/`);
+    await getV2(`/api-v2/media-entries/${FAKE_MEDIA_ENTRY_ID}/`);
+
+    const logged = await new Promise((resolve, reject) => {
+      http
+        .get(`${base}/_test/requests`, (res) => {
+          let body = '';
+          res.on('data', (c) => {
+            body += c;
+          });
+          res.on('end', () =>
+            resolve({ status: res.statusCode, body: JSON.parse(body) })
+          );
+        })
+        .on('error', reject);
+    });
+    assert.equal(logged.status, 200);
+    const paths = logged.body.requests.map((r) => r.path);
+    assert.ok(paths.some((p) => p.startsWith('/api/') && !p.startsWith('/api-v2')));
+    assert.ok(paths.some((p) => p.startsWith('/api-v2/')));
+  });
 });
