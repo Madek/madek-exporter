@@ -331,12 +331,12 @@
                          (:basic-auth http-options)
                          (assoc :basic-auth "***redacted***")))
               api-status (probe-apis url live-http-options http-options)
-              ;; Provisional mode until the user picks one after login (UI).
+              ;; UI sends the picker value; changing mode reconnects with it.
               api-mode (normalize-api-mode (or (:api-mode connect-body) :api))
               _ (debug 'api-status api-status)
               _ (debug 'api-mode api-mode)]
           (cond
-            ;; Export still uses /api (JSON-ROA); require v1 auth until api-v2 export ships.
+            ;; Wizard step 1 still needs /api (ROA). Reject connect if v1 is down.
             (not (get-in api-status [:api :available]))
             (let [api-probe (:api api-status)
                   probe-status (:status api-probe)
