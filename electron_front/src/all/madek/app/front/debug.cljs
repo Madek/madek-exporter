@@ -9,7 +9,6 @@
     [madek.app.front.breadcrumb :as breadcrumb]
     [madek.app.front.i18n :as i18n]
     [madek.app.front.state :as state]
-    [madek.app.front.state.jvm-sync :as jvm-sync]
     [clojure.string]
     [clojure.walk]
     ))
@@ -93,19 +92,14 @@
        (-> @state/electron-main-db :jvm-process :port)
        "/debug/performance"))
 
-(defn- jvm-auth-opts []
-  (when-let [pw (jvm-sync/jvm-password)]
-    {:basic-auth ["" pw]}))
-
 (defn- fetch-perf! []
   (go (let [resp (<! (http/get (perf-url)
-                               (merge {:headers {"accept" "application/json"}}
-                                      (jvm-auth-opts))))]
+                               {:headers {"accept" "application/json"}}))]
         (when (:success resp)
           (reset! perf-entries* (vec (-> resp :body :entries)))))))
 
 (defn- clear-perf! []
-  (go (<! (http/delete (perf-url) (or (jvm-auth-opts) {})))
+  (go (<! (http/delete (perf-url)))
       (reset! perf-entries* [])))
 
 (defn- format-time [at]
