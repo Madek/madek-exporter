@@ -13,8 +13,10 @@
     ))
 
 (defroute about-page "/about" []
-  (reset! madek.app.front.state/current-page madek.app.front.about/page)
-  (reset! madek.app.front.state/current-path "/about"))
+  ;; About lives under Help; keep /about as a deep-link.
+  (reset! madek.app.front.help/scroll-to* madek.app.front.about/section-id)
+  (reset! madek.app.front.state/current-page madek.app.front.help/page)
+  (reset! madek.app.front.state/current-path "/help"))
 
 (defroute connection-page "/connection" []
   (reset! madek.app.front.state/current-page madek.app.front.connection/page)

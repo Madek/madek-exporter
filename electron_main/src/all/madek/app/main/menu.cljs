@@ -56,7 +56,7 @@
                     :click (fn [_ win _]
                              (when win
                                (.send (.-webContents win) "madek:navigate" "/help")))}
-                   {:label "About"
+                   {:label "About the Madek-Exporter"
                     :click (fn [_ win _]
                              (when win
                                (.send (.-webContents win) "madek:navigate" "/about")))}]}]
