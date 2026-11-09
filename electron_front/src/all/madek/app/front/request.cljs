@@ -8,6 +8,7 @@
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.i18n :as i18n]
     [madek.app.front.state :as state]
+    [madek.app.front.state.jvm-sync :as jvm-sync]
 
     [cljs-http.client :as http]
     [cljs-uuid-utils.core :as uuid]
@@ -53,11 +54,14 @@
 
 (defn send-off [req-opts meta-req & {:keys [callback]
                                      :or {callback nil}}]
-  (let [req (deep-merge {:method :post
+  (let [jvm-pw (jvm-sync/jvm-password)
+        req (deep-merge {:method :post
                          :headers {"accept" "application/json-roa+json"}
                          :url (str "http://localhost:"
                                    (-> @state/electron-main-db :jvm-process :port)
                                    (:path req-opts))}
+                        (when (presence jvm-pw)
+                          {:basic-auth ["" jvm-pw]})
                         req-opts)
         id (uuid/uuid-string (uuid/make-random-uuid))
         params (:json-params req)

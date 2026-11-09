@@ -35,8 +35,14 @@
 (.appendSwitch (.-commandLine app) "disable-gpu")
 (.appendSwitch (.-commandLine app) "in-process-gpu")
 
-;; Zip-distributed Linux builds cannot ship a working setuid chrome-sandbox.
-(when (= (.-platform nodejs/process) "linux")
+;; Portable zip launcher passes --no-sandbox itself. Opt-in here for CI /
+;; unpackaged Linux (MADEK_ELECTRON_NO_SANDBOX=1) or when chrome-sandbox is absent.
+(defn- linux-needs-no-sandbox? []
+  (or (= "1" (some-> nodejs/process .-env (aget "MADEK_ELECTRON_NO_SANDBOX")))
+      (= "1" (some-> nodejs/process .-env (aget "MADEK_E2E")))))
+
+(when (and (= (.-platform nodejs/process) "linux")
+           (linux-needs-no-sandbox?))
   (.appendSwitch (.-commandLine app) "no-sandbox")
   (.appendSwitch (.-commandLine app) "disable-setuid-sandbox"))
 
@@ -53,7 +59,8 @@
     (do
       (file-log/log! "INFO" (str "Start Madek application on " (.type Os) "."))
       (file-log/log! "INFO" "GPU disabled (disableHardwareAcceleration, disable-gpu, in-process-gpu)")
-      (when (= (.-platform nodejs/process) "linux")
+      (when (and (= (.-platform nodejs/process) "linux")
+                 (linux-needs-no-sandbox?))
         (file-log/log! "INFO" "Linux sandbox disabled (no-sandbox, disable-setuid-sandbox)"))
       (.on app "second-instance"
            (fn [_args _working-directory]

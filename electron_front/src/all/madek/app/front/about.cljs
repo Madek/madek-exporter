@@ -5,7 +5,7 @@
     [madek.app.front.state :as state]
     [madek.app.front.env]
     [madek.app.front.release :as release]
-    [cljs.nodejs :as nodejs]
+    [madek.app.front.bridge :as bridge]
     ))
 
 (defn version-component []
@@ -15,25 +15,27 @@
    [release/release-info-component]])
 
 (defn electron-component []
-  [:div.electron
-   [:h2 (i18n/t :about/electron-components)]
-   [:ul
-    [:li
-     [:span (i18n/t :about/nodejs-version)]
-     [:span.code (-> @state/electron-main-db
-                     :environment :nodejs-version)]]
-    [:li
-     [:span (i18n/t :about/electron-version)]
-     [:span.code (-> nodejs/process .-versions .-electron)]]
-    [:li
-     [:span (i18n/t :about/electron-modules)]
+  (let [v (bridge/versions)]
+    [:div.electron
+     [:h2 (i18n/t :about/electron-components)]
      [:ul
-      (doall
-        (for [[k v] (js->clj (.-versions nodejs/process))]
-          [:li {:key (str k)} (str k ": " v)]))]]
-    [:li
-     [:span (i18n/t :about/chrome-version)]
-     [:span.code (.-appVersion js/navigator)]]]])
+      [:li
+       [:span (i18n/t :about/nodejs-version)]
+       [:span.code (or (-> @state/electron-main-db
+                           :environment :nodejs-version)
+                       (:node v))]]
+      [:li
+       [:span (i18n/t :about/electron-version)]
+       [:span.code (:electron v)]]
+      [:li
+       [:span (i18n/t :about/electron-modules)]
+       [:ul
+        (doall
+          (for [[k val] (:versions v)]
+            [:li {:key (str k)} (str k ": " val)]))]]
+      [:li
+       [:span (i18n/t :about/chrome-version)]
+       [:span.code (or (:chrome v) (.-appVersion js/navigator))]]]]))
 
 (defn page []
   [:div.about
