@@ -3,6 +3,50 @@
 - version_major: 0
   version_minor: 11
   version_patch: 2
+  version_pre: 
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Export through `/api`, `/api-v2`, or both. Mode “both” writes into `api/` and `api-v2/` subfolders.
+    * Choose the export API after login. Connect still probes `/api` and `/api-v2` and reports which are available.
+    * Prefill an empty Madek URL with `https://medienarchiv.zhdk.ch`.
+    * Compare an api vs api-v2 export (file counts, JSON keys, and files present on only one side).
+    * api-v2 auth requires a token or session; HTTP Basic and API-client passwords are reported as unsupported.
+    * When Cloudflare blocks requests, show a VPN hint instead of a generic connection error.
+    * Show Madek HTTP requests in the download log panel (live during export); filter lines by `api`, `api-v2`, or both (default).
+    * Extend `tests/fake-madek-api` with `/api-v2` export stubs (vocabularies, meta-keys, media entries). Use `npm run fake-madek-api` (`bin/fake-madek-api`) so a fresh stub replaces any stale listener on the port.
+    * Playwright export E2E: projects `export-from-api` and `export-from-both-apis`; JVM `export-fake-api-test` covers the same flows and request-log counts against the fake API.
+    * Harden the local JVM control plane: HTTP Basic Auth, Madek secret redaction over Sente, export path/filename safety, and `/open` URI allowlisting.
+    * Isolate the Electron renderer behind preload/`contextBridge` (`nodeIntegration` off); inject JVM Basic Auth from the main process so the password never reaches the renderer.
+    * Do not store Madek passwords/tokens in client-db request history or Debug dumps; keep secrets only for the live HTTP call.
+    * Route step-2 prefix-options walks to `/api` or `/api-v2` from the selected export mode (`both` uses `/api`); reconnect after changing the mode.
+    * Gate the `/debug` route to dev builds; gate JVM `/debug/performance` behind `MADEK_EXPORTER_DEBUG=1` (Electron `:dev` sets it).
+    * Strip prod Closure `out_*` dirs and source maps on every prod cljs path (`bin/build-electron-prod`, JVM prod build, and Cider-CI); fail CI on security-audit findings.
+    * Harden preload `openPath` and refuse export targets under system path prefixes; quiet JVM library logging for production (`madek.exporter` stays at `:info`).
+    * Merge Help “About” with version, release link, runtime versions, and supported operating systems into one TOC section.
+    * Add auth/path unit tests, optional prod Electron Playwright smoke, and wire them into Cider-CI / `bin/test-login`.
+    * Scan resolved Clojure dependencies with `bin/clj-osv-scan`; gate CI on OSV findings via `bin/security-audit` (npm audit remains informational).
+    * Prod Electron main process: resolve `app-dir` for asar, nested, and sibling layouts; random JVM listen port and password unless `MADEK_E2E=1`.
+    * Keep Export disabled until the selected API mode (`api`, `api-v2`, or `both`) is available on the connected server.
+    * Sync `package.json` / `package-lock.json` / `project.clj` versions from `releases.yml` via `bin/update-releases`; add a manual macOS `bin/notarize-mac` helper.
+    * Remove dead root `clj_http` / `madek/exporter` leftovers; extract prefix-options into its own JVM namespace.
+
+    Notes
+    -----
+
+    * Same packaging, toolchain, and platform notes as 0.11.1.
+    * After pulling, rebuild Electron and JVM (`bin/build-electron-dev`, `bin/build-jvm-main-dev`) so preload auth injection, Help, and logging changes are picked up.
+
+####### 0.11.2 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 2
   version_pre: 3
   version_build: NULL
   name: NULL
