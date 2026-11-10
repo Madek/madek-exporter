@@ -49,9 +49,19 @@
     (.log js/console "stopping jvm-main-process")
     (.kill @jvm-main-process-child "SIGKILL")))
 
+;; Electron's fs reports files inside app.asar as existing, but java can't read them.
+(defn- inside-asar? [p]
+  (boolean (re-find #"\.asar([/\\]|$)" p)))
+
 (defn start []
   (let [jar-path (if (= env/env :prod)
-                   (.resolve path env/resources-dir "jvm-main.jar")
+                   (let [in-resources (.resolve path env/resources-dir "jvm-main.jar")
+                         in-app (.resolve path env/app-dir "jvm-main.jar")]
+                     (cond
+                       (.existsSync fs in-resources) in-resources
+                       (and (not (inside-asar? in-app))
+                            (.existsSync fs in-app)) in-app
+                       :else in-resources))
                    (.resolve path env/app-dir "jvm-main.jar"))
         java-path (resolve-java-path)]
     (.log js/console "starting jvm-main-process"

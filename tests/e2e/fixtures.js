@@ -101,13 +101,17 @@ async function setExportApiMode(page, mode) {
   await openApiModeMenu(page);
   const option = apiModeOption(page, mode);
   await expect(option).toBeVisible();
-  // Changing mode reconnects via POST /connect with the new api-mode.
+  // Mode picker persists via PATCH /connect/api-mode (no full reconnect).
   await Promise.all([
     page.waitForResponse(
-      (r) =>
-        /\/connect\/?$/.test(new URL(r.url()).pathname) &&
-        r.request().method() === 'POST' &&
-        r.ok(),
+      (r) => {
+        const path = new URL(r.url()).pathname;
+        return (
+          /\/connect\/api-mode\/?$/.test(path) &&
+          ['PATCH', 'POST'].includes(r.request().method()) &&
+          r.ok()
+        );
+      },
       { timeout: 30_000 }
     ),
     option.click(),

@@ -121,6 +121,7 @@ fi
 
 ELECTRON_VERSION=$(node -p "require('./package.json').config.electronVersion")
 
+echo "[build-mac-os-arm64] packaging app/prod (mode=prod, asar) -> $OUTPUT_DIR"
 npx @electron/packager \
   --overwrite --platform=darwin --arch=arm64 --electron-version="$ELECTRON_VERSION" --asar \
   --icon=Madek.icns \

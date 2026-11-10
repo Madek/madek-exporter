@@ -184,7 +184,9 @@
                                  (io/file (System/getProperty "user.home"))))
             tmp-path (.getPath (.getCanonicalFile
                                 (io/file (System/getProperty "java.io.tmpdir"))))]
-        (when (blocked-target-path? abs-path)
+        (when (and (not (under-dir? home-path abs-path))
+                   (not (under-dir? tmp-path abs-path))
+                   (blocked-target-path? abs-path))
           (throw (ex-info "Refusing to export into a system directory."
                           {:type :invalid-target-directory :path abs-path})))
         (when (.isFile abs)

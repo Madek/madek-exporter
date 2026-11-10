@@ -34,6 +34,7 @@ else
   echo "Skipping Windows app icon (need Madek.ico + wine); packaging with default Electron icon"
 fi
 
+echo "[build-win] packaging app/prod (mode=prod, asar) -> $OUTPUT_DIR"
 npx @electron/packager \
   "${PACKAGER_ARGS[@]}" \
   ./app/prod madek-exporter

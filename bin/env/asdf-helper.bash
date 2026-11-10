@@ -96,6 +96,11 @@ function asdf-update-plugin () {
     echo "# ${CACHE_ID} env check via asdf $(asdf --version)"
     CACHE_FILE="${TMPDIR}asdf_cache_${CACHE_ID}"
 
+    if [[ -z "$(resolved-tool-version "$PLUGIN" "$(tool-name-for-mise "$PLUGIN")")" ]]; then
+      echo "# ${CACHE_ID} no version pinned in .tool-versions/mise.toml; skipping asdf install"
+      return 0
+    fi
+
     if cache-needs-update "$CACHE_FILE"; then
       if asdf plugin list | grep -q "$PLUGIN"; then
         echo "asdf $PLUGIN found: updating"

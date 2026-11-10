@@ -10,6 +10,42 @@ process.env.FAKE_MADEK_API_TEST_URL =
   process.env.FAKE_MADEK_API_TEST_URL || `http://127.0.0.1:${FAKE_PORT}`;
 process.env.MADEK_E2E = process.env.MADEK_E2E || '1';
 
+// One project per scope; login only runs once the app shell itself works.
+// These rely on dev-only UI (e.g. the Debug page), so they never run against app/prod.
+const devProjects = [
+  { name: 'setup', testMatch: /setup\.spec\.js$/ },
+  {
+    name: 'login',
+    testMatch: /login\.spec\.js$|connected\.spec\.js$/,
+    dependencies: ['setup'],
+  },
+  {
+    name: 'export-from-api',
+    testMatch: /export-from-api\.spec\.js$|prefix\.spec\.js$/,
+    dependencies: ['setup'],
+    timeout: 120_000,
+  },
+  {
+    name: 'api-mode-endpoints',
+    testMatch: /api-mode-endpoints\.spec\.js$/,
+    dependencies: ['setup'],
+    timeout: 120_000,
+  },
+  {
+    name: 'export-from-both-apis',
+    testMatch: /export-from-both-apis\.spec\.js$/,
+    dependencies: ['setup'],
+    timeout: 120_000,
+  },
+];
+
+// Opt-in via MADEK_E2E_PROD=1; skipped otherwise.
+const prodSmokeProject = {
+  name: 'prod-smoke',
+  testMatch: /prod-smoke\.spec\.js$/,
+  timeout: 240_000,
+};
+
 /** @type {import('@playwright/test').PlaywrightTestConfig} */
 module.exports = {
   globalSetup: path.join(__dirname, 'tests/e2e/global-setup.js'),
@@ -35,31 +71,6 @@ module.exports = {
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  // One project per scope; login only runs once the app shell itself works.
-  projects: [
-    { name: 'setup', testMatch: /setup\.spec\.js$/ },
-    {
-      name: 'login',
-      testMatch: /login\.spec\.js$|connected\.spec\.js$/,
-      dependencies: ['setup'],
-    },
-    {
-      name: 'export-from-api',
-      testMatch: /export-from-api\.spec\.js$|prefix\.spec\.js$/,
-      dependencies: ['setup'],
-      timeout: 120_000,
-    },
-    {
-      name: 'api-mode-endpoints',
-      testMatch: /api-mode-endpoints\.spec\.js$/,
-      dependencies: ['setup'],
-      timeout: 120_000,
-    },
-    {
-      name: 'export-from-both-apis',
-      testMatch: /export-from-both-apis\.spec\.js$/,
-      dependencies: ['setup'],
-      timeout: 120_000,
-    },
-  ],
+  projects:
+    process.env.MADEK_E2E_APP === 'prod' ? [prodSmokeProject] : [...devProjects, prodSmokeProject],
 };
