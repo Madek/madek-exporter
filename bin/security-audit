@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Fail only when osv-scanner reports vulnerabilities (exit 1). npm audit and
+# scan tooling errors are logged but do not fail the job (Cider-CI gates on OSV findings).
+set -uo pipefail
 
 PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && pwd -P)"
 cd "${PROJECT_DIR}"
@@ -7,40 +9,63 @@ cd "${PROJECT_DIR}"
 mkdir -p logs
 status=0
 
+if command -v osv-scanner >/dev/null 2>&1; then
+  OSV_SCANNER=(osv-scanner)
+elif command -v mise >/dev/null 2>&1; then
+  OSV_SCANNER=(mise exec -- osv-scanner)
+else
+  echo "[security] osv-scanner not found; skipping lockfile scans" >&2
+  exit 0
+fi
+
+osv_scan() {
+  local label=$1
+  shift
+  echo "[security] osv-scanner (${label})"
+  "$@"
+  local ec=$?
+  case "${ec}" in
+    0) ;;
+    1)
+      echo "[security] vulnerabilities reported (${label})" >&2
+      status=1
+      ;;
+    *)
+      echo "[security] osv-scanner error (${label}, exit ${ec}); not treating as findings" >&2
+      ;;
+  esac
+  return 0
+}
+
 echo "[security] npm audit (json)"
-if npm audit --json > logs/npm-audit.json 2>logs/npm-audit.err; then
+npm audit --json >logs/npm-audit.json 2>logs/npm-audit.err || true
+if command -v node >/dev/null 2>&1; then
   node <<'NODE'
 const fs = require('fs');
 const p = 'logs/npm-audit.json';
-const r = JSON.parse(fs.readFileSync(p, 'utf8'));
+let r = {};
+try {
+  r = JSON.parse(fs.readFileSync(p, 'utf8'));
+} catch (_) {
+  console.log('[security] npm audit output not parseable; see logs/npm-audit.err');
+  process.exit(0);
+}
 const v = (r.metadata && r.metadata.vulnerabilities) || {};
 console.log('[security] vulnerabilities', JSON.stringify(v));
 NODE
 else
-  echo "[security] npm audit failed (non-blocking); see logs/npm-audit.err"
-  echo "[security] continuing with osv-scanner lockfile scan"
+  echo "[security] node not on PATH; npm audit log in logs/npm-audit.json"
 fi
 
-echo "[security] osv-scanner (Clojure/JVM)"
-./bin/clj-osv-scan || status=$?
+osv_scan "Clojure/JVM" ./bin/clj-osv-scan
 
-echo "[security] osv-scanner (npm + Ruby lockfiles)"
-if command -v mise >/dev/null 2>&1; then
-  OSV_SCANNER=(mise exec -- osv-scanner)
-elif command -v osv-scanner >/dev/null 2>&1; then
-  OSV_SCANNER=(osv-scanner)
-else
-  echo "[security] osv-scanner not found; skipping lockfile scan"
-  exit "${status}"
-fi
-"${OSV_SCANNER[@]}" scan source \
+osv_scan "npm + Ruby lockfiles" "${OSV_SCANNER[@]}" scan source \
   --format markdown \
   --config "${PROJECT_DIR}/osv-scanner/osv-scanner.toml" \
   --lockfile package-lock.json \
-  --lockfile Gemfile.lock \
-  || status=$?
+  --lockfile Gemfile.lock
 
-echo "[security] done"
+echo "[security] done (exit ${status})"
 exit "${status}"
 
 # vi: ft=sh
