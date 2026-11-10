@@ -19,18 +19,39 @@ PROJECT_DIR="$(cd -- "$(dirname "${BASH_SOURCE}")" ; cd .. > /dev/null 2>&1 && p
 DEPS_JSON=$(mktemp "${TMPDIR:-/tmp}/clj-osv-scan.XXXXXX")
 
 cleanup() {
-  rm -f "${DEPS_JSON}"
+  rm -f "${DEPS_JSON}" "${LEIN_LOG:-}"
 }
 trap cleanup EXIT
 
 cd "${PROJECT_DIR}"
 
+# Cider-CI provides Leiningen on PATH but JDK 8/11; project needs 21+ (with-java21).
+# ./bin/lein requires asdf/mise, which the security-audit job does not provide.
+LEIN_LOG=$(mktemp "${TMPDIR:-/tmp}/clj-osv-scan-lein.XXXXXX")
+run_lein() {
+  if [ -x "${PROJECT_DIR}/bin/with-java21" ]; then
+    "${PROJECT_DIR}/bin/with-java21" lein "$@"
+  elif command -v lein >/dev/null 2>&1; then
+    lein "$@"
+  else
+    "${PROJECT_DIR}/bin/lein" "$@"
+  fi
+}
+
 # Resolve runtime deps (exclude :dev so cljs/guava build-only deps are omitted),
 # then convert Leiningen `[group/artifact "version"]` lines to osv-scanner's
 # JSON lockfile format. Artifacts without a group become group:artifact
 # (Leiningen convention). Git-sha based deps are skipped (not in Maven).
-./bin/lein with-profile -dev deps :tree 2>/dev/null | \
-  sed -n 's/.*\[\([^][:space:]]*\) "\([^"]*\)".*/\1 \2/p' | \
+set +o pipefail
+run_lein with-profile -dev deps :tree >"${LEIN_LOG}" 2>&1
+lein_status=$?
+set -o pipefail
+if [ "${lein_status}" -ne 0 ]; then
+  echo "[security] clojure/jvm scan skipped (lein deps :tree exit ${lein_status})" >&2
+  tail -n 20 "${LEIN_LOG}" >&2 || true
+  exit 0
+fi
+sed -n 's/.*\[\([^][:space:]]*\) "\([^"]*\)".*/\1 \2/p' "${LEIN_LOG}" | \
   awk '
     BEGIN { printf "{\"results\":[{\"packages\":["; first=1 }
     NF < 2 { next }
@@ -49,21 +70,25 @@ cd "${PROJECT_DIR}"
     END { printf "]}]}\n" }
   ' > "${DEPS_JSON}"
 
-# Prefer mise-managed osv-scanner (see mise.toml); fall back to PATH.
-if command -v mise >/dev/null 2>&1; then
-  OSV_SCANNER=(mise exec -- osv-scanner)
-elif command -v osv-scanner >/dev/null 2>&1; then
+# Prefer PATH osv-scanner (Cider-CI installs a release binary); then mise.
+if command -v osv-scanner >/dev/null 2>&1; then
   OSV_SCANNER=(osv-scanner)
+elif command -v mise >/dev/null 2>&1; then
+  OSV_SCANNER=(mise exec -- osv-scanner)
 else
   echo "osv-scanner not found. Install via: mise install   (pinned in mise.toml)" >&2
   echo "  or: brew install osv-scanner" >&2
   exit 127
 fi
 
+set +e
 "${OSV_SCANNER[@]}" scan source \
   --format markdown \
   --config "${PROJECT_DIR}/osv-scanner/osv-scanner.toml" \
   --lockfile "osv-scanner:${DEPS_JSON}" \
   "$@"
+osv_ec=$?
+set -e
+exit "${osv_ec}"
 
 # vi: ft=sh

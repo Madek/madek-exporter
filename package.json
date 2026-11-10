@@ -51,6 +51,8 @@
   },
   "overrides": {
     "brace-expansion": "^5.0.12",
-    "@xmldom/xmldom": "^0.9.12"
+    "@xmldom/xmldom": "^0.9.12",
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1"
   }
 }
