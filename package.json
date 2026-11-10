@@ -1,6 +1,6 @@
 {
   "name": "madek-exporter",
-  "version": "0.11.2-3",
+  "version": "0.11.2",
   "description": "Desktop exporter for Madek media archives",
   "scripts": {
     "ci:node": "./bin/with-node22",
