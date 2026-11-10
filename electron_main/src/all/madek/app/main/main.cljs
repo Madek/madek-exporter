@@ -2,6 +2,7 @@
   (:require
     [cljs.nodejs :as nodejs]
 
+    [madek.app.main.env]
     [madek.app.main.jvm-auth]
     [madek.app.main.jvm-main-process]
     [madek.app.main.file-logger :as file-log]
@@ -49,6 +50,11 @@
 
 (.log js/console "__dirname" (js* "__dirname"))
 
+(defn- start-message []
+  (str "Start Madek application on " (.type Os)
+       " (mode: " (name madek.app.main.env/env)
+       ", app-dir: " madek.app.main.env/app-dir ")."))
+
 (defn -main []
   (when-let [user-data-dir (some-> nodejs/process .-env (aget "MADEK_USER_DATA_DIR") not-empty)]
     (.setPath app "userData" user-data-dir))
@@ -58,7 +64,7 @@
       (file-log/log! "WARN" "Another instance already running; quitting")
       (.quit app))
     (do
-      (file-log/log! "INFO" (str "Start Madek application on " (.type Os) "."))
+      (file-log/log! "INFO" (start-message))
       (file-log/log! "INFO" "GPU disabled (disableHardwareAcceleration, disable-gpu, in-process-gpu)")
       (when (and (= (.-platform nodejs/process) "linux")
                  (linux-needs-no-sandbox?))
@@ -95,6 +101,6 @@
 
 (nodejs/enable-util-print!)
 
-(.log js/console (str "Start Madek application on " (.type Os) "."))
+(.log js/console (start-message))
 
 (set! *main-cli-fn* -main)

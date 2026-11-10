@@ -78,8 +78,9 @@
     (.once window "ready-to-show" ensure-shown)
     (.once (.-webContents window) "did-finish-load" ensure-shown)
     (js/setTimeout ensure-shown 2000)
-    (.on (.-webContents window) "dom-ready"
+    (.on (.-webContents window) "did-finish-load"
          (fn []
+           ;; After front.js runs (dom-ready is too early — init IPC was lost).
            ;; Password stays in main (webRequest injection); renderer only gets the port.
            (.send (.-webContents window) "madek:jvm-sync:init"
                   (clj->js {:jvm-port env/jvm-port}))

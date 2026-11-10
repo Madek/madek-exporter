@@ -112,6 +112,44 @@
   []
   (connect!))
 
+(def connection* (reaction (-> @state/jvm-main-db :connection)))
+
+(def connected?*
+  (reaction (and (-> @connection* :url presence boolean)
+                 (or (-> @connection* :email_address presence boolean)
+                     (-> @connection* :login presence boolean)))))
+
+(defn- selected-api-mode []
+  (keyword
+   (or (:api-mode @form-data)
+       (:api-mode @connection*)
+       :api)))
+
+(defn- current-api-status []
+  (:api-status @connection*))
+
+(defn- api-probe-available? [probe]
+  (boolean (or (:available probe) (get probe "available"))))
+
+(defn- api-mode-available? [api-status mode]
+  (if-not api-status
+    false
+    (let [mode (keyword (or mode :api))
+          probe (fn [k]
+                  (api-probe-available?
+                   (or (get api-status k) (get api-status (name k)) {})))]
+      (case mode
+        :api (probe :api)
+        :api-v2 (probe :api-v2)
+        :both (and (probe :api) (probe :api-v2))
+        false))))
+
+(def selected-api-mode-available?*
+  (reaction (api-mode-available? (current-api-status) (selected-api-mode))))
+
+(def export-ready?*
+  (reaction (and @connected?* @selected-api-mode-available?*)))
+
 (defn set-api-mode!
   "Persist the picker choice on the existing JVM session (no re-auth)."
   [mode]
@@ -263,44 +301,6 @@
        (i18n/t :connection/continue-export)]]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def connection* (reaction (-> @state/jvm-main-db :connection)))
-
-(def connected?*
-  (reaction (and (-> @connection* :url presence boolean)
-                 (or (-> @connection* :email_address presence boolean)
-                     (-> @connection* :login presence boolean)))))
-
-(defn- selected-api-mode []
-  (keyword
-   (or (:api-mode @form-data)
-       (:api-mode @connection*)
-       :api)))
-
-(defn- current-api-status []
-  (:api-status @connection*))
-
-(defn- api-probe-available? [probe]
-  (boolean (or (:available probe) (get probe "available"))))
-
-(defn- api-mode-available? [api-status mode]
-  (if-not api-status
-    false
-    (let [mode (keyword (or mode :api))
-          probe (fn [k]
-                  (api-probe-available?
-                   (or (get api-status k) (get api-status (name k)) {})))]
-      (case mode
-        :api (probe :api)
-        :api-v2 (probe :api-v2)
-        :both (and (probe :api) (probe :api-v2))
-        false))))
-
-(def selected-api-mode-available?*
-  (reaction (api-mode-available? (current-api-status) (selected-api-mode))))
-
-(def export-ready?*
-  (reaction (and @connected?* @selected-api-mode-available?*)))
 
 (defn can-access-download? []
   (let [download (-> @state/jvm-main-db :download)]
