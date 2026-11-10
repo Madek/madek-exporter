@@ -24,7 +24,7 @@
   []
   (swap! generation inc))
 
-(defn- aborted? [gen]
+(defn aborted? [gen]
   (not= gen @generation))
 
 (defn- throw-unless-current! [gen]

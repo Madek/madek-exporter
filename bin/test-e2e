@@ -42,7 +42,7 @@ export PLAYWRIGHT_FORCE_TTY="${PLAYWRIGHT_FORCE_TTY:-0}"
 
 APP_MODE="${MADEK_E2E_APP:-dev}"
 if [[ "$APP_MODE" == "prod" ]]; then
-  if [[ ! -f app/prod/js/front.js || ! -f app/prod/js/main.js || ! -f app/prod/jvm-main.jar || ! -f app/prod/preload.js ]]; then
+  if [[ ! -f app/prod/js/front.js || ! -f app/prod/js/main.js || ! -f app/prod/jvm-main.jar || ! -f app/prod/css/site.css || ! -f app/prod/preload.js ]]; then
     echo "[test-e2e] building prod electron artifacts..." >&2
     ./bin/build-electron-prod
     ./bin/build-jvm-main-prod
@@ -53,6 +53,11 @@ elif [[ ! -f app/dev/js/front.js || ! -f app/dev/js/main.js || ! -f app/dev/jvm-
 fi
 
 NPX="$(npx_cmd)"
+
+# `playwright test -- <file>` ignores the file filter and runs every project.
+if [[ "${1:-}" == "--" ]]; then
+  shift
+fi
 
 if [[ "$(uname -s)" == "Linux" && -z "${DISPLAY:-}" ]]; then
   echo "[test-e2e] no DISPLAY; running under xvfb-run" >&2

@@ -11,6 +11,7 @@
    [madek.exporter.export.meta-keys :as export-meta-keys]
    [madek.exporter.perf-log :as perf-log]
    [madek.exporter.request-log :as request-log]
+   [madek.exporter.server.prefix-options :as prefix-options]
    [madek.exporter.server.web :as web]
    [madek.exporter.state :as state]
    ))
@@ -251,7 +252,7 @@
 (deftest prefix-options-lists-title-with-folder-name
   (connect-fake!)
   (step1-entry!)
-  (let [{:keys [status body]} (web/prefix-options {})
+  (let [{:keys [status body]} (prefix-options/handler {})
         title (some #(when (= "madek_core:title" (:meta_key_id %)) %) (:options body))
         subtitle (some #(when (= "madek_core:subtitle" (:meta_key_id %)) %) (:options body))]
     (is (= 200 status))
@@ -300,7 +301,7 @@
    (assert-prefix-options-paths! expected-api {}))
   ([expected-api request]
    (clear-fake-requests!)
-   (let [{:keys [status body]} (web/prefix-options request)
+   (let [{:keys [status body]} (prefix-options/handler request)
          after-prefix (fake-request-paths)
          title (some #(when (= "madek_core:title" (:meta_key_id %)) %)
                      (:options body))]
@@ -359,7 +360,7 @@
     (is (some #(string/includes? % "collections") after-step1)
         "set step1 uses /api/collections"))
   (clear-fake-requests!)
-  (let [{:keys [status]} (web/prefix-options {})
+  (let [{:keys [status]} (prefix-options/handler {})
         after-prefix (fake-request-paths)]
     (is (= 200 status))
     (assert-paths-for-api! :api after-prefix "set prefix-options")))
@@ -368,7 +369,7 @@
   (connect-fake! :api-mode :api-v2)
   (step1-set!)
   (clear-fake-requests!)
-  (let [{:keys [status body]} (web/prefix-options {})
+  (let [{:keys [status body]} (prefix-options/handler {})
         after-prefix (fake-request-paths)]
     (is (= 200 status))
     (is (= 2 (count (:options body))))
@@ -420,15 +421,15 @@
     (is (some #(and (api-v2-path? %) (string/includes? % "media-entries")) paths))))
 
 (deftest prefix-options-without-step1
-  (is (= 409 (:status (web/prefix-options {})))))
+  (is (= 409 (:status (prefix-options/handler {})))))
 
 (deftest continuing-to-step-3-aborts-prefix-options
-  (let [gen (web/abort-prefix-options!)]
-    (is (not (web/prefix-options-aborted? gen)))
+  (let [gen (prefix-options/abort!)]
+    (is (not (prefix-options/aborted? gen)))
     (is (= 204 (:status (web/patch-download {:body {:recursive true}}))))
-    (is (not (web/prefix-options-aborted? gen)))
+    (is (not (prefix-options/aborted? gen)))
     (is (= 204 (:status (web/patch-download {:body {:step2-completed true}}))))
-    (is (web/prefix-options-aborted? gen)))
-  (let [gen (web/abort-prefix-options!)]
+    (is (prefix-options/aborted? gen)))
+  (let [gen (prefix-options/abort!)]
     (is (= 204 (:status (web/patch-download {:body {:step1-completed false}}))))
-    (is (web/prefix-options-aborted? gen))))
+    (is (prefix-options/aborted? gen))))

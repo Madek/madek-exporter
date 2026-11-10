@@ -4,6 +4,8 @@ set -euo pipefail
 # Combined prod cljsbuild for main + front (used by `npm run build:electron:prod`).
 # Keep post-compile strip in sync with bin/build-electron-{front,main}-prod and CI.
 
+echo "[build-electron-prod] mode=prod (advanced compilation) -> app/prod"
+
 rm -rf \
   app/prod/js/out_main \
   app/prod/js/out_front \
@@ -26,3 +28,7 @@ rm -rf \
   app/prod/js/front.js.map
 
 ./bin/build-stylesheets-prod
+
+for f in app/prod/js/main.js app/prod/js/front.js app/prod/css/site.css; do
+  echo "[build-electron-prod] built $f ($(wc -c <"$f" | tr -d ' ') bytes)"
+done

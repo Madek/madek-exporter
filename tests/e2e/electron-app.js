@@ -112,6 +112,8 @@ async function launchMadekExporter() {
   });
   // The JVM cold-starts in the background; the UI can't reach it until then.
   await waitForPort(jvmPort, 150_000);
+  const page = await app.firstWindow();
+  await waitForFrontReady(page, attachPageDiagnostics(page));
   return { app, jvmPort };
 }
 

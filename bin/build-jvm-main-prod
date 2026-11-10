@@ -6,4 +6,5 @@ ${PROJECT_DIR}/bin/env/lein-setup
 ${PROJECT_DIR}/bin/env/clojure-setup
 ${PROJECT_DIR}/bin/env/java-setup
 
+echo "[build-jvm-main-prod] mode=prod: lein uberjar -> app/prod/jvm-main.jar"
 lein uberjar
