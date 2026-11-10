@@ -60,7 +60,7 @@ jobs:
                 fi
                 # Fail the job on audit findings (exit 1). Use osv-scanner.toml
                 # ignores for accepted exceptions.
-                ./bin/security-audit
+                ./bin/with-java21 ./bin/security-audit
 
   tests:
     name: All tests
