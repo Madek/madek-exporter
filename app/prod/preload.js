@@ -7,7 +7,7 @@
  * IMPORTANT: do not expose as `window.madek` — that collides with the CLJS
  * namespace root `madek.app.front.*` and breaks goog.provide under :none.
  */
-const { contextBridge, ipcRenderer, shell } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 function on(channel, handler) {
   const listener = (_event, ...args) => handler(...args);
@@ -30,23 +30,12 @@ contextBridge.exposeInMainWorld('madekBridge', {
   chooseDirectory(defaultPath) {
     return ipcRenderer.invoke('madek:choose-directory', defaultPath || '');
   },
+  // `shell` is unavailable in sandboxed preloads (prod); main validates and opens.
   openExternal(url) {
-    if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url)) {
-      return shell.openExternal(url);
-    }
-    return Promise.reject(new Error('Blocked non-http(s) openExternal'));
+    return ipcRenderer.invoke('madek:open-external', url);
   },
   openPath(dir) {
-    // Only absolute paths without traversal — used to reveal the export target.
-    const absolute =
-      typeof dir === 'string' &&
-      dir.length > 0 &&
-      !dir.includes('..') &&
-      (dir.startsWith('/') || /^[A-Za-z]:[\\/]/.test(dir));
-    if (absolute) {
-      return shell.openPath(dir);
-    }
-    return Promise.reject(new Error('Blocked unsafe openPath'));
+    return ipcRenderer.invoke('madek:open-path', dir);
   },
   onJvmSyncInit(handler) {
     return on('madek:jvm-sync:init', handler);

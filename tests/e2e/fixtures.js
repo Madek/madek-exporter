@@ -420,6 +420,7 @@ module.exports = {
   expectRejected,
   expectConnected,
   openExportPage,
+  runExportWizard,
   exportFakeMediaEntry,
   exportFakeSet,
   expectExportDownloadLogCount,

@@ -48,3 +48,6 @@
   (or (when (e2e?)
         (some-> js/process .-env (aget "MADEK_JVM_PASSWORD") not-empty))
       (uuid/make-random-uuid)))
+
+(def debug-enabled?
+  (= "1" (some-> js/process .-env (aget "MADEK_EXPORTER_DEBUG"))))
