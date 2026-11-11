@@ -1,3 +1,28 @@
+####### 0.11.3 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 3
+  version_pre: 1
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Fix opening external links and the “Open Finder / Explorer / file manager” button in prod builds: the sandboxed preload has no `shell`, so it now asks the Electron main process to open them (same http(s)/mailto and absolute-path checks).
+    * Show the Debug page (State, App logs) in prod builds too.
+    * Show the Debug “Performance” tab and enable JVM `/debug/performance` only when the app is started with `MADEK_EXPORTER_DEBUG=1` (always on in dev builds).
+    * Prod Playwright smoke: verify that clicking a Help link and the Open Finder button reach Electron `shell`, that unsafe links/paths are rejected, and that the Performance tab follows `MADEK_EXPORTER_DEBUG`.
+
+    Notes
+    -----
+
+    * Same packaging, toolchain, and platform notes as 0.11.2.
+    * Enable performance debugging on macOS with e.g. `open --env MADEK_EXPORTER_DEBUG=1 -a /path/to/madek-exporter.app`.
+
 ####### 0.11.2 ######################################################################
 
 - version_major: 0
