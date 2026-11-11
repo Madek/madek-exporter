@@ -22,7 +22,8 @@
                {:nodejs-version (.-version nodejs/process)
                 :package-json package-json
                 :latest-release (first releases) }
-               :jvm-process {:port env/jvm-port}}))
+               :jvm-process {:port env/jvm-port}
+               :debug-enabled env/debug-enabled?}))
 
 (js/setInterval #(swap! db assoc :timestamp (.now js/Date)) 1000)
 

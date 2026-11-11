@@ -10,8 +10,6 @@
     [madek.app.front.utils :refer [str keyword deep-merge]]
 
     [madek.app.front.bridge :as bridge]
-    [madek.app.front.env :as env]
-
     [accountant.core :as accountant]
     [reagent.core :as reagent :refer [atom]]
     [secretary.core :as secretary :include-macros true :refer [defroute]]
@@ -124,8 +122,7 @@
     (list
       ^{:key "connection"} [burger-page "/connection" (i18n/t :nav/connection) false]
       ^{:key "export"} [burger-page "/download" (i18n/t :nav/export) (not export-ready?)]
-      (when (= env/env :dev)
-        ^{:key "debug"} [burger-page "/debug" (i18n/t :nav/debug) false])
+      ^{:key "debug"} [burger-page "/debug" (i18n/t :nav/debug) false]
       ^{:key "help"} [burger-page "/help" (i18n/t :nav/help) false]
       [:li.divider.burger-page {:key "pages-divider" :role "separator"}])))
 
@@ -198,8 +195,7 @@
      [:ul.nav.navbar-nav.navbar-pages
       [nav-item "/connection" (i18n/t :nav/connection)]
       [export-nav-item]
-      (when (= env/env :dev)
-        [nav-item "/debug" (i18n/t :nav/debug)])
+      [nav-item "/debug" (i18n/t :nav/debug)]
       [nav-item "/help" (i18n/t :nav/help)]]]]])
 
 (defn navigation []

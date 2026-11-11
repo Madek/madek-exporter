@@ -5,7 +5,6 @@
     [madek.app.front.connection]
     [madek.app.front.debug]
     [madek.app.front.download]
-    [madek.app.front.env :as env]
     [madek.app.front.help]
     [madek.app.front.state]
 
@@ -29,10 +28,9 @@
       (reset! madek.app.front.state/current-path "/download"))
     (accountant/navigate! "/connection")))
 
-(when (= env/env :dev)
-  (defroute debug-page "/debug" []
-    (reset! madek.app.front.state/current-page madek.app.front.debug/page)
-    (reset! madek.app.front.state/current-path "/debug")))
+(defroute debug-page "/debug" []
+  (reset! madek.app.front.state/current-page madek.app.front.debug/page)
+  (reset! madek.app.front.state/current-path "/debug"))
 
 (defroute help-page "/help" []
   (reset! madek.app.front.state/current-page madek.app.front.help/page)

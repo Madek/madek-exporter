@@ -28,4 +28,6 @@
   (or (some-> js/process .-env (aget "MADEK_JVM_PASSWORD") not-empty)
       "secret"))
 
+(def debug-enabled? true)
+
 

@@ -6,6 +6,7 @@
     [cljs-uuid-utils.core :as uuid]
     [cljs.nodejs :as nodejs]
     [clojure.set :refer [difference]]
+    [clojure.string]
 
 
     [timothypratley.patchin :as patchin]
@@ -20,6 +21,8 @@
 (def dialog (.-dialog Electron))
 
 (def ipcMain (.-ipcMain Electron))
+
+(def shell (.-shell Electron))
 
 (def windows (atom {}))
 
@@ -48,8 +51,24 @@
              (when-not (.-canceled result)
                (aget (.-filePaths result) 0))))))
 
+(defn- open-external [_event url]
+  (if (and (string? url) (re-find #"(?i)^(https?:|mailto:)" url))
+    (.openExternal shell url)
+    (js/Promise.reject (js/Error. "Blocked non-http(s) openExternal"))))
+
+(defn- open-path [_event dir]
+  (if (and (string? dir)
+           (not= dir "")
+           (not (clojure.string/includes? dir ".."))
+           (or (clojure.string/starts-with? dir "/")
+               (re-find #"^[A-Za-z]:[\\/]" dir)))
+    (.openPath shell dir)
+    (js/Promise.reject (js/Error. "Blocked unsafe openPath"))))
+
 (defn init-ipc []
-  (.handle ipcMain "madek:choose-directory" choose-directory))
+  (.handle ipcMain "madek:choose-directory" choose-directory)
+  (.handle ipcMain "madek:open-external" open-external)
+  (.handle ipcMain "madek:open-path" open-path))
 
 (defn open-new []
   (let [id (-> (uuid/make-random-uuid) uuid/uuid-string)

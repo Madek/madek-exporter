@@ -69,9 +69,10 @@
                     :jar-path jar-path}))
     (file-log/log! "INFO" "starting jvm-main-process" {:javaPath java-path :jarPath jar-path})
     (let [spawn-env (js/Object.assign #js {} (.-env js/process))]
-      (when (= env/env :dev)
+      (if env/debug-enabled?
         ;; Enables JVM /debug/performance for the Electron Debug tab.
-        (aset spawn-env "MADEK_EXPORTER_DEBUG" "1"))
+        (aset spawn-env "MADEK_EXPORTER_DEBUG" "1")
+        (js-delete spawn-env "MADEK_EXPORTER_DEBUG"))
       (reset! jvm-main-process-child
               (.spawn child-process java-path
                       (clj->js ["-jar" jar-path

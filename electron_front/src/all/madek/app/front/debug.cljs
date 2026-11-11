@@ -240,15 +240,17 @@
     label]])
 
 (defn content []
-  [:div
-   [:ul.nav.nav-tabs {:style {:margin-bottom "1em"}}
-    [tab :state (i18n/t :debug/state)]
-    [tab :logs (i18n/t :debug/app-logs)]
-    [tab :performance (i18n/t :debug/performance)]]
-   (case @active-tab*
-     :logs [logs-content]
-     :performance [performance-content]
-     [state-content])])
+  (let [perf? (:debug-enabled @state/electron-main-db)]
+    [:div
+     [:ul.nav.nav-tabs {:style {:margin-bottom "1em"}}
+      [tab :state (i18n/t :debug/state)]
+      [tab :logs (i18n/t :debug/app-logs)]
+      (when perf?
+        [tab :performance (i18n/t :debug/performance)])]
+     (case @active-tab*
+       :logs [logs-content]
+       :performance (if perf? [performance-content] [state-content])
+       [state-content])]))
 
 (defn page []
   [:div.page.debug
