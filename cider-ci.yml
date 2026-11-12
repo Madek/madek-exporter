@@ -1,6 +1,6 @@
 jobs:
   check-releases-file-is-up-to-date:
-    name: Check if releases.json and package versions are up to date
+    name: Check if app/prod/releases.json is up to date
     run_when:
       on any branch:
         type: branch
