@@ -12,6 +12,10 @@
     Fixes and Features
     ------------------
 
+    * Fix opening external links and the “Open Finder / Explorer / file manager” button in prod builds: the sandboxed preload has no `shell`, so it now asks the Electron main process to open them (same http(s)/mailto and absolute-path checks).
+    * Show the Debug page (State, App logs) in prod builds too.
+    * Show the Debug “Performance” tab and enable JVM `/debug/performance` only when the app is started with `MADEK_EXPORTER_DEBUG=1` (always on in dev builds).
+    * Prod Playwright smoke: verify that clicking a Help link and the Open Finder button reach Electron `shell`, that unsafe links/paths are rejected, and that the Performance tab follows `MADEK_EXPORTER_DEBUG`.
     * Export step 2: prefix meta-key picker as a dropdown (load/refresh prefix options, filter, live example tree) with “replace spaces with `-`” and “initials only” checkboxes beneath the control.
     * Apply `prefix_dashes` and `prefix_initials` when building export folder names on the JVM; small api-v2 export follow-up.
     * Connection: sign-in info popover links to Help login variants and opens the Madek token overview in the browser; click the Madek base-URL label to prefill the default host.
@@ -22,7 +26,8 @@
     Notes
     -----
 
-    * Same packaging, toolchain, and platform notes as 0.11.3-1.
+    * Same packaging, toolchain, and platform notes as 0.11.2.
+    * Enable performance debugging on macOS with e.g. `open --env MADEK_EXPORTER_DEBUG=1 -a /path/to/madek-exporter.app`.
     * Rebuild the Electron front after pulling (`bin/build-electron-dev`) for Sass and ClojureScript changes.
 
 ####### 0.11.3 ######################################################################
