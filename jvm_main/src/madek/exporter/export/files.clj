@@ -2,6 +2,7 @@
   (:require
    [cheshire.core :as cheshire]
    [clojure.java.io :as io]
+   [clojure.string :as string]
    [clojure.tools.logging :as logging]
    [json-roa.client.core :as roa]
    [logbug.catcher :as catcher]
@@ -31,14 +32,30 @@
   "Keep letters, digits, and spaces in a folder-name prefix."
   (.replaceAll (str s) "[^a-zA-Z0-9 ]" ""))
 
+(defn format-prefix
+  "useableFileName plus the step-2 options: `prefix_initials` keeps only the
+  first char of each word without spaces, `prefix_dashes` replaces runs of
+  spaces with `-` (combined: initials joined by `-`)."
+  ([s] (format-prefix s (select-keys (:download @state/db)
+                                     [:prefix_initials :prefix_dashes])))
+  ([s {:keys [prefix_initials prefix_dashes]}]
+   (let [s (useableFileName s)]
+     (cond
+       prefix_initials (->> (string/split (string/trim s) #"\s+")
+                            (remove empty?)
+                            (map first)
+                            (string/join (if prefix_dashes "-" "")))
+       prefix_dashes (string/replace (string/trim s) #"\s+" "-")
+       :else s))))
+
 (defn path-prefix [prefix-meta-key media-resource]
-  "Folder name: sanitized meta-key value plus id, `_` plus id when the key is
+  "Folder name: formatted meta-key value plus id, `_` plus id when the key is
   set but empty, or the bare id when no prefix key is selected."
   (let [id (-> media-resource roa/data :id)]
     (if-not (presence prefix-meta-key)
       (str id)
       (if-let [v (presence (get-prefix prefix-meta-key media-resource))]
-        (str (useableFileName v) "_" id)
+        (str (format-prefix v) "_" id)
         (str "_" id)))))
 
 ;### Progress-aware copy ######################################################

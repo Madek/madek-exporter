@@ -310,7 +310,7 @@
       (i18n/t :connection/sign-in-login)]]]
    [login-form-component]
    [token-form-component]
-   [:div.form-group.pull-right
+   [:div.form-group.action-buttons
     [:button.btn.btn-primary
      (merge {:on-click connect}
             (when (not @form-is-valid)
@@ -319,23 +319,21 @@
 
 (defn continue-form []
   (let [export-ready? @export-ready?*]
-    [:div.form
-     [:div.pull-left
-      [:button.btn.btn-warning
-       {:on-click disconnect}
-       (i18n/t :connection/disconnect)]]
-     [:div.pull-right
-      [:a.btn.btn-primary
-       (merge {:href "/download"
-               :on-click (fn [e]
-                           (when-not export-ready?
-                             (.preventDefault e)))}
-              (when-not export-ready?
-                {:class "disabled"
-                 :aria-disabled "true"
-                 :tabIndex -1
-                 :title (i18n/t :connection/api-mode-unavailable-warn)}))
-       (i18n/t :connection/continue-export)]]]))
+    [:div.form.action-buttons
+     [:button.btn.btn-link
+      {:on-click disconnect}
+      (i18n/t :connection/disconnect)]
+     [:a.btn.btn-primary
+      (merge {:href "/download"
+              :on-click (fn [e]
+                          (when-not export-ready?
+                            (.preventDefault e)))}
+             (when-not export-ready?
+               {:class "disabled"
+                :aria-disabled "true"
+                :tabIndex -1
+                :title (i18n/t :connection/api-mode-unavailable-warn)}))
+      (i18n/t :connection/continue-export)]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -486,12 +484,13 @@
              [:span.sr-only warn]]))]]]]))
 
 (defn status-icon-component []
-  (let [connected? @connected?*]
+  (let [connected? @connected?*
+        hint (if connected?
+               (i18n/t :connection/disconnect-hint)
+               (i18n/t :connection/not-connected))]
     [:li.connection-status
      [:a {:href "#"
-          :title (if connected?
-                   (i18n/t :connection/disconnect-hint)
-                   (i18n/t :connection/not-connected))
+          :aria-label hint
           :on-click (fn [e]
                       (.preventDefault e)
                       (if connected?
@@ -499,7 +498,8 @@
                         (accountant/navigate! "/connection")))}
       [:span.glyphicon.glyphicon-link
        {:class (if connected? "text-success" "text-danger")
-        :aria-hidden "true"}]]]))
+        :aria-hidden "true"}]]
+     [:span.connection-status-tooltip {:aria-hidden "true"} hint]]))
 
 (defn connection-status-component []
   [:div.connection.status

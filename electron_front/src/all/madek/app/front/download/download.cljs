@@ -528,15 +528,13 @@
   (connection/disconnect))
 
 (defn dismiss-component []
-  [:div.dismiss
-   [:div.form.pull-left
-    [:button.btn.btn-primary
-     {:on-click clear-export-steps}
-     (i18n/t :download/back-new-export) ]]
-   [:div.form.pull-right
-    [:button.btn.btn-warning
-     {:on-click disconnect}
-     (i18n/t :connection/disconnect) ]]])
+  [:div.dismiss.action-buttons
+   [:button.btn.btn-link
+    {:on-click disconnect}
+    (i18n/t :connection/disconnect) ]
+   [:button.btn.btn-primary
+    {:on-click clear-export-steps}
+    (i18n/t :download/back-new-export) ]])
 
 (defn downloaded-component []
   [:div

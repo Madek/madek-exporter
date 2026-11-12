@@ -63,7 +63,7 @@
                            (:value md)))
                        meta-data))
         prefix-part (if (presence (some-> prefix str))
-                      (str (files/useableFileName (str prefix)) "_")
+                      (str (files/format-prefix (str prefix)) "_")
                       "")]
     (str prefix-part resource-id)))
 

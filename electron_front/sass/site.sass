@@ -73,6 +73,30 @@ pre
     .navbar-status
       order: 2
 
+      > .connection-status
+        position: relative
+
+        > .connection-status-tooltip
+          display: none
+          position: absolute
+          top: 100%
+          left: 50%
+          transform: translateX(-50%)
+          z-index: $zindex-navbar-fixed + 10
+          padding: 4px 8px
+          font-size: 12px
+          line-height: 1.4
+          color: #fff
+          white-space: nowrap
+          background: #000
+          border-radius: 4px
+          pointer-events: none
+
+        &:hover,
+        &:focus-within
+          > .connection-status-tooltip
+            display: block
+
     .navbar-pages
       order: 3
 
@@ -638,6 +662,16 @@ pre
       &.depth-3
         padding-left: 3.75em
 
+    .prefix-format-options
+      margin: 1.25em 0
+      margin-left: 25px
+
+      .checkbox
+        margin: 0
+
+        & + .checkbox
+          margin-top: 0.4em
+
     .prefix-help-toggle
       margin-top: 0.75em
 
@@ -835,6 +869,51 @@ pre
   .dismiss
     margin-top: 2em
     clear: both
+
+.action-buttons
+  $save-green-top: #8fbb45
+  $save-green-bottom: #6b9a2b
+  $save-green-border: #5a8424
+
+  display: flex
+  justify-content: center
+  align-items: center
+  gap: 1.25em
+  clear: both
+
+  > .btn-link
+    padding-left: 0
+    padding-right: 0
+
+  > .btn-primary
+    color: #fff
+    background-color: $save-green-bottom
+    background-image: linear-gradient($save-green-top, $save-green-bottom)
+    border: 1px solid $save-green-border
+    border-radius: 3px
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25)
+
+    &:hover,
+    &:focus,
+    &:active,
+    &:active:hover,
+    &:active:focus
+      color: #fff
+      background-color: darken($save-green-bottom, 5%)
+      background-image: linear-gradient(darken($save-green-top, 5%), darken($save-green-bottom, 5%))
+      border-color: darken($save-green-border, 5%)
+
+    &:active
+      box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.2)
+
+    &.disabled,
+    &[disabled]
+      &,
+      &:hover,
+      &:focus
+        background-color: $save-green-bottom
+        background-image: linear-gradient($save-green-top, $save-green-bottom)
+        border-color: $save-green-border
 
 .glyphicon.spinning
   animation: spin 1s linear infinite
