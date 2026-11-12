@@ -136,12 +136,11 @@
                 [:section.form
                  [url-input-component]
                  [target-dir-input-component]
-                 [:div.form-actions.clearfix
-                  [:div.pull-left
-                   [:a.btn.btn-info
-                    {:href "/connection"}
-                    (i18n/t :download/back-connection)]]
-                  [:button.btn.btn-primary.pull-right
+                 [:div.form-actions.action-buttons
+                  [:a.btn.btn-link
+                   {:href "/connection"}
+                   (i18n/t :download/back-connection)]
+                  [:button.btn.btn-primary
                    (merge
                      {:on-click submit}
                      (when (not @form-valid?*) {:disabled true}))

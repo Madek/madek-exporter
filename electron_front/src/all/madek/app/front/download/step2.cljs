@@ -47,7 +47,8 @@
              :json-params (assoc
                             (select-keys
                               @form-data*
-                              [:prefix_meta_key :recursive :skip_media_files])
+                              [:prefix_meta_key :prefix_dashes :prefix_initials
+                               :recursive :skip_media_files])
                             :step2-completed true)
              :path "/download"}]
     (request/send-off
@@ -209,6 +210,28 @@
     (cond->> (filter (partial matches-filter? term) (:options @prefix-options*))
       @only-with-value* (filter #(presence (:value %))))))
 
+(defn- usable-file-name [s]
+  "Same rule as JVM useableFileName: keep a–z A–Z 0–9 and spaces."
+  (clojure.string/replace (str s) #"[^a-zA-Z0-9 ]" ""))
+
+(defn- format-prefix
+  "Same rule as JVM format-prefix, driven by the step-2 checkboxes."
+  [s]
+  (let [{:keys [prefix_initials prefix_dashes]} @form-data*
+        s (usable-file-name s)]
+    (cond
+      prefix_initials (->> (clojure.string/split (clojure.string/trim s) #"\s+")
+                           (remove empty?)
+                           (map first)
+                           (clojure.string/join (if prefix_dashes "-" "")))
+      prefix_dashes (clojure.string/replace (clojure.string/trim s) #"\s+" "-")
+      :else s)))
+
+(defn- option-folder-name [option]
+  (if-let [v (presence (:value option))]
+    (str (format-prefix v) "_" (entity-id))
+    (str "_" (entity-id))))
+
 (defn- prefix-option-row [option selected?]
   [:tr {:class (when selected? "info")
         :role "option"
@@ -222,7 +245,7 @@
    [:td.prefix-value {:title (:value option)}
     (or (:value option)
         [:span.text-muted (i18n/t :download/available-prefixes-no-value)])]
-   [:td.folder-name [:code (:folder_name option)]]])
+   [:td.folder-name [:code (option-folder-name option)]]])
 
 (defn- prefix-options-status-icon [status]
   (case status
@@ -303,13 +326,9 @@
           ^{:key (:meta_key_id option)}
           [prefix-option-row option (= selected (:meta_key_id option))])]]]]))
 
-(defn- usable-file-name [s]
-  "Same rule as JVM useableFileName: keep a–z A–Z 0–9 and spaces."
-  (clojure.string/replace (str s) #"[^a-zA-Z0-9 ]" ""))
-
 (defn- selected-folder-name []
   (if-let [option (selected-option)]
-    (or (:folder_name option) (str "_" (entity-id)))
+    (option-folder-name option)
     (entity-id)))
 
 (defn- name-with-prefix [folder-name]
@@ -356,7 +375,7 @@
 
 (defn- prefix-help-details []
   (let [value (presence (:value (selected-option)))
-        cleaned (when value (usable-file-name value))]
+        cleaned (when value (format-prefix value))]
     [:div.prefix-help-details
      [:p.help-block (i18n/t :download/prefix-sanitize-help)]
      (when (and value (not= value cleaned))
@@ -411,6 +430,19 @@
   (when (= "Escape" (.-key e))
     (reset! prefix-dropdown-open* false)))
 
+(defn- prefix-format-checkbox [k label]
+  [:div.checkbox
+   [:label
+    [:input {:type :checkbox
+             :checked (boolean (get @form-data* k))
+             :on-change #(set-value k (not (get @form-data* k)))}]
+    " " (i18n/t label)]])
+
+(defn- prefix-format-options []
+  [:div.prefix-format-options
+   [prefix-format-checkbox :prefix_dashes :download/prefix-dashes]
+   [prefix-format-checkbox :prefix_initials :download/prefix-initials]])
+
 (defn- prefix-picker-render []
   (let [status (:status @prefix-options*)
         loaded? (= :loaded status)
@@ -444,6 +476,7 @@
        [:span.glyphicon.glyphicon-refresh {:aria-hidden "true"}]]]
      (when open?
        [prefix-dropdown-menu])
+     [prefix-format-options]
      [prefix-example-component]
      [prefix-help-toggle]]))
 
@@ -479,16 +512,13 @@
    [recursive-component]
    [prefix-component]
    [skip-media-files-component]
-   [:div.form-actions
-    [:div.pull-left
-     [:button.btn.btn-info
-      {:on-click back}
-      (i18n/t :download/back-step1) ]]
-    [:div.pull-right
-     [:button.btn.btn-primary
-      {:on-click submit}
-      (i18n/t :download/continue-step3) ]]
-    [:div.clearfix]]])
+   [:div.form-actions.action-buttons
+    [:button.btn.btn-link
+     {:on-click back}
+     (i18n/t :download/back-step1) ]
+    [:button.btn.btn-primary
+     {:on-click submit}
+     (i18n/t :download/continue-step3) ]]])
 
 (defn debug-component []
   (when (:debug @state/client-db)

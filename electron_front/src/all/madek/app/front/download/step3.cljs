@@ -45,16 +45,13 @@
      ]))
 
 (defn form-component []
-  [:div.form-actions
-   [:div.pull-left
-    [:button.btn.btn-info
-     {:on-click back}
-     (i18n/t :download/back-step2) ]]
-   [:div.pull-right
-    [:button.btn.btn-primary
-     {:on-click submit}
-     (i18n/t :download/start-export) ]]
-   [:div.clearfix]])
+  [:div.form-actions.action-buttons
+   [:button.btn.btn-link
+    {:on-click back}
+    (i18n/t :download/back-step2) ]
+   [:button.btn.btn-primary
+    {:on-click submit}
+    (i18n/t :download/start-export) ]])
 
 (defn main-component []
   [:div.download-form
