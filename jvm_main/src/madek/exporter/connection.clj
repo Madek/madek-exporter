@@ -370,6 +370,7 @@
                      (merge
                       (select-keys connect-body [:url])
                       {:http-options http-options
+                       :sign-in-method (if (and login password) :login :token)
                        :auth-info auth-info
                        :api-status api-status
                        :api-mode api-mode
