@@ -7,6 +7,8 @@ pre
   white-space: pre-wrap
 
 .navbar.navbar-inverse
+  $zhdk-logo-height: 32px
+
   margin-bottom: 0
   border-radius: 0
 
@@ -48,7 +50,7 @@ pre
 
         > .zhdk-logo
           display: block
-          height: 20px
+          height: $zhdk-logo-height
           width: auto
 
         &.navbar-brand-logo
@@ -82,7 +84,12 @@ pre
       order: 5
 
   @media (max-width: $grid-float-breakpoint-max)
+    $zhdk-logo-height-wrap: 40px
+    $zhdk-logo-width-wrap: $zhdk-logo-height-wrap * 75 / 32
+    $zhdk-logo-column: calc(15px + #{$zhdk-logo-width-wrap} + 0.25em)
+
     > .navbar-bar
+      position: relative
       flex-wrap: wrap
 
       > .navbar-line
@@ -92,12 +99,33 @@ pre
         min-width: 0
 
       > .navbar-line-pages
-        padding-left: 74px
+        padding-left: $zhdk-logo-column
+
+        .navbar-pages > li:first-child > a
+          padding-left: 0
+
+      .navbar-brand.navbar-brand-logo
+        position: absolute
+        left: 15px
+        top: 50%
+        transform: translateY(-50%)
+        z-index: 1
+        width: $zhdk-logo-width-wrap
+        height: auto
+        padding: 0
+        margin: 0
+        display: flex
+        justify-content: center
+        align-items: center
+
+        > .zhdk-logo
+          height: $zhdk-logo-height-wrap
 
       .navbar-header
         flex: 1 1 auto
         min-width: 0
         order: 0
+        padding-left: $zhdk-logo-column
 
         > .navbar-brand:not(.navbar-brand-logo)
           display: block
@@ -106,6 +134,7 @@ pre
           overflow: hidden
           text-overflow: ellipsis
           white-space: nowrap
+          padding-left: 0
 
       .navbar-status,
       .navbar-burger,
@@ -372,6 +401,36 @@ pre
 
     .glyphicon.text-danger
       color: #a94442
+
+.page.connection .sign-in-info
+  position: relative
+  display: inline-block
+  margin-left: 0.4em
+  font-weight: normal
+
+  > .glyphicon
+    color: #337ab7
+    cursor: pointer
+
+  .sign-in-info-panel
+    position: absolute
+    top: 100%
+    left: -0.5em
+    z-index: 1000
+    min-width: 16em
+    padding-top: 0.35em
+
+    ul
+      margin: 0
+      padding: 0.6em 0.9em
+      background: #fff
+      border: 1px solid #ccc
+      border-radius: 4px
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15)
+
+    li
+      white-space: nowrap
+      padding: 0.15em 0
 
 .page.connection .api-mode-picker
   width: 100%

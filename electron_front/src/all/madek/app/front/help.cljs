@@ -5,6 +5,7 @@
     [madek.app.front.breadcrumb :as breadcrumb]
     [madek.app.front.i18n :as i18n]
     [madek.app.front.bridge :as bridge]
+    [madek.app.front.state :as state]
     [reagent.core :as reagent]
     ))
 
@@ -36,12 +37,24 @@
                     (bridge/open-external url))}
     label]))
 
+(def ^:private default-madek-url "https://medienarchiv.zhdk.ch")
+
+(def login-variants-id "help-login-variants")
+
+(defn tokens-url []
+  (let [base (or (some-> @state/jvm-main-db :connection :url string/trim not-empty)
+                 (some-> @state/client-db :connection :form :url string/trim not-empty)
+                 default-madek-url)]
+    (str (string/replace base #"/+$" "") "/my/tokens")))
+
 (defn login-variants-component []
-  [:div.login-variants {:id "help-login-variants"}
+  [:div.login-variants {:id login-variants-id}
    [:h4 (i18n/t :help/login-variants)]
+   [:p (i18n/t :help/api-v2-token-only)]
+   [:p (i18n/t :help/tokens-link) [external-link (tokens-url)]]
    [:h5 (i18n/t :help/sign-in-token)]
    [:ul
-    [:li [:code "api-token"] " only"]]
+    [:li [:code "api-token"] (i18n/t :help/api-token-v2-note)]]
    [:h5 (i18n/t :help/sign-in-login)]
    [:ul
     [:li [:code "login/api-token"]]
@@ -165,7 +178,7 @@
 
 (def ^:private toc-sections
   [[about/section-id :about/title about/section]
-   ["help-login-variants" :help/login-variants login-variants-component]
+   [login-variants-id :help/login-variants login-variants-component]
    [prefix-examples-id :help/prefix-examples prefix-examples-component]
    ["help-references" :help/references references-component]
    ["help-contact" :help/contact kontakt-component]])

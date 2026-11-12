@@ -2,6 +2,8 @@
   (:refer-clojure :exclude [str keyword])
   (:require
     [madek.app.front.breadcrumb :as breadcrumb]
+    [madek.app.front.bridge :as bridge]
+    [madek.app.front.help :as help]
     [madek.app.front.utils :refer [str keyword deep-merge presence]]
     [madek.app.front.i18n :as i18n]
     [madek.app.front.request :as request]
@@ -209,10 +211,44 @@
      :on-change #(update-form-data-value
                    :url (-> % .-target .-value presence))}]])
 
+(defn- sign-in-info []
+  (let [open?* (reagent/atom false)]
+    (fn []
+      (let [label (i18n/t :connection/sign-in-info)]
+        [:span.sign-in-info
+         {:on-mouse-enter #(reset! open?* true)
+          :on-mouse-leave #(reset! open?* false)}
+         [:span.glyphicon.glyphicon-info-sign
+          {:tab-index 0
+           :role "button"
+           :aria-label label
+           :aria-expanded @open?*
+           :on-focus #(reset! open?* true)
+           :on-blur #(reset! open?* false)}]
+         (when @open?*
+           [:div.sign-in-info-panel
+            [:ul.list-unstyled
+             [:li
+              [:a {:href "/help"
+                   :on-mouse-down #(.preventDefault %)
+                   :on-click (fn [e]
+                               (.preventDefault e)
+                               (reset! help/scroll-to* help/login-variants-id)
+                               (accountant/navigate! "/help"))}
+               (str (i18n/t :help/title) " / " (i18n/t :help/login-variants))]]
+             [:li
+              (let [url (help/tokens-url)]
+                [:a {:href url
+                     :on-mouse-down #(.preventDefault %)
+                     :on-click (fn [e]
+                                 (.preventDefault e)
+                                 (bridge/open-external url))}
+                 (i18n/t :connection/tokens-overview)])]]])]))))
+
 (defn login-form-component []
   (when (= @sign-in-method* :login)
     [:div.form-group
-     [:label {:for "login"} (i18n/t :connection/login-label)]
+     [:label {:for "login"} (i18n/t :connection/login-label) [sign-in-info]]
      [:input.login.form-control
       {:type "text"
        :placeholder (i18n/t :connection/login-placeholder)
@@ -230,7 +266,8 @@
       (case @sign-in-method*
         :token (i18n/t :connection/api-token)
         :login (i18n/t :connection/password)
-        (i18n/t :connection/oops))]
+        (i18n/t :connection/oops))
+      (when (= @sign-in-method* :token) [sign-in-info])]
      [:div.input-group
       [:input.password.form-control
        {:type (if show-password? "text" "password")
@@ -439,7 +476,14 @@
         (i18n/t :connection/connected-to-prefix) [:code (-> @connection* :url)]
         [:br]
         (i18n/t :connection/connected-as) [:code [:em auth-type]] " "
-        [:em user] "."]]]]))
+        [:em user] "."
+        (when (= :login (some-> @connection* :sign-in-method keyword))
+          (let [warn (i18n/t :connection/login-api-v2-warn)]
+            [:span.login-api-v2-warn.text-warning
+             {:title warn
+              :style {:margin-left "0.5em" :cursor "help"}}
+             [:span.glyphicon.glyphicon-warning-sign {:aria-hidden "true"}]
+             [:span.sr-only warn]]))]]]]))
 
 (defn status-icon-component []
   (let [connected? @connected?*]
