@@ -50,7 +50,9 @@
 (defn login-variants-component []
   [:div.login-variants {:id login-variants-id}
    [:h4 (i18n/t :help/login-variants)]
-   [:p (i18n/t :help/api-v2-token-only)]
+   [:p (i18n/t :help/api-v2-token-only-before)
+    [:strong (i18n/t :help/api-v2-token-only-emphasis)]
+    (i18n/t :help/api-v2-token-only-after)]
    [:p (i18n/t :help/tokens-link) [external-link (tokens-url)]]
    [:h5 (i18n/t :help/sign-in-token)]
    [:ul

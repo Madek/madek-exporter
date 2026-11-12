@@ -3,6 +3,33 @@
 - version_major: 0
   version_minor: 11
   version_patch: 3
+  version_pre: 
+  version_build: NULL
+  name: NULL
+
+  description: |
+
+    Fixes and Features
+    ------------------
+
+    * Export step 2: prefix meta-key picker as a dropdown (load/refresh prefix options, filter, live example tree) with “replace spaces with `-`” and “initials only” checkboxes beneath the control.
+    * Apply `prefix_dashes` and `prefix_initials` when building export folder names on the JVM; small api-v2 export follow-up.
+    * Connection: sign-in info popover links to Help login variants and opens the Madek token overview in the browser; click the Madek base-URL label to prefill the default host.
+    * Help references: product home, wiki, API browser, and GitHub releases; refresh login/token copy and styling.
+    * Export wizard action buttons and prefix-picker layout (align format options under the dropdown).
+    * i18n: align prefix/API-mode help with DE/EN; update FR/IT/ES/ZH (including Debug Performance strings).
+
+    Notes
+    -----
+
+    * Same packaging, toolchain, and platform notes as 0.11.3-1.
+    * Rebuild the Electron front after pulling (`bin/build-electron-dev`) for Sass and ClojureScript changes.
+
+####### 0.11.3 ######################################################################
+
+- version_major: 0
+  version_minor: 11
+  version_patch: 3
   version_pre: 1
   version_build: NULL
   name: NULL
